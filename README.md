@@ -2,6 +2,9 @@
 
 > One sentence: **[Name] helps [user] at [bank] do [task] in [minutes] instead of [hours], with a human in control.**
 
+> **Note:** the stack is not decided yet. It will be chosen on 11 Nov once the challenge is announced.
+> The Python skeleton below is only a placeholder and gets replaced if we pick something else.
+
 Built in 32 hours at **Futury Build Days #4 — Banking & Finance** (Frankfurt, 11–12 Nov 2026).
 Challenge: _TBD (Deutsche Bank / Deutsche Börse Group / Helaba)_
 
