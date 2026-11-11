@@ -50,6 +50,7 @@ def convert_gz_to_csv(
     return converted_files
 
 
+
 if __name__ == "__main__":
     convert_gz_to_csv(
         input_dir="Data/XETRA_TES_OFFBOOK_TRADES",
