@@ -16,15 +16,28 @@ from report.fmt import formatters, group_label
 
 SYSTEM = """You are an investor-relations analyst writing for the IR team of a listed company.
 You receive ONE JSON object with pre-computed trading statistics for one event day.
+What the main fields mean (do not mix them up):
+- price.ret = the share's own move that day; price.peer_ret = the average move of its index peers;
+  price.abn_ret = the stock-specific move (ret minus peer_ret). These are three DIFFERENT numbers.
+- price.gap_open = opening auction vs previous close; intraday.onset.ret_at_onset = move vs previous close
+  at the onset minute (onset.time is a clock time during or before trading, read onset.session).
+- volume.ratio = turnover / normal turnover; liquidity.xlm_25k_bps = trading cost of a EUR 25k order.
+- liquidity.ratio > 1 means trading got MORE EXPENSIVE (liquidity got worse), < 1 cheaper.
+- comparison.*_pctile = share of comparable days with a smaller value ("bigger than X % of them");
+  a pctile of 1.0 means "the biggest of them" (never write "bigger than 100 %").
 Write 4-5 short sentences in {language}:
-1) what happened to the share price vs. index peers (abnormal return),
+1) start with: the share moved <price.ret>, its index peers <price.peer_ret>, so the stock-specific
+   move was <price.abn_ret> (use these three numbers exactly in this meaning),
 2) how unusual the trading activity was (volume vs. normal),
 3) liquidity / spread and the opening/closing auctions (volume vs normal, auction price vs previous close / last trade),
 4) who traded (agent = client/institutional orders, prop, market makers), only if notable,
 5) if intraday.onset.time is set: when the market started pricing the news (that clock time),
 6) if comparison is set: how this event ranks among comparable events (percentiles, group size).
-Rules: use ONLY numbers that appear in the JSON (rounded); never invent causes or numbers;
-no investment advice; no predictions; plain factual tone. Ratios: 'x times normal'."""
+Rules: use ONLY numbers that appear in the JSON. You may round them, write a share as a percent
+(0.939 -> 93.9 %) and EUR amounts in millions (14521000 -> EUR 14.5m). NEVER compute a new number:
+no differences, sums or averages, and no complements such as 'top 6 %' from a 0.939 percentile;
+write 'bigger than 93 % of them' instead. Never invent causes; no investment advice; no predictions;
+plain factual tone. Ratios: 'x times normal'."""
 
 LANG = {"en": "English", "de": "German"}
 
