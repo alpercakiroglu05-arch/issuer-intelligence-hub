@@ -86,7 +86,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
   - Shown as percentiles of stock-specific move, turnover and trading cost against normal, plus the rank.
 
 ### AI and export
-- **Summary text (DE/EN):** the model gets only the card JSON and is told to use only its numbers, never invent causes, and give no advice. A template produces the same structure without a model.
+- **Summary text (DE/EN):** the model gets only the card JSON and is told to use only its numbers, never invent causes, and give no advice. A **numbers check** (`ai/checks.py`) then compares every figure in the text with the JSON, allowing for percent, EUR m and rounding. Any unknown figure means the template text is shown instead, and the card says which one it is. Model: an open model through the JAIF gateway (OpenAI-compatible), swappable in `.env`. Answers are cached so the live demo does not depend on the network.
 - **Assistant (v1):** answers IR questions from the stock's KPIs and unusual days.
 - **IR snapshot:** the card plus the summary as HTML and PDF.
 
@@ -121,7 +121,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
   - **Turnover cohort:** a size proxy, the top, middle or bottom third by median turnover over the last 60 days.
   - Market capitalisation is not in the data, so the size groups are turnover-based, not market-cap-based.
   - The impact card's abnormal return still uses index peers.
-- **AI text:** the LLM endpoint was not connected during development, so texts came from templates. An automatic check that every number in the text exists in the JSON is planned.
+- **AI text:** the numbers check catches invented figures with decimals or large values; a small integer could match an unrelated value by chance. Without a model key the texts come from templates.
 
 ## 5. What else IR teams need, and which data
 

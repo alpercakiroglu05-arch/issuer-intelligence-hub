@@ -13,7 +13,7 @@ import pandas as pd  # noqa: E402
 import plotly.graph_objects as go  # noqa: E402
 import streamlit as st  # noqa: E402
 
-from ai.narrate import narrate  # noqa: E402
+from ai.narrate import narrate_with_meta  # noqa: E402
 from components import render_card, setup  # noqa: E402
 from engine import baseline, data  # noqa: E402
 from engine.impact import impact_card  # noqa: E402
@@ -46,12 +46,20 @@ render_card(card)
 
 
 @st.cache_data(show_spinner="Writing summary…")
-def text(card_json: str, lang: str) -> str:
-    return narrate(json.loads(card_json), lang)
+def text(card_json: str, lang: str) -> dict:
+    return narrate_with_meta(json.loads(card_json), lang)
 
 
-summary = text(json.dumps(card, default=str), lang)
+note = text(json.dumps(card, default=str), lang)
+summary = note["text"]
 st.info(summary)
+if note["source"] == "llm":
+    st.caption(f"✍️ Written by {note['model']} (open model via JAIF) · every number checked against the data above")
+elif note["rejected"]:
+    st.caption("Template text: the model's draft contained numbers that are not in the data "
+               f"({', '.join(note['rejected'][:5])}), so it was not shown.")
+else:
+    st.caption("Template text (no language model connected)")
 
 # Intraday chart (appears once C1 has built data/intraday_bars.parquet)
 bars = data.intraday(isin)

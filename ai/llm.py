@@ -9,8 +9,12 @@ Providers (set in .env, see .env.example):
 
 The demo never breaks: without a key every AI feature falls back to templates.
 
-TODO C4: disk cache for answers (LLM_CACHE) so the live demo survives Wi-Fi/API outages.
+Answer cache (LLM_CACHE, default on): every answer is stored in data/llm_cache.json, keyed by model + messages.
+The same question is answered from the cache, so the live demo survives Wi-Fi or API outages and is fast.
+Run each demo scenario once beforehand to fill it. Set LLM_CACHE=false to always ask the model.
 """
+import hashlib
+import json
 import os
 from types import SimpleNamespace
 
@@ -43,10 +47,56 @@ def available() -> bool:
         return False
 
 
+def model_name() -> str:
+    p = _provider()
+    return os.getenv("LLM_MODEL") or {"anthropic": "claude-sonnet-5-5"}.get(p, "gpt-4o-mini")
+
+
+def _cache_path():
+    return config.DATA_DIR / "llm_cache.json"
+
+
+def _cache_key(messages, temperature) -> str:
+    raw = json.dumps([_provider(), model_name(), temperature, messages], sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _cache_on() -> bool:
+    return os.getenv("LLM_CACHE", "true").lower() not in ("0", "false", "no")
+
+
+def _cache_get(k: str):
+    try:
+        return json.loads(_cache_path().read_text(encoding="utf-8")).get(k)
+    except (OSError, ValueError):
+        return None
+
+
+def _cache_put(k: str, content: str) -> None:
+    try:
+        p = _cache_path()
+        d = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        d[k] = content
+        p.write_text(json.dumps(d, ensure_ascii=False, indent=0), encoding="utf-8")
+    except (OSError, ValueError):
+        pass
+
+
 def chat(messages: list[dict], temperature: float = 0.2, **kwargs):
-    """Returns an object with .content (str) and .tool_calls (OpenAI providers only)."""
+    """Returns an object with .content (str) and .tool_calls (OpenAI providers only).
+    Plain answers (no tools) are cached when LLM_CACHE is on."""
     key, provider = _key(), _provider()
     model = os.getenv("LLM_MODEL")
+    ck = _cache_key(messages, temperature) if _cache_on() and not kwargs else None
+    if ck and (hit := _cache_get(ck)) is not None:
+        return SimpleNamespace(content=hit, tool_calls=None)
+    msg = _call(provider, key, model, messages, temperature, **kwargs)
+    if ck and getattr(msg, "content", None):
+        _cache_put(ck, msg.content)
+    return msg
+
+
+def _call(provider, key, model, messages, temperature, **kwargs):
 
     if provider == "anthropic":
         import anthropic

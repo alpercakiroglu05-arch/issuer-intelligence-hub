@@ -34,7 +34,7 @@
 
 ## Q&A: one-sentence answers
 
-- **Hallucinations?** Every number is computed in code, and the LLM sees only that JSON. Without a model the same text comes from a template. (An automatic check that rejects any number not in the JSON is planned; only claim it once C4 has merged it.)
+- **Hallucinations?** Every number is computed in code, and the model sees only that JSON. A numbers check then compares every figure in the model's text with the JSON; if one is not there, the model's text is thrown away and a template is shown. The card says which of the two you are reading. The model is an open model on European infrastructure (JAIF), and it can be swapped in one line.
 - **Which data?** Only Deutsche Börse exchange data plus public corporate calendars. No personal data.
 - **Is this investment advice / MAR?** No. It explains past trading, never predicts or recommends.
 - **Who buys it, what does it cost?** DB offers it in the Issuer Services Hub (free for Prime/General Standard, Scale); premium tier for deeper analytics.
