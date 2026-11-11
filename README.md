@@ -115,7 +115,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 
 ### C4 · AI + report. Owner: AskingAtlas
 Priorities from the demo dry run (Wed evening), in this order:
-- [ ] **Part A report** (brief: the dashboard result "can be exported as a short report"): a button on the dashboard, HTML/PDF, DE/EN, reusing `report/export.py`. Content: KPIs vs index/sector/size (`baseline.kpis()`), liquidity trend (`liquidity_trend()["summary"]`), episodes with linked events.
+- [x] **Part A report** (brief: the dashboard result "can be exported as a short report"): a button on the dashboard, HTML/PDF, DE/EN, reusing `report/export.py` (`part_a_html()`, done by C2). Content: KPIs vs index/sector/size (`baseline.kpis()`), liquidity trend (`liquidity_trend()["summary"]`), episodes with linked events.
 - [ ] **Assistant without LLM:** today `ask()` answers with a raw JSON dump when no key is set. Add a deterministic fallback for the typical questions:
   - liquidity → `liquidity_trend()` summary
   - spreads and peers → `kpis()` vs index/sector/size

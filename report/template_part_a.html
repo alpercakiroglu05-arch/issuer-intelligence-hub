@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<title>IR Report - {{ d.name }}</title>
+<style>
+  @page { size: A4; margin: 16mm; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #1a1a1a; font-size: 9.5pt; }
+  h1 { font-size: 16pt; margin: 0 0 2pt 0; }
+  h2 { font-size: 11.5pt; margin: 12pt 0 3pt 0; border-bottom: 0.5pt solid #ccc; padding-bottom: 2pt; }
+  .sub { color: #555; margin-bottom: 6pt; line-height: 1.4; }
+  .base { color: #666; font-size: 8pt; }
+  table.t { width: 100%; border-collapse: collapse; margin: 4pt 0; }
+  table.t th { text-align: left; background: #eef1f4; padding: 4pt; font-size: 8pt; border: 0.5pt solid #ccc; }
+  table.t td { padding: 4pt; border: 0.5pt solid #ccc; vertical-align: top; font-size: 8.5pt; }
+  td.num, th.num { text-align: right; }
+  .text { background: #f4f6f8; padding: 7pt; margin: 5pt 0; line-height: 1.4; }
+  .note { color: #8a5a00; font-size: 8.5pt; margin: 3pt 0; }
+  .foot { color: #888; font-size: 7.5pt; margin-top: 14pt; border-top: 0.5pt solid #ccc; padding-top: 4pt; }
+</style>
+</head>
+<body>
+  {# 1. Header #}
+  <h1>{{ d.name }} ({{ k.ticker }}, {{ k.index }})</h1>
+  <div class="sub">
+    {{ L.title }} &middot; ISIN {{ d.isin }}<br>
+    {{ L.sector }}: {% if k.peer_groups.sector.fallback %}n/a ({{ L.sector_unknown }}){% else %}{{ k.peer_groups.sector.name }}{% endif %}
+    &middot; {{ L.size }}: {{ size_word(k.peer_groups.size.name) }} <span class="base">({{ L.size_note }})</span><br>
+    {{ L.data }}: {{ d.period.start }} &ndash; {{ d.period.end }} ({{ d.period.days }} {{ L.days }})
+  </div>
+
+  {# 2. KPIs vs index / sector / size #}
+  <h2>{{ L.kpi_h }} <span class="base">&middot; {{ L.kpi_period }}</span></h2>
+  <table class="t">
+    <tr><th></th><th class="num">{{ L.stock }}</th><th class="num">{{ peer_label("index") }}</th>
+        <th class="num">{{ peer_label("sector") }}</th><th class="num">{{ peer_label("size") }}</th></tr>
+    {% for key, label, f in [("median_turnover_eur", L.turnover, eur), ("median_xlm_25k_bps", L.xlm, bps),
+                             ("median_auction_share", L.auction, pct0), ("median_agent_share", L.agent, pct0)] %}
+    <tr><td>{{ label }}</td><td class="num"><b>{{ f(k[key].stock) }}</b></td><td class="num">{{ f(k[key].index_median) }}</td>
+        <td class="num">{{ f(k[key].sector_median) }}</td><td class="num">{{ f(k[key].size_median) }}</td></tr>
+    {% endfor %}
+  </table>
+  {% if "small_peer_group" in k.flags %}<div class="note">{{ L.small_peer }}</div>{% endif %}
+  <div class="text"><b>{{ L.ds_h }}: {{ k.liquidity_check.category_estimate }}</b><br>
+    <span class="base">{{ L.ds_text.format(to=eur(k.liquidity_check.avg_turnover_eur_4m), xlm=bps(k.liquidity_check.median_xlm_25k_bps_4m)) }}</span></div>
+
+  {# 3. Liquidity trend #}
+  <h2>{{ L.trend_h }}</h2>
+  <table class="t">
+    <tr><th>{{ L.verdict }}</th><th></th><th class="num">{{ L.before }}</th><th class="num">{{ L.now }}</th><th class="num">{{ L.change }}</th></tr>
+    <tr><td rowspan="2"><b>{{ verdict or "n/a" }}</b>
+          {% if t.vs_index %}<br><span class="base">{{ L.vs_index }}: {{ vs_word[t.vs_index] }}</span>{% endif %}
+          {% if t.vs_sector %}<br><span class="base">{{ L.vs_sector }}: {{ vs_word[t.vs_sector] }}</span>{% endif %}</td>
+        <td>{{ L.xlm }}</td><td class="num">{{ bps(t.stock.xlm_25k_bps.before) }}</td>
+        <td class="num">{{ bps(t.stock.xlm_25k_bps.now) }}</td><td class="num">{{ pct(t.xlm_25k_change_pct) }}</td></tr>
+    <tr><td>{{ L.turnover }}</td><td class="num">{{ eur(t.stock.turnover_eur.before) }}</td>
+        <td class="num">{{ eur(t.stock.turnover_eur.now) }}</td><td class="num">{{ pct(t.turnover_change_pct) }}</td></tr>
+    <tr><td></td><td>{{ L.ds_cat }}</td><td class="num">{{ (t.ds_category or {}).before or "n/a" }}</td>
+        <td class="num">{{ (t.ds_category or {}).now or "n/a" }}</td><td></td></tr>
+  </table>
+  <div class="text">{{ summary }}<br><span class="base">{{ trend_help }}</span></div>
+
+  {# 4. Trading cost by order size #}
+  <h2>{{ L.curve_h }} <span class="base">&middot; {{ L.curve_period }} {{ peer_label(d.peer_by) }}</span></h2>
+  {% if cs.largest_absorbed_eur is none %}
+  <div class="note">{{ L.no_xlm }}</div>
+  {% else %}
+  <table class="t">
+    <tr><th></th><th class="num">{{ L.stock }}</th><th class="num">{{ peer_label(d.peer_by) }}</th></tr>
+    <tr><td>{{ L.largest }}</td><td class="num"><b>{{ label_eur(cs.largest_absorbed_label) }}</b></td>
+        <td class="num">{{ label_eur(cs.peer_largest_absorbed_label) }}</td></tr>
+    <tr><td>{{ L.cost_100k }}</td><td class="num"><b>{{ bps(cs.cost_100k_bps) }}</b></td><td class="num">{{ bps(cs.peer_cost_100k_bps) }}</td></tr>
+    <tr><td>{{ L.cost_1m }}</td><td class="num"><b>{% if cs.cost_1m_bps is none or cs.cost_1m_bps != cs.cost_1m_bps %}{{ L.thin }}{% else %}{{ bps(cs.cost_1m_bps) }}{% endif %}</b></td>
+        <td class="num">{{ bps(cs.peer_cost_1m_bps) }}</td></tr>
+  </table>
+  {% endif %}
+
+  {# 5. Unusual episodes #}
+  <h2>{{ L.ep_h }}</h2>
+  {% if not d.episodes %}
+  <div class="note">{{ L.no_ep }}</div>
+  {% else %}
+  <div class="base">{{ L.ep_note }}{% if d.n_episodes > d.episodes|length %} {{ L.shown.format(k=d.episodes|length, n=d.n_episodes) }}{% endif %}</div>
+  <table class="t">
+    <tr><th width="10%">{{ L.start }}</th><th width="10%">{{ L.end }}</th><th class="num" width="5%">{{ L.ndays }}</th>
+        <th width="27%">{{ L.event }}</th><th width="14%">{{ L.market }}</th><th width="12%">{{ L.reason }}</th>
+        <th class="num" width="8%">{{ L.peak }}</th><th class="num" width="8%">{{ L.total }}</th>
+        <th class="num" width="6%">{{ L.volx }}</th></tr>
+    {% for e in d.episodes %}
+    <tr><td>{{ e.start }}</td><td>{{ e.end }}</td><td class="num">{{ e.days }}</td><td>{{ e.event }}</td>
+        <td>{% for f in e.context %}{{ ctx_words.get(f, f) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+        <td>{% for r in e.reason %}{{ reason_word(r) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+        <td class="num">{{ pct(e.peak_abn_ret) }}</td><td class="num">{{ pct(e.total_abn_ret) }}</td>
+        <td class="num">{{ x(e.max_vol_ratio) }}</td></tr>
+    {% endfor %}
+  </table>
+  {% for word, help in ctx_help %}<div class="base"><b>{{ word }}</b>: {{ help }}</div>{% endfor %}
+  {% endif %}
+
+  {# 6. Footer #}
+  <div class="foot">{{ L.foot }}</div>
+</body>
+</html>
