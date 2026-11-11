@@ -92,8 +92,8 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [ ] Optional: Eurex single-stock options and futures open interest (`EUREX_OPEN_INTEREST_DYNAMICS_EQUITYINDEX`, join on `ISIN_UNDERLYING`) to show derivatives positioning before events
 
 ### C2 · Engine. Owner: ________
-- [ x] `engine/compare.py`: `same_type_events`, `percentile`, `sector_peers`. This fills `card["comparison"]`.
-- [ x] `impact.py`: refine the intraday block once bars exist (minutes to price discovery)
+- [ ] `engine/compare.py`: `same_type_events`, `percentile`, `sector_peers`. This fills `card["comparison"]`.
+- [ ] `impact.py`: refine the intraday block once bars exist (minutes to price discovery)
 - [ ] `baseline.py`: liquidity trend ("has liquidity improved?"), merge consecutive anomaly days
 - [ ] Unit tests: GXI 2026-02-11 should give ret ≈ −31.4 %, abnormal ≈ −30.5 %, volume ≈ 20× normal
 
