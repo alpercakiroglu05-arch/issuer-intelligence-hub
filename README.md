@@ -1,70 +1,145 @@
-# Project Name
+# Issuer Intelligence Hub
 
-> One sentence: **[Name] helps [user] at [bank] do [task] in [minutes] instead of [hours], with a human in control.**
+**Decode your share price: AI-powered Xetra trading insights for investor relations.**
+Futury Build Days 2026 · Deutsche Börse challenge "Issuer Intelligence Hub and corporate event impact tracker"
 
-> **Note:** the stack is not decided yet. It will be chosen on 11 Nov once the challenge is announced.
-> The Python skeleton below is only a placeholder and gets replaced if we pick something else.
+Mid- and small-cap IR teams cannot easily see how their own share trades or how the market reacted
+to their announcements. They have no terminal and no analyst, so they wait days for broker reports.
+This tool answers two questions with one click:
 
-Built in 32 hours at **Futury Build Days #4 — Banking & Finance** (Frankfurt, 11–12 Nov 2026).
-Challenge: _TBD (Deutsche Bank / Deutsche Börse Group / Helaba)_
+- **Part A, Dashboard: "How does our share normally trade?"** Turnover, trading cost (XLM spread), auctions, who trades, comparison with index peers, unusual days.
+- **Part B, Impact card: "What happened when we announced X?"** Move vs. peers, volume vs. normal, spread, auctions, participant flows and intraday reaction, exported as an IR snapshot (DE/EN).
 
-## Problem
+> **Design rule: numbers come from code, words come from the LLM.**
+> The engine computes every figure deterministically. The LLM only sees the resulting JSON and writes text.
+> Without an API key the app still runs on template texts.
 
-_Who is the user, what do they do today, what does it cost? One concrete number._
-
-## Solution
-
-_What the prototype does, in 3 bullets._
-
-- Reads [input] and extracts [what]
-- Flags [issues] with the exact evidence it is based on
-- A human approves, escalates or rejects; every step lands in an audit trail
+---
 
 ## Quick start
 
 ```bash
-git clone <REPO_URL> && cd <REPO>
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+git clone https://github.com/Bthn28/futury-build-days-2026 && cd futury-build-days-2026
+python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env               # Windows: copy .env.example .env
-
-streamlit run app/streamlit_app.py # demo UI  -> http://localhost:8501
-uvicorn api.main:app --reload      # REST API -> http://127.0.0.1:8000/docs
-pytest                             # smoke tests (mock mode, no API key needed)
+cp .env.example .env                                   # optional: add LLM key
 ```
 
-`LLM_PROVIDER=mock` works without any API key, so everyone can run the app from minute one.
-Switch to `anthropic` or `openai` in `.env` when a key is in place. `openai` also covers any
-OpenAI-compatible endpoint via `OPENAI_BASE_URL` (Mistral, a local model, an organiser endpoint).
+**Data.** Raw data is never in git. Copy the processed files into `data/` from the shared OneDrive folder:
+`daily_features.parquet`, `universe.csv` (and later `intraday_bars.parquet`).
 
-## How it works
-
-```text
-input (PDF / text) -> core/documents.py   extract text
-                   -> core/pipeline.py    LLM returns structured JSON with quoted evidence
-                   -> app/ or api/        human decision: approve / escalate / reject
-                   -> core/audit.py       every AI output and decision logged (.cache/audit_log.jsonl)
+```bash
+streamlit run app/Home.py      # demo UI -> http://localhost:8501
+pytest                         # smoke tests (data tests skip if data/ is empty)
 ```
 
-| Folder | What lives there |
-| --- | --- |
-| `app/` | Streamlit demo UI |
-| `api/` | FastAPI endpoints (for a React/Next.js frontend) |
-| `core/` | LLM client, pipeline and prompts, document parsing, audit log |
-| `data/scenarios/` | 3 fictional demo cases: clean, red flags, edge case |
-| `docs/` | Scope, API contract, pitch |
-| `tests/` | Smoke tests |
+Rebuild the processed data. Only the data owner (C1) needs the 8.9 GB raw excerpt for this.
 
-## Data
+```bash
+python ingest/build_daily.py "<path to Futury MDS Data Excerpt>" data     # ~25 s → daily_features.parquet, universe.csv, hero_candidates.csv
+python ingest/build_events.py                    # events/events.csv → data/events.parquet
+python ingest/build_intraday.py GXI EVD HDD      # C1 TODO → data/intraday_bars.parquet
+```
 
-Only synthetic or public data. No real customer or employer data, ever.
+---
 
-## Team
+## Architecture
 
-| Name | Role |
-| --- | --- |
-| | Captain — product & pitch |
-| | Tech lead — backend & AI |
-| | Frontend & demo |
-| | Data & research |
+```
+ Raw DB excerpt (8.9 GB)              events/events.csv (research team)
+  XETRA_OHLC · FLOW_DYNAMICS ·                │
+  XLM spreads · index_constituents ·          │
+  XETRA_ONBOOK_TRADES                         │
+          │  ingest/  (run once)              │
+          ▼                                   ▼
+  data/daily_features.parquet   data/intraday_bars.parquet   data/events.parquet
+  (174 stocks × 213 days)       (1-min bars, hero stocks)    (+ timing, reaction_day)
+          └───────────────┬───────────────────┘
+                          ▼
+  engine/   baseline.py (Part A) · impact.py (Part B) · compare.py      ← deterministic
+                          ▼  JSON
+  ai/       narrate.py (DE/EN text) · agent.py (Q&A)                    ← LLM sees JSON only
+                          ▼
+  app/      Streamlit: Dashboard · Impact card · Compare · Assistant
+  report/   IR snapshot HTML/PDF
+```
+
+```
+futury-build-days-2026/
+├── config.py              paths, windows, thresholds (single source of truth)
+├── ingest/                build_daily.py ✅ · build_events.py ✅ · build_intraday.py 🔲
+├── engine/                data.py ✅ · baseline.py ✅ · impact.py ✅ (v1) · compare.py 🔲
+├── ai/                    llm.py ✅ · narrate.py ✅ · agent.py ✅ (v1)
+├── report/                template.html ✅ · export.py ✅
+├── app/                   Home.py · pages/1_Dashboard · 2_Impact_Card · 3_Compare · 4_Assistant
+├── events/                events.csv · sectors.csv   (filled by the research team)
+├── docs/                  API_CONTRACT · SCOPE · PITCH
+├── tests/                 smoke tests (pytest)
+└── data/                  processed files (gitignored)
+```
+
+---
+
+## Work packages (4 coders)
+
+Everyone works on their own files, so merge conflicts are rare. Contracts between modules are fixed (see below).
+
+### C1 · Data. Owner: ________
+- [ ] `ingest/build_intraday.py`: 1-min bars from `XETRA_ONBOOK_TRADES` for the hero stocks (steps are in the docstring)
+- [ ] Sanity check: daily sum of bars ≈ `turnover_eur` in daily_features
+- [ ] Run `build_events.py` whenever the research team updates `events.csv`, and share outputs on OneDrive
+- [ ] Optional: Eurex single-stock options and futures open interest (`EUREX_OPEN_INTEREST_DYNAMICS_EQUITYINDEX`, join on `ISIN_UNDERLYING`) to show derivatives positioning before events
+
+### C2 · Engine. Owner: ________
+- [ ] `engine/compare.py`: `same_type_events`, `percentile`, `sector_peers`. This fills `card["comparison"]`.
+- [ ] `impact.py`: refine the intraday block once bars exist (minutes to price discovery)
+- [ ] `baseline.py`: liquidity trend ("has liquidity improved?"), merge consecutive anomaly days
+- [ ] Unit tests: GXI 2026-02-11 should give ret ≈ −31.4 %, abnormal ≈ −30.5 %, volume ≈ 20× normal
+
+### C3 · Frontend. Owner: ________
+- [ ] Impact card design (the demo moment): follow the designer's sketch
+- [ ] Intraday chart: event-time marker, highlighted auctions
+- [ ] Compare page: scatter of abnormal return vs volume ratio, selected stock highlighted
+- [ ] Polish: colors, empty states, loading, one clean end-to-end flow for the pitch
+
+### C4 · AI + report. Owner: ________
+- [ ] Get the JAIF / LLM endpoint working in `.env`
+- [ ] `narrate.py`: tune the prompt and add a numbers check (every number in the text must exist in the JSON)
+- [ ] `agent.py` v2: tool calling with `TOOLS` (kpis, anomalies, impact_card)
+- [ ] `report/`: PDF layout, a small chart, Part A snapshot
+
+### Non-code (research and pitch team)
+- `events/events.csv`: events of the hero stocks **with time of day**, plus DAX 2026 results dates for comparisons
+- `events/sectors.csv`: sector of every DAX/MDAX/SDAX stock
+- Pitch deck (3–5 slides), demo script, backup video (2–3 min), and the list "what else IR needs + which data"
+
+---
+
+## Data contracts
+
+All schemas (`daily_features`, `intraday_bars`, `events.csv`, `impact_card` JSON) and the engine functions are in **[docs/API_CONTRACT.md](docs/API_CONTRACT.md)**. Changing a schema? Tell C3 and C4 first.
+
+## Data pitfalls (already handled in `build_daily.py`, keep in mind for new code)
+- **Flows**: `DATE` is the publication date, so use `REPORTED_FLOW_DATES`. Fewer than 7 executions means censored; the row then appears later, summed with other days. `VOLUME` counts both sides.
+- **OHLC**: open/high/low/close are **quoted mid prices**. Use auction prices for returns. Ignore `ADJUSTED_PRICE`. Use EUR lines only.
+- **Trades**: timestamps are **UTC** and must be converted to Europe/Berlin (watch DST). Empty `SIDE` = auction trade. Trading runs 08:00–22:00, so filter to the session you need.
+- **Index lists**: if a day is missing, use the previous file. TKCC was an MDAX member for one day only (spin-off on 28 Oct).
+
+## Conventions
+See **[CONTRIBUTING.md](CONTRIBUTING.md)**. In short:
+- `main` must always run: `streamlit run app/Home.py` and `pytest`. Use branches `feat/<name>-<topic>` and small PRs.
+- Paths and thresholds go in `config.py` only. Never commit data or `.env`.
+- Engine functions return plain dicts and DataFrames, never Streamlit objects.
+- No investment advice in any text. The tool explains the past and does not predict.
+
+## Timeline
+| When | Milestone |
+|---|---|
+| Wed 18:00 | End-to-end on real daily data (✅ skeleton) + events v1 |
+| Wed 22:00 | Intraday bars + comparison + LLM text live |
+| Thu 08:30 | Review, cut scope |
+| Thu 11:00 | **Feature freeze** |
+| Thu 12:00 | Backup demo video recorded |
+| Thu 13:30 | Demo submission · 14:30 deck · 15:00 pitch |
+
+**Data:** Deutsche Börse Xetra/Eurex excerpt, 2 Jan to 30 Oct 2026, provided for Futury Build Days. Not for redistribution.
