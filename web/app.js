@@ -244,6 +244,7 @@ function dashBand(u, name) {
   return `<section class="band"><div class="wrap band-in">
     <div class="kicker">${u.index} · ISIN <b>${u.isin}</b> · Xetra${u.sector ? " · " + esc(u.sector) : ""}</div>
     <h1>${esc(name)}</h1><p class="lede">${lede}</p>
+    <p class="band-acts"><a class="pill" href="/api/export?isin=${u.isin}&lang=${S.lang}" download>${L("Export IR report (PDF)", "IR-Report exportieren (PDF)")} ↓</a></p>
     <dl class="facts">
       <div><dt>${L("Closing auction", "Schlussauktion")} · ${dL(S.iss.meta.last_date)}</dt><dd>${PX(last)}</dd></div>
       <div><dt>${L("Since 2 Jan", "Seit 2. Jan.")}</dt><dd>${P(last / first - 1)}</dd></div>
@@ -454,7 +455,8 @@ function cardHTML(d) {
   return `<article class="card rv in" id="thecard">
     <div class="card-head"><div><div class="ttl">${L("Impact card", "Impact Card")}</div><div class="id">${esc(id)}</div></div><div class="timing">${timing}</div></div>
     <div class="card-title"><div><span class="tag">${esc(e.type)}</span><h2 style="margin-top:8px">${esc(notable ? L("Unusual trading day", "Auffälliger Handelstag") : e.title)}</h2>
-      <div class="src"><span>${ver}</span>${e.source_url ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">${L("Source", "Quelle")} ↗</a>` : ""}</div></div></div>
+      <div class="src"><span>${ver}</span>${e.source_url ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">${L("Source", "Quelle")} ↗</a>` : ""}</div></div>
+      <a class="pill pill--sm" href="${exportURL(c.isin, e.reaction_day, e.event_id)}" download>${L("Export IR report (PDF)", "IR-Report exportieren (PDF)")} ↓</a></div>
     <div class="card-sec card-top">
       <div><div class="big-cap">${L("Stock-specific move (abnormal return)", "Titelspezifische Bewegung (abnormale Rendite)")}</div>
         <div class="big" style="color:${col}"><span class="count" data-to="${p.abn_ret}">${P(p.abn_ret)}</span></div>
@@ -714,6 +716,8 @@ function cardURL(isin, day, ev) {
   if (own) u += `&date=${own.date}&time=${enc(own.time_local || "")}&type=${enc(own.type)}&title=${enc(own.title)}`;
   return u;
 }
+// one-click IR report (PDF) for this card: same event parameters as the card itself
+function exportURL(isin, day, ev) { return cardURL(isin, day, ev).replace("/api/card?", "/api/export?") + `&lang=${S.lang}`; }
 const EVTYPES = ["FY", "Q1", "H1", "Q3", "ADHOC", "GUIDANCE", "DIVIDEND_EX", "AGM", "CMD", "MA", "OTHER"];
 function evForm() {
   return `<form class="ev-form" id="evform"><div class="r2"><input id="ev-d" type="date" min="${S.iss.meta.first_date}" max="${S.iss.meta.last_date}" required aria-label="${L("Date", "Datum")}"><input id="ev-t" type="time" aria-label="${L("Time (CET)", "Uhrzeit (MEZ)")}"></div>
