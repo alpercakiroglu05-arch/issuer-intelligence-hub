@@ -125,3 +125,20 @@ def test_rank_text_is_the_same_everywhere():
                                                    "group_type": "NOTABLE_DAY", "group_index": "MDAX"}}
     assert "rank 3 of 215 (incl. this day)" in template_narrative(card, "en")
     assert "Rang 3 von 215 (inkl. dieses Tages)" in template_narrative(card, "de")
+
+
+def test_numbers_check_understands_german_short_dates():
+    """'am 29.05.' is a date when the data has 2026-05-29; '14.7' stays a number when no such day exists."""
+    from ai.checks import unsupported_numbers
+    payload = {"episodes": [{"peak_date": "2026-05-29", "abn_ret": 0.104}, {"peak_date": "2026-07-14"}]}
+    assert unsupported_numbers("+10.4% am 29.05. und am 14.7.: Ad-hoc.", payload) == []
+    assert unsupported_numbers("Am 03.08. fiel die Aktie.", payload) == ["03.08"]   # no 3 Aug in the data
+    assert unsupported_numbers("Der Umsatz stieg um 14.7%.", {"x": 0.104}) == ["14.7"]  # a percentage, not a date
+
+
+def test_numbers_check_reads_english_thousands_in_titles():
+    """The event title says 'EUR 1,628m'; '1,628 Mrd. EUR' (German) is the same number."""
+    from ai.checks import unsupported_numbers
+    payload = {"title": "incoming orders down to EUR 1,628m"}
+    assert unsupported_numbers("Auftragseingang 1,628 Mrd. EUR.", payload) == []
+    assert unsupported_numbers("Auftragseingang 1,734 Mrd. EUR.", payload) == ["1,734"]
