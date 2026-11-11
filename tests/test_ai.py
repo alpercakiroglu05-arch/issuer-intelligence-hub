@@ -96,3 +96,32 @@ def test_prompt_asks_for_german_number_style_in_de_only():
     assert system_prompt("en") == SYSTEM.format(language=LANG["en"])   # EN prompt (and its cache) unchanged
     de = system_prompt("de")
     assert "German" in de and "−23,2 %" in de and "27.03.2026" in de and "8,6-fach" in de and "Mio. EUR" in de
+
+
+def test_meaning_check_share_move_must_be_the_own_return():
+    """EVD 27.03: ret −23.2 %, abnormal −21.7 %. 'The share fell 21.7 %' mixes them up."""
+    from ai.checks import meaning_errors
+    assert meaning_errors("The share price fell 21.7% vs. the MDAX.", CARD)
+    assert meaning_errors("The share moved −23.2%, its peers −1.5%, so the stock-specific move was −21.7%.", CARD) == []
+    assert meaning_errors("Die Aktie verlor 21,7 % gegenüber dem MDAX.", CARD)
+    assert meaning_errors("Die Aktie verlor 23,2 % gegenüber dem MDAX.", CARD) == []
+    assert meaning_errors("The stock fell 23.2% while its peers fell 1.5%.", CARD) == []   # only the first % counts
+    assert meaning_errors("Turnover rose to 8.6x normal. The share fell 23.2%.", CARD) == []  # other sentences untouched
+
+
+def test_llm_text_with_wrong_share_move_falls_back(monkeypatch):
+    from ai import llm, narrate
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: SimpleNamespace(content="The share price fell 21.7% vs. the MDAX.", tool_calls=None))
+    out = narrate.narrate_with_meta({**CARD, "auctions": {}, "comparison": None}, "en")
+    assert out["source"] == "template" and out["rejected"] and "21.7%" in out["rejected"][0]
+
+
+def test_rank_text_is_the_same_everywhere():
+    from ai.narrate import template_narrative
+    from report.fmt import formatters
+    assert formatters("en")["rank"](3, 215) == "rank 3 of 215 (incl. this day)"
+    assert formatters("de")["rank"](3, 215) == "Rang 3 von 215 (inkl. dieses Tages)"
+    card = {**CARD, "auctions": {}, "comparison": {**CARD["comparison"], "rank_of": 215, "group": "unusual trading days",
+                                                   "group_type": "NOTABLE_DAY", "group_index": "MDAX"}}
+    assert "rank 3 of 215 (incl. this day)" in template_narrative(card, "en")
+    assert "Rang 3 von 215 (inkl. dieses Tages)" in template_narrative(card, "de")

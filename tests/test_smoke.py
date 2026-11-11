@@ -147,6 +147,7 @@ def test_compare_matches_card_and_ranks_evd():
     c = card["comparison"]
     assert c["group_type"] == "NOTABLE_DAY" and c["group_index"] == "MDAX" and c["n"] >= 100
     assert c["abs_abn_ret_pctile"] >= 0.98 and c["rank_abs_abn_ret"] <= 3
+    assert c["rank_of"] == c["n"] + 1   # the rank counts this day too
     typed = compare.same_type_events("H1")
     assert set(typed["ticker"]) >= {"ADS", "SAP", "EVD"} and len(typed) >= 30
 

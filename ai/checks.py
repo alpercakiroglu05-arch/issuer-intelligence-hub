@@ -6,6 +6,7 @@ every number in an LLM text must be derivable from the card JSON the model was g
 falls back to the template text.
 
     unsupported_numbers(text, payload) -> list[str]   numbers in `text` that are not in `payload`
+    meaning_errors(text, card) -> list[str]           "the share fell X %" where X is not |price.ret|
 
 "Derivable" means: the JSON value itself, ×100 (percent), ÷1e3/1e6/1e9 (EUR k/m/bn), or a group size + 1
 ("#3 of 215" when n = 214), rounded to the decimals written in the text. Signs are ignored ("fell 23.2 %"
@@ -67,6 +68,34 @@ def _numbers(text: str) -> list[tuple[str, float, int]]:
         dec = len(val.split(".")[1]) if "." in val else 0
         found.append((m.group(), abs(float(val)), dec))
     return found
+
+
+_SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-ZÄÖÜ])")       # "21.7" and "vs. the" do not split
+_SUBJECT = re.compile(r"\b(share|stock|Aktie)\b", re.I)
+_VERB = re.compile(r"\b(fell|rose|dropped|gained|verlor|stieg|fiel)\b", re.I)
+_PCT = re.compile(r"[-+−]?(\d+(?:[.,]\d+)?)\s*%")
+
+
+def meaning_errors(text: str, card) -> list[str]:
+    """Narrow meaning check: in a sentence with share/stock/Aktie and fell/rose/... the first percentage
+    after the verb is the share's own move, so it must be |price.ret| (rounded as written).
+    Catches "the share fell 21.7 %" when 21.7 % is the stock-specific move. Other sentences are not checked."""
+    ret = ((card or {}).get("price") or {}).get("ret") if isinstance(card, dict) else None
+    if ret is None:
+        return []
+    errors = []
+    for s in _SENTENCE.split(text.replace("\xa0", " ").replace(" ", " ")):
+        verb = _VERB.search(s)
+        if not (verb and _SUBJECT.search(s)):
+            continue
+        m = _PCT.search(s, verb.end())
+        if not m:
+            continue
+        val = m.group(1).replace(",", ".")
+        dec = len(val.split(".")[1]) if "." in val else 0
+        if abs(float(val) - abs(ret) * 100) > 0.5 * 10 ** -dec + 1e-6:
+            errors.append(f"{m.group().strip()} (share's own move is {abs(ret) * 100:.1f}%)")
+    return errors
 
 
 def unsupported_numbers(text: str, payload) -> list[str]:

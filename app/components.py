@@ -13,6 +13,7 @@ import streamlit as st
 
 from config import DEFAULT_TICKER, HERO_TICKERS
 from engine import data
+from report.fmt import formatters
 
 
 # ---------- formatting (None/NaN -> "n/a") ----------
@@ -111,7 +112,8 @@ def render_card(card: dict) -> None:
                 delta_color="off")
     cmp = card.get("comparison")
     if cmp:
-        rank = f" (#{cmp['rank_abs_abn_ret']} of {cmp['n'] + 1})" if cmp.get("rank_abs_abn_ret") else ""
+        rank = (", " + formatters("en")["rank"](cmp["rank_abs_abn_ret"], cmp.get("rank_of") or cmp["n"] + 1)
+                if cmp.get("rank_abs_abn_ret") else "")
         move = ("**the biggest of them**" if cmp["abs_abn_ret_pctile"] == 1.0
                 else f"bigger than **{pctile0(cmp['abs_abn_ret_pctile'])}** of them")
         st.info(f"📐 **Compared with {cmp['n']} {cmp['group']}:** the stock-specific move was "

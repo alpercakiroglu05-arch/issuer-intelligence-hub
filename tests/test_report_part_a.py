@@ -121,3 +121,13 @@ def test_part_a_de_numbers_match_engine(ticker, by):
     assert "02.01.2026" in h and "2026-01-02" not in h
     body = re.sub(r"<td>[^<]*(Ad hoc|results|report|MSCI|Q\d|FY)[^<]*</td>", "", h)  # event titles are source text
     assert not re.search(r"EUR \d|\d\.\d%|\d\.\dx\b", body)
+
+
+@needs_data
+def test_snapshot_shows_rank_incl_this_day():
+    from engine.impact import impact_card
+    from report.export import to_html
+    card = impact_card(_isin("EVD"), "2026-03-27")
+    c = card["comparison"]
+    assert f"rank {c['rank_abs_abn_ret']} of {c['rank_of']} (incl. this day)" in to_html(card, "text", "en")
+    assert f"Rang {c['rank_abs_abn_ret']} von {c['rank_of']} (inkl. dieses Tages)" in to_html(card, "text", "de")

@@ -111,6 +111,7 @@ def percentile(card: dict, table: pd.DataFrame) -> dict:
         out[f"{col}_median"] = None if x.empty else round(float(x.median()), 4)
     x = others["abs_abn_ret"].dropna()
     out["rank_abs_abn_ret"] = None if mine["abs_abn_ret"] is None else int((x > mine["abs_abn_ret"]).sum()) + 1
+    out["rank_of"] = out["n"] + 1  # the rank counts this event too: "rank 3 of 215 (incl. this day)"
     return out
 
 

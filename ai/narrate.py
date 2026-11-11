@@ -4,14 +4,15 @@ Impact card -> short IR text in German or English.  OWNER: C4 (AI).  STATUS: v1 
 Rule: the LLM only sees the impact_card JSON. Every number in the text must come from it.
 
 Numbers check (ai/checks.py): an LLM text with a number that is not in the card JSON is rejected and the
-template text is used instead. narrate_with_meta() says which one the user sees.
+template text is used instead, and so is a text that calls another number the share's own move
+(meaning_errors). narrate_with_meta() says which one the user sees.
 
 TODO C4: tune the prompt with the IR expert (tone: factual, no advice, no speculation)
 """
 import json
 
 from ai import llm
-from ai.checks import unsupported_numbers
+from ai.checks import meaning_errors, unsupported_numbers
 from report.fmt import formatters, group_label
 
 SYSTEM = """You are an investor-relations analyst writing for the IR team of a listed company.
@@ -32,7 +33,8 @@ Write 4-5 short sentences in {language}:
 3) liquidity / spread and the opening/closing auctions (volume vs normal, auction price vs previous close / last trade),
 4) who traded (agent = client/institutional orders, prop, market makers), only if notable,
 5) if intraday.onset.time is set: when the market started pricing the news (that clock time),
-6) if comparison is set: how this event ranks among comparable events (percentiles, group size).
+6) if comparison is set: how this event ranks among comparable events (percentiles, group size); write the rank
+   exactly as 'rank <rank_abs_abn_ret> of <rank_of> (incl. this day)' (German: 'Rang <r> von <rank_of> (inkl. dieses Tages)').
 Rules: use ONLY numbers that appear in the JSON. You may round them, write a share as a percent
 (0.939 -> 93.9 %) and EUR amounts in millions (14521000 -> EUR 14.5m). NEVER compute a new number:
 no differences, sums or averages, and no complements such as 'top 6 %' from a 0.939 percentile;
@@ -62,7 +64,7 @@ def narrate_with_meta(card: dict, lang: str = "en") -> dict:
             {"role": "user", "content": json.dumps(card, default=str)},
         ])
         text = (msg.content or "").strip()
-        bad = unsupported_numbers(text, card)
+        bad = unsupported_numbers(text, card) + meaning_errors(text, card)
         if text and not bad:
             return {"text": text, "source": "llm", "model": llm.model_name(), "rejected": []}
         meta["rejected"] = bad
@@ -99,7 +101,8 @@ def template_narrative(card: dict, lang: str = "en") -> str:
                   f"bewegte den Kurs um {_p(au['close_auction_move'])} gegenüber dem letzten Handel.")
         if cmp and cmp.get("abs_abn_ret_pctile") is not None:
             t += (f" Im Vergleich mit {cmp['n']} {group_label(cmp, 'de')}, war die unternehmensspezifische "
-                  f"Bewegung {'die größte von allen' if cmp['abs_abn_ret_pctile'] == 1.0 else 'größer als bei ' + _pctile(cmp['abs_abn_ret_pctile']) + ' von ihnen'}.")
+                  f"Bewegung {'die größte von allen' if cmp['abs_abn_ret_pctile'] == 1.0 else 'größer als bei ' + _pctile(cmp['abs_abn_ret_pctile']) + ' von ihnen'}"
+                  f"{_rank(cmp, f)}.")
         return t
     t = (f"{card['name']} moved {_p(p['ret'])} on {card['event']['reaction_day']} while its {card['index']} peers "
          f"moved {_p(p['peer_ret'])} (stock-specific: {_p(p['abn_ret'])}). "
@@ -117,5 +120,11 @@ def template_narrative(card: dict, lang: str = "en") -> str:
     if cmp and cmp.get("abs_abn_ret_pctile") is not None:
         move = ("the biggest of them" if cmp["abs_abn_ret_pctile"] == 1.0
                 else f"bigger than {_pctile(cmp['abs_abn_ret_pctile'])} of them")
-        t += f" Compared with {cmp['n']} {cmp['group']}, the stock-specific move was {move}."
+        t += f" Compared with {cmp['n']} {cmp['group']}, the stock-specific move was {move}{_rank(cmp, f)}."
     return t
+
+
+def _rank(cmp: dict, f: dict) -> str:
+    """', rank 3 of 215 (incl. this day)'; empty when the card has no rank."""
+    r = cmp.get("rank_abs_abn_ret")
+    return f", {f['rank'](r, cmp.get('rank_of') or cmp['n'] + 1)}" if r else ""
