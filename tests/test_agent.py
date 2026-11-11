@@ -44,25 +44,41 @@ def test_fallback_numbers_all_come_from_tools(q):
     assert r["text"] and r["check"]["unsupported"] == [], (q, r["text"], r["check"])
 
 
-@needs_data
-def test_tool_calling_loop(monkeypatch):
-    """The model calls impact_card and show, then answers; numbers are checked against the tool output."""
-    from ai import agent, llm
+def _script(*answers):
     call = lambda i, name, args: SimpleNamespace(id=f"c{i}", function=SimpleNamespace(name=name, arguments=json.dumps(args)))  # noqa: E731
-    script = [
-        SimpleNamespace(content="", tool_calls=[call(1, "impact_card", {"day": "2026-03-27", "event_id": "EVD_FY_20260326"}),
-                                                call(2, "show", {"view": "card", "day": "2026-03-27"})]),
-        SimpleNamespace(content="The share fell 23.2% (stock-specific -21.7%) on 8.6x normal turnover; 99.9% made up.",
-                        tool_calls=None),
-    ]
+    return [SimpleNamespace(content="", tool_calls=[call(1, "impact_card", {"day": "2026-03-27", "event_id": "EVD_FY_20260326"}),
+                                                    call(2, "show", {"view": "card", "day": "2026-03-27"})])] + \
+           [SimpleNamespace(content=a, tool_calls=None) for a in answers]
+
+
+def _fake_llm(monkeypatch, script):
+    from ai import llm
     monkeypatch.setattr(llm, "available", lambda: True)
     monkeypatch.setattr(llm, "model_name", lambda: "test-model")
     monkeypatch.setattr(llm, "chat", lambda *a, **k: script.pop(0))
+
+
+@needs_data
+def test_tool_calling_loop_repairs_an_invented_figure(monkeypatch):
+    """Model calls impact_card + show, writes one invented figure, gets one repair round, then answers cleanly."""
+    from ai import agent
+    script = _script("The share fell 23.2% (stock-specific -21.7%) on 8.6x normal turnover; 99.9% made up.",
+                     "The share fell 23.2% (stock-specific -21.7%) on 8.6x normal turnover, #3 of 215 unusual days.")
+    _fake_llm(monkeypatch, script)
     r = agent.run("What happened on 27 March?", EVD, context={"page": "dashboard"})
-    assert r["source"] == "llm" and r["model"] == "test-model"
+    assert r["source"] == "llm" and r["model"] == "test-model" and not script
     assert [s["tool"] for s in r["steps"]] == ["impact_card", "show"]
     assert r["actions"] == [{"view": "card", "isin": EVD, "day": "2026-03-27", "event_id": None, "event_type": None, "index": None}]
-    assert r["check"]["unsupported"] == ["99.9"]
+    assert r["check"]["unsupported"] == [] and "99.9" not in r["text"]
+
+
+@needs_data
+def test_invented_figures_are_never_shown(monkeypatch):
+    from ai import agent
+    _fake_llm(monkeypatch, _script("The share fell 12.4% on 5.6x turnover.", "Still 12.4% and 5.6x."))
+    r = agent.run("What happened on 27 March?", EVD, context={"page": "dashboard"})
+    assert r["source"] == "template" and "12.4" not in r["text"] and "rejected" in r["note"]
+    assert r["actions"] and r["actions"][0]["view"] == "card"
 
 
 @needs_data
