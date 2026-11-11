@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Issuer Intelligence Hub · Seismograph UI (C3 mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=Martian+Mono:wght@300;400;500&display=swap">
+<style>
+/* =====================================================================
+   Concept: a seismograph for listed companies.
+   An announcement is a tremor; the app measures it like an instrument does:
+   magnitude, epicentre (the minute the market starts reacting), aftershocks
+   (days until turnover and spread are back to normal).
+   Materials: plotter paper with a millimetre grid (charts only), ultramarine
+   pen for the company, graphite pencil for peers/index, red pen for events.
+   Layout: no card grid. Sections are separated by rules and whitespace,
+   readings sit on a shared baseline like instrument dials.
+   Values with a ° are placeholders until the engine provides them; the rest
+   are real (CLAUDE.md: EVD, 27 Mar 2026).
+   ===================================================================== */
+:root{
+  --paper:#f5f6f3;     /* cool lab paper, not cream */
+  --sheet:#ffffff;
+  --ink:#141618;
+  --ink2:#585e64;
+  --ink3:#979da3;
+  --rule:#d9dcd8;
+  --grid:rgba(20,22,24,.055);
+  --grid-major:rgba(20,22,24,.10);
+  --pen:#2340d8;       /* ultramarine plotter ink: the company */
+  --pen-soft:rgba(35,64,216,.10);
+  --pencil:#8f959b;    /* graphite: peers / index / normal */
+  --red:#df3f27;       /* red pen: events, unusual, losses */
+  --red-soft:rgba(223,63,39,.10);
+  --green:#1d7a4c;     /* gains */
+  --hl:#fff1a8;
+  --f-display:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+  --f-ui:"Instrument Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"Martian Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0e1012; --sheet:#15181b; --ink:#eceff1; --ink2:#a5acb3; --ink3:#6c737a; --rule:#2a2f34;
+  --grid:rgba(236,239,241,.045); --grid-major:rgba(236,239,241,.09);
+  --pen:#8197ff; --pen-soft:rgba(129,151,255,.14); --pencil:#7b828a; --red:#ff6b4f; --red-soft:rgba(255,107,79,.13);
+  --green:#4cc38a; --hl:#5a4d10; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0e1012; --sheet:#15181b; --ink:#eceff1; --ink2:#a5acb3; --ink3:#6c737a; --rule:#2a2f34;
+  --grid:rgba(236,239,241,.045); --grid-major:rgba(236,239,241,.09);
+  --pen:#8197ff; --pen-soft:rgba(129,151,255,.14); --pencil:#7b828a; --red:#ff6b4f; --red-soft:rgba(255,107,79,.13);
+  --green:#4cc38a; --hl:#5a4d10; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--pen);outline-offset:3px}
+.mono{font-family:var(--f-mono);font-weight:400;letter-spacing:-.01em}
+.num{font-variant-numeric:tabular-nums}
+.neg{color:var(--red)} .pos{color:var(--green)} .pen{color:var(--pen)} .dim{color:var(--ink2)}
+.ph::after{content:"°";color:var(--ink3);margin-left:1px}  /* placeholder marker */
+
+/* ---------- top bar ---------- */
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--rule)}
+.top-in{max-width:1280px;margin:0 auto;padding:0 28px;height:60px;display:flex;align-items:center;gap:28px}
+.mark{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:800;font-size:17px;letter-spacing:-.02em;white-space:nowrap}
+.mark svg{width:30px;height:18px}
+.tabs{display:flex;gap:4px;height:100%}
+.tab{flex:none;white-space:nowrap;border:0;background:none;padding:0 12px;height:100%;font-size:14px;font-weight:500;color:var(--ink2);position:relative}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink)}
+.tab[aria-selected="true"]::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;background:var(--ink)}
+.tab .k{font-family:var(--f-mono);font-size:10px;color:var(--ink3);margin-left:6px}
+.spacer{flex:1}
+.stock{flex:none;white-space:nowrap;display:flex;align-items:center;gap:10px;border:1px solid var(--rule);background:var(--sheet);height:36px;padding:0 12px;border-radius:3px}
+.stock .t{font-family:var(--f-mono);font-size:12px;font-weight:500}
+.stock .n{font-size:13.5px}
+.stock .ix{font-size:11px;color:var(--ink2);border-left:1px solid var(--rule);padding-left:10px}
+.lang{flex:none;display:flex;border:1px solid var(--rule);border-radius:3px;overflow:hidden;height:36px}
+.lang button{border:0;background:var(--sheet);padding:0 11px;font-size:12px;font-family:var(--f-mono);color:var(--ink2)}
+.lang button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.btn{height:36px;border-radius:3px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);padding:0 16px;font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn:hover{background:var(--pen);border-color:var(--pen)}
+.btn.line{background:transparent;color:var(--ink);border-color:var(--rule)}
+.btn.line:hover{border-color:var(--ink);background:transparent}
+.btn.small{height:30px;font-size:12.5px;padding:0 12px}
+
+/* ---------- page ---------- */
+main{max-width:1280px;margin:0 auto;padding:0 28px 120px}
+.view[hidden]{display:none}
+.masthead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:30px 0 6px;color:var(--ink2);font-size:13px}
+.masthead b{color:var(--ink);font-weight:600}
+.masthead .sep{width:4px;height:4px;border-radius:50%;background:var(--ink3);display:inline-block;transform:translateY(-3px)}
+.stamp{font-family:var(--f-mono);font-size:11px;color:var(--ink2);display:inline-flex;align-items:center;gap:7px}
+.stamp::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 22%,transparent)}
+
+.lede{font-family:var(--f-display);font-weight:400;font-size:clamp(26px,3.3vw,40px);line-height:1.18;letter-spacing:-.025em;max-width:22em;margin:14px 0 0;text-wrap:balance}
+.lede b{font-weight:800}
+.section{padding:44px 0 0}
+.sec-h{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.sec-h h2{margin:0;font-family:var(--f-display);font-weight:600;font-size:21px;letter-spacing:-.015em}
+.sec-h p{margin:0;color:var(--ink2);font-size:13.5px}
+.sec-h .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.eyebrow{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+
+/* plotter paper: used ONLY behind charts */
+.paper{background-color:var(--sheet);
+  background-image:linear-gradient(var(--grid-major) 1px,transparent 1px),linear-gradient(90deg,var(--grid-major) 1px,transparent 1px),
+                   linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:50px 50px,50px 50px,10px 10px,10px 10px;border:1px solid var(--rule);position:relative}
+svg{display:block;width:100%;height:auto;overflow:visible}
+
+/* ---------- readings: instrument dials on a shared baseline ---------- */
+.readings{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-top:1px solid var(--ink);border-bottom:1px solid var(--rule)}
+.readings.r4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.reading{padding:16px 18px 18px 0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.reading+.reading{padding-left:18px;border-left:1px solid var(--rule)}
+.reading .lab{font-size:12.5px;color:var(--ink2);font-weight:500}
+.reading .val{font-family:var(--f-display);font-weight:600;font-size:34px;line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.reading .val small{font-size:15px;font-weight:600;letter-spacing:0;margin-left:3px;color:var(--ink2)}
+.reading .ctx{font-size:12.5px;color:var(--ink2)}
+.dotplot{height:18px;position:relative;margin-top:2px}
+.dotplot .ln{position:absolute;left:0;right:0;top:8px;height:1px;background:var(--rule)}
+.dotplot i{position:absolute;top:3px;width:11px;height:11px;border-radius:50%;transform:translateX(-50%)}
+.dotplot i.you{background:var(--pen)} .dotplot i.idx{background:var(--sheet);border:2px solid var(--pencil)}
+.dotplot i.bad{background:var(--red)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{display:inline-block;width:16px;height:2px;background:var(--pen)}
+.sw.p{background:repeating-linear-gradient(90deg,var(--pencil) 0 4px,transparent 4px 7px)}
+.sw.r{background:var(--red);height:8px;width:3px}
+.sw.dot{width:9px;height:9px;border-radius:50%}
+
+/* ---------- pulse strip ---------- */
+.strip-wrap{padding:18px 18px 10px}
+.tip{position:fixed;z-index:50;pointer-events:none;background:var(--ink);color:var(--paper);font-size:12px;padding:8px 10px;border-radius:3px;line-height:1.45;white-space:nowrap;opacity:0;transition:opacity .12s}
+.tip .mono{font-size:11px;opacity:.75}
+
+/* ---------- two-column blocks ---------- */
+.cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:40px}
+.cols.c73{grid-template-columns:minmax(0,7fr) minmax(0,3fr)}
+.blk{display:flex;flex-direction:column;gap:12px;min-width:0}
+.blk h3{margin:0;font-family:var(--f-display);font-size:17px;font-weight:600;letter-spacing:-.01em}
+.blk .sub{font-size:13px;color:var(--ink2);margin-top:-8px}
+
+/* ---------- unusual-day list ---------- */
+.days{border-top:1px solid var(--ink)}
+.day{display:grid;grid-template-columns:112px 120px minmax(0,1fr) 92px 92px 130px;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--rule);cursor:pointer}
+.day:hover{background:linear-gradient(90deg,var(--pen-soft),transparent 70%)}
+.day .d{font-family:var(--f-mono);font-size:12.5px}
+.day .why{font-size:13.5px}
+.day .why em{font-style:normal;color:var(--ink2)}
+.day .r{font-family:var(--f-mono);font-size:13px;text-align:right}
+.day .open{justify-self:end;font-size:13px;font-weight:600;color:var(--pen);display:flex;gap:6px;align-items:center}
+.day .open::after{content:"→";transition:transform .15s}
+.day:hover .open::after{transform:translateX(4px)}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2)}
+.status::before{content:"";width:8px;height:8px;border:1.5px solid var(--red);border-radius:50%}
+.status.ok::before{background:var(--ink);border-color:var(--ink)}
+
+/* ---------- liquidity rulers ---------- */
+.ruler{display:flex;flex-direction:column;gap:7px}
+.ruler .row{display:flex;justify-content:space-between;font-size:13px}
+.ruler .bar{position:relative;height:30px;border-bottom:1px solid var(--ink)}
+.ruler .bar .tick{position:absolute;bottom:0;width:1px;background:var(--ink3)}
+.ruler .bar .thr{position:absolute;bottom:-6px;top:-4px;width:2px;background:var(--red)}
+.ruler .bar .thr span{position:absolute;top:-18px;left:6px;font-family:var(--f-mono);font-size:10.5px;color:var(--red);white-space:nowrap}
+.ruler .bar .me{position:absolute;bottom:-6px;width:12px;height:12px;border-radius:50%;background:var(--pen);transform:translateX(-50%);box-shadow:0 0 0 4px var(--pen-soft)}
+.verdict{font-family:var(--f-display);font-size:20px;font-weight:600;letter-spacing:-.01em}
+
+/* ---------- EVENT VIEW ---------- */
+.evline{display:flex;align-items:center;gap:0;margin-top:22px;overflow-x:auto;padding-bottom:6px;position:relative}
+.evline::before{content:"";position:absolute;left:0;right:0;top:15px;height:1px;background:var(--rule)}
+.ev{flex:none;border:0;background:none;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:8px 22px 4px 0;position:relative;text-align:left}
+.ev .pin{width:15px;height:15px;border-radius:50%;background:var(--paper);border:2px solid var(--pencil);position:relative;z-index:1}
+.ev.ann .pin{border-color:var(--ink)}
+.ev.hot .pin{border-color:var(--red)}
+.ev[aria-pressed="true"] .pin{background:var(--red);border-color:var(--red);box-shadow:0 0 0 5px var(--red-soft)}
+.ev .d{font-family:var(--f-mono);font-size:11px;color:var(--ink2)}
+.ev .t{font-size:13px;font-weight:500;white-space:nowrap}
+.ev[aria-pressed="true"] .t{font-weight:700}
+
+.ev-head{display:grid;grid-template-columns:300px minmax(0,1fr);gap:48px;padding-top:34px;align-items:start}
+.meter{display:flex;flex-direction:column;gap:10px;position:sticky;top:84px}
+.meter .big{font-family:var(--f-display);font-weight:800;font-size:112px;line-height:.82;letter-spacing:-.06em;font-variant-numeric:tabular-nums}
+.meter .big small{font-size:22px;letter-spacing:0;font-weight:600;color:var(--ink2);margin-left:6px}
+.scale{position:relative;height:46px;margin-top:8px}
+.scale .base{position:absolute;left:0;right:0;bottom:16px;height:1px;background:var(--ink)}
+.scale .t{position:absolute;bottom:16px;width:1px;background:var(--ink)}
+.scale .lbl{position:absolute;bottom:0;font-family:var(--f-mono);font-size:9.5px;color:var(--ink2);transform:translateX(-50%)}
+.scale .needle{position:absolute;bottom:16px;width:2px;height:34px;background:var(--red);transform-origin:bottom;left:0;transition:left 1.4s cubic-bezier(.2,.8,.2,1)}
+.scale .needle::after{content:"";position:absolute;top:-5px;left:-4px;width:10px;height:10px;border-radius:50%;background:var(--red)}
+.bands{display:flex;justify-content:space-between;font-size:11px;color:var(--ink2);border-top:1px dashed var(--rule);padding-top:6px}
+.meter .meta{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink2);border-top:1px solid var(--rule);padding-top:12px;margin-top:6px}
+.meter .meta b{color:var(--ink);font-weight:600}
+.cause{display:flex;gap:10px;align-items:flex-start;background:var(--red-soft);padding:10px 12px;font-size:12.5px;border-left:2px solid var(--red)}
+.formula{font-family:var(--f-mono);font-size:10.5px;color:var(--ink3);line-height:1.6}
+
+.ev-title{font-family:var(--f-display);font-size:clamp(30px,4.2vw,54px);font-weight:800;letter-spacing:-.04em;line-height:1;margin:0}
+.ev-title span{color:var(--red)}
+.ev-sub{font-size:14px;color:var(--ink2);margin-top:10px}
+.ev-lede{font-family:var(--f-display);font-size:24px;line-height:1.3;letter-spacing:-.015em;margin:22px 0 0;max-width:30em;text-wrap:pretty}
+.ev-lede b{font-weight:700}
+
+.seis{margin-top:26px}
+.seis-top{display:flex;justify-content:space-between;align-items:baseline;padding:12px 16px 0;font-size:12px;color:var(--ink2)}
+.seis-top .mono{font-size:10.5px}
+#seis path.trace{stroke-dasharray:var(--len);stroke-dashoffset:var(--len)}
+#seis.go path.trace{animation:draw 2.2s cubic-bezier(.45,.05,.25,1) forwards}
+#seis .ann{opacity:0}
+#seis.go .ann{animation:fade .35s ease forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes fade{to{opacity:1}}
+.cross{pointer-events:none}
+
+/* decomposition */
+.decomp{display:flex;flex-direction:column;gap:10px}
+.dbar{display:flex;height:34px;border:1px solid var(--ink)}
+.dbar div{height:100%;display:flex;align-items:center;padding:0 10px;font-family:var(--f-mono);font-size:11px;white-space:nowrap;overflow:hidden}
+.dkey{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;font-size:12.5px;color:var(--ink2)}
+.dkey b{display:block;font-family:var(--f-display);font-size:20px;color:var(--ink);font-weight:600;letter-spacing:-.01em}
+
+/* analyst note */
+.note{display:grid;grid-template-columns:140px minmax(0,1fr);gap:28px;border-top:1px solid var(--ink);padding-top:18px}
+.note .side{display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--ink2)}
+.note .side .check{display:flex;gap:7px;align-items:center;color:var(--green);font-weight:600}
+.note .body{font-family:var(--f-display);font-size:19px;line-height:1.5;letter-spacing:-.005em;max-width:38em}
+.note .body p{margin:0 0 10px}
+.ref{border-bottom:1.5px solid var(--pen);cursor:help}
+.ref:hover{background:var(--pen-soft)}
+.note .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+
+/* compare */
+.sentence{font-family:var(--f-display);font-size:clamp(22px,2.6vw,32px);letter-spacing:-.02em;line-height:1.35;margin:26px 0 0;max-width:30em}
+.pick{font:inherit;border:0;border-bottom:2px solid var(--pen);background:transparent;color:var(--pen);font-weight:700;padding:0 2px;cursor:pointer;appearance:none;-webkit-appearance:none}
+.rank{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--ink)}
+.rank div{padding:14px 18px 14px 0;display:flex;flex-direction:column;gap:4px}
+.rank div+div{padding-left:18px;border-left:1px solid var(--rule)}
+.rank b{font-family:var(--f-display);font-size:28px;font-weight:600;letter-spacing:-.02em}
+.rank span{font-size:12.5px;color:var(--ink2)}
+
+/* ask */
+.ask{max-width:820px;display:flex;flex-direction:column;gap:22px;padding-top:30px}
+.qs{display:flex;flex-direction:column;border-top:1px solid var(--ink)}
+.q{border:0;border-bottom:1px solid var(--rule);background:none;text-align:left;padding:14px 0;font-family:var(--f-display);font-size:19px;letter-spacing:-.01em;display:flex;justify-content:space-between;gap:12px}
+.q:hover{color:var(--pen)}
+.q::after{content:"↵";font-family:var(--f-mono);font-size:13px;color:var(--ink3)}
+.thread{display:flex;flex-direction:column;gap:18px}
+.msg-q{font-family:var(--f-display);font-size:22px;font-weight:600;letter-spacing:-.015em}
+.trace-tools{font-family:var(--f-mono);font-size:10.5px;color:var(--ink2);display:flex;flex-direction:column;gap:3px}
+.msg-a{font-family:var(--f-display);font-size:19px;line-height:1.5;min-height:1.5em}
+.caret{display:inline-block;width:9px;height:1.1em;background:var(--pen);vertical-align:-3px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.input{display:flex;border:1px solid var(--ink);background:var(--sheet);height:54px;align-items:center;padding:0 8px 0 18px;gap:10px}
+.input input{flex:1;border:0;background:transparent;font:inherit;font-size:16px;color:var(--ink);outline:none}
+.input .hint{font-family:var(--f-mono);font-size:10.5px;color:var(--ink3)}
+.disclaimer{font-size:12px;color:var(--ink2)}
+
+/* lab */
+.ideas-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;border-top:1px solid var(--ink);margin-top:26px}
+.idea{padding:22px 24px 26px 0;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:10px}
+.idea:not(:nth-child(3n+1)){padding-left:24px;border-left:1px solid var(--rule)}
+.idea .no{font-family:var(--f-mono);font-size:11px;color:var(--ink3)}
+.idea h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:20px;letter-spacing:-.015em}
+.idea p{margin:0;font-size:13.5px;color:var(--ink2)}
+.idea .data{font-family:var(--f-mono);font-size:10.5px;color:var(--ink);border-top:1px dashed var(--rule);padding-top:8px;margin-top:auto}
+.idea .data b{color:var(--green);font-weight:500}
+.idea .data i{font-style:normal;color:var(--red)}
+
+/* report modal */
+dialog{border:0;padding:0;background:transparent;max-width:min(980px,96vw);width:100%}
+dialog::backdrop{background:rgba(10,12,14,.55);backdrop-filter:blur(3px)}
+.sheet{background:#fff;color:#141618;display:grid;grid-template-columns:minmax(0,1fr) 260px;min-height:560px}
+.a4{padding:38px 42px;border-right:1px solid #e3e5e2;font-size:12px;display:flex;flex-direction:column;gap:14px}
+.a4 h4{margin:0;font-family:var(--f-display);font-size:24px;letter-spacing:-.02em}
+.a4 .k{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #141618}
+.a4 .k div{padding:8px 8px 8px 0}
+.a4 .k b{display:block;font-family:var(--f-display);font-size:20px}
+.a4 .mini{height:80px;background:repeating-linear-gradient(0deg,#eef0ed 0 1px,transparent 1px 10px),repeating-linear-gradient(90deg,#eef0ed 0 1px,transparent 1px 10px);border:1px solid #e3e5e2}
+.opts{padding:26px 22px;display:flex;flex-direction:column;gap:16px;background:#f5f6f3;color:#141618}
+.opts label{display:flex;gap:9px;font-size:13px;align-items:center}
+.opts input{accent-color:#2340d8}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:3px;font-size:13px;opacity:0;transition:all .2s;z-index:60}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* design notes */
+.notes{margin-top:90px;border-top:3px double var(--rule);padding-top:22px;color:var(--ink2);font-size:13.5px}
+.notes summary{cursor:pointer;font-family:var(--f-display);font-size:17px;color:var(--ink);font-weight:600}
+.notes pre{background:var(--sheet);border:1px solid var(--rule);padding:12px 14px;overflow-x:auto;font-family:var(--f-mono);font-size:11.5px;line-height:1.6;color:var(--ink)}
+
+@media (max-width:1060px){
+  .readings{grid-template-columns:repeat(3,minmax(0,1fr))}.reading:nth-child(4){border-left:0;padding-left:0}
+  .ev-head{grid-template-columns:minmax(0,1fr);gap:24px}.meter{position:static}
+  .cols,.cols.c73{grid-template-columns:minmax(0,1fr)}
+  .day{grid-template-columns:100px minmax(0,1fr) 80px 120px}.day .hide-m{display:none}
+}
+@media (max-width:760px){
+  .top-in{padding:0 16px;gap:12px}.mark span{display:none}.stock .n,.stock .ix,.lang{display:none}
+  main{padding:0 16px 80px}.readings,.readings.r4,.ideas-grid,.rank,.dkey{grid-template-columns:minmax(0,1fr)}
+  .reading+.reading,.idea:not(:nth-child(3n+1)),.rank div+div{border-left:0;padding-left:0;border-top:1px solid var(--rule)}
+  .note{grid-template-columns:minmax(0,1fr)}.sheet{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  #seis path.trace{stroke-dashoffset:0}#seis .ann{opacity:1}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="mark" aria-label="Issuer Intelligence Hub">
+      <svg viewBox="0 0 30 18" aria-hidden="true"><path d="M0 9h7l2-6 3 13 3-15 3 12 2-4h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      <span>Issuer Intelligence Hub</span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" data-v="overview" aria-selected="false">Overview<span class="k">1</span></button>
+      <button class="tab" role="tab" data-v="event" aria-selected="true">Event reading<span class="k">2</span></button>
+      <button class="tab" role="tab" data-v="compare" aria-selected="false">Compare<span class="k">3</span></button>
+      <button class="tab" role="tab" data-v="ask" aria-selected="false">Ask<span class="k">4</span></button>
+      <button class="tab" role="tab" data-v="lab" aria-selected="false">Lab<span class="k">5</span></button>
+    </nav>
+    <span class="spacer"></span>
+    <button class="stock" title="Switch company (⌘K)"><span class="t">EVD</span><span class="n">CTS Eventim</span><span class="ix">MDAX ▾</span></button>
+    <div class="lang" role="group" aria-label="Language"><button aria-pressed="true" data-lang="en">EN</button><button aria-pressed="false" data-lang="de">DE</button></div>
+    <button class="btn" id="exportBtn">Export snapshot</button>
+  </div>
+</header>
+
+<main>
+
+<!-- =============================== OVERVIEW (Part A) =============================== -->
+<section class="view" data-name="overview" hidden>
+  <div class="masthead"><b>CTS Eventim AG &amp; Co. KGaA</b><i class="sep"></i><span class="mono">DE0005470306</span><i class="sep"></i><span>MDAX</span><i class="sep"></i><span class="stamp">Xetra data to 30 Oct 2026</span></div>
+  <p class="lede">On a normal day <b class="ph">€13.1m</b> of CTS Eventim changes hands, <b>more than half</b> of it in the closing auction. In 2026 the share had <b class="neg">4 tremors</b>; one of them was stock-specific.</p>
+
+  <div class="section">
+    <div class="sec-h"><h2>The year in one strip</h2><p>Each line is one trading day: turnover against its own normal. Red marks unusual days. Click one to read it.</p>
+      <div class="right"><span class="eyebrow">Turnover ÷ 60-day normal, log scale</span></div></div>
+    <div class="paper strip-wrap"><svg id="strip" viewBox="0 0 1200 200" role="img" aria-label="Daily turnover relative to normal, 2 Jan to 30 Oct 2026"></svg></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-h"><h2>Normal state</h2><p>Last 60 trading days. Blue dot: CTS Eventim. Hollow dot: median MDAX stock.</p></div>
+    <div class="readings">
+      <div class="reading"><span class="lab">Daily turnover</span><span class="val ph">€13.1m</span><div class="dotplot"><span class="ln"></span><i class="idx" style="left:46%"></i><i class="you" style="left:62%"></i></div><span class="ctx">MDAX median <span class="ph">€9.4m</span></span></div>
+      <div class="reading"><span class="lab">Cost to trade €25k</span><span class="val ph">7<small>bps</small></span><div class="dotplot"><span class="ln"></span><i class="you" style="left:30%"></i><i class="idx" style="left:40%"></i></div><span class="ctx">MDAX median <span class="ph">9 bps</span> · lower is better</span></div>
+      <div class="reading"><span class="lab">In the closing auction</span><span class="val ph">54<small>%</small></span><div class="dotplot"><span class="ln"></span><i class="idx" style="left:52%"></i><i class="you" style="left:54%"></i></div><span class="ctx">MDAX median 52%</span></div>
+      <div class="reading"><span class="lab">Traded by clients (agent)</span><span class="val ph">46<small>%</small></span><div class="dotplot"><span class="ln"></span><i class="idx" style="left:44%"></i><i class="you" style="left:46%"></i></div><span class="ctx">rest: proprietary and market makers</span></div>
+      <div class="reading"><span class="lab">Xetra liquidity category</span><span class="val">A</span><div class="dotplot"><span class="ln"></span><i class="you" style="left:88%"></i></div><span class="ctx">no Designated Sponsor needed (est.)</span></div>
+    </div>
+  </div>
+
+  <div class="section cols">
+    <div class="blk"><h3>What it costs to trade</h3><p class="sub">XLM spread for a €25k order, bps. The band is the MDAX middle half.</p>
+      <div class="paper" style="padding:12px 12px 6px"><svg id="xlm" viewBox="0 0 560 230" role="img" aria-label="Trading cost compared with MDAX"></svg></div>
+      <div class="legend"><span><i class="sw"></i>CTS Eventim</span><span><i class="sw p"></i>MDAX median</span></div></div>
+    <div class="blk"><h3>Who trades the share</h3><p class="sub">Share of turnover, 10-day average, from Xetra Flow Dynamics.</p>
+      <div class="paper" style="padding:12px 12px 6px"><svg id="who" viewBox="0 0 560 230" role="img" aria-label="Participant mix over time"></svg></div>
+      <div class="legend"><span><i class="sw dot" style="background:var(--pen)"></i>Clients (agent)</span><span><i class="sw dot" style="background:var(--pencil)"></i>Proprietary</span><span><i class="sw dot" style="background:var(--rule)"></i>Market makers</span></div></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-h"><h2>Unusual days</h2><p>Detected automatically when price or turnover leaves its normal range (|z| ≥ 3).</p></div>
+    <div class="days" id="dayList">
+      <div class="day" data-go="event"><span class="d">27 Mar 2026</span><span class="status">cause open</span><span class="why">Stock fell, peers did not <em>· sell-off all day</em></span><span class="r neg">−23.2%</span><span class="r hide-m">8.6×</span><span class="open">Read event</span></div>
+      <div class="day" data-go="event"><span class="d">30 Mar 2026</span><span class="status">cause open</span><span class="why">Follow-through after 27 Mar <em>· aftershock</em></span><span class="r pos ph">+3.1%</span><span class="r hide-m ph">3.9×</span><span class="open">Read event</span></div>
+      <div class="day" data-go="event"><span class="d">19 Jun 2026</span><span class="status ok">explained</span><span class="why">Index review day <em>· technical, not news</em></span><span class="r ph">+0.6%</span><span class="r hide-m ph">2.7×</span><span class="open">Read event</span></div>
+      <div class="day" data-go="event"><span class="d">27 Oct 2026</span><span class="status ok">explained</span><span class="why">83% of turnover in the closing auction <em>· index flows</em></span><span class="r ph">−0.4%</span><span class="r hide-m ph">2.2×</span><span class="open">Read event</span></div>
+    </div>
+  </div>
+
+  <div class="section cols c73">
+    <div class="blk"><h3>Liquidity check against Xetra rules</h3><p class="sub">Category A needs both: cost ≤ 100 bps for €25k and ≥ €2.5m daily turnover (4-month average). Being Public Guide, p. 32.</p>
+      <div class="ruler" style="margin-top:18px">
+        <div class="row"><span>Cost to trade €25k</span><b class="mono ph">7 bps</b></div>
+        <div class="bar" id="r1"></div>
+      </div>
+      <div class="ruler" style="margin-top:22px">
+        <div class="row"><span>Average daily turnover</span><b class="mono ph">€12.8m</b></div>
+        <div class="bar" id="r2"></div>
+      </div>
+    </div>
+    <div class="blk" style="justify-content:flex-end;gap:8px"><span class="eyebrow">Verdict</span><span class="verdict">Comfortably category A.</span><span class="dim" style="font-size:13px">Heidelberger Druck (SDAX) sits at ~90 bps, close to the line. Same check, very different story.</span></div>
+  </div>
+</section>
+
+<!-- =============================== EVENT READING (Part B) =============================== -->
+<section class="view" data-name="event">
+  <div class="masthead"><b>CTS Eventim</b><i class="sep"></i><span class="mono">EVD · MDAX</span><i class="sep"></i><span>Events and notable days in 2026</span></div>
+  <div class="evline" role="group" aria-label="Choose an event">
+    <button class="ev ann" aria-pressed="false"><i class="pin"></i><span class="d">26 Feb</span><span class="t">FY results<span class="ph"></span></span></button>
+    <button class="ev hot" aria-pressed="true"><i class="pin"></i><span class="d">27 Mar</span><span class="t">Notable day</span></button>
+    <button class="ev hot" aria-pressed="false"><i class="pin"></i><span class="d">30 Mar</span><span class="t">Aftershock</span></button>
+    <button class="ev ann" aria-pressed="false"><i class="pin"></i><span class="d">13 May</span><span class="t">Q1 results<span class="ph"></span></span></button>
+    <button class="ev" aria-pressed="false"><i class="pin"></i><span class="d">19 Jun</span><span class="t">Index review</span></button>
+    <button class="ev ann" aria-pressed="false"><i class="pin"></i><span class="d">20 Aug</span><span class="t">H1 results<span class="ph"></span></span></button>
+    <button class="ev" aria-pressed="false"><i class="pin"></i><span class="d">27 Oct</span><span class="t">Auction spike</span></button>
+  </div>
+
+  <div class="ev-head">
+    <aside class="meter" aria-label="Impact magnitude">
+      <span class="eyebrow">Impact magnitude</span>
+      <div class="big" id="mag">0.0<small>/10</small></div>
+      <div class="scale" id="scale"><span class="base"></span><span class="needle" id="needle"></span></div>
+      <div class="bands"><span>noise</span><span>notable</span><span>strong</span><span>severe</span></div>
+      <div class="formula">M = f(|abnormal return z|, turnover ×, spread ×)<br>computed in engine/, proposed</div>
+      <div class="meta">
+        <span>Reaction day <b>Fri 27 Mar 2026</b></span>
+        <span>Normal = <b>60 days</b>, t−65 … t−6</span>
+        <span>Peers = <b>MDAX</b></span>
+      </div>
+      <div class="cause"><span><b>Cause not verified.</b> The data shows how the market moved, not why. The research team links a source here.</span></div>
+    </aside>
+
+    <div>
+      <h1 class="ev-title">−21.7% <span>stock-specific</span></h1>
+      <div class="ev-sub">CTS Eventim −23.2% · MDAX peers −1.5% · reaction day 27 March 2026</div>
+      <p class="ev-lede">It was not the market. Turnover ran at <b>8.6× normal</b>, client orders were <b>net sellers</b>, and the price slid <b>all session long</b>: only 7% of turnover traded in the first 15 minutes.</p>
+
+      <div class="paper seis">
+        <div class="seis-top"><span>Intraday trace · % vs previous close · Frankfurt time</span><span class="mono">1-min bars · on-book trades</span></div>
+        <svg id="seis" viewBox="0 0 900 360" role="img" aria-label="Intraday price trace and turnover for 27 March 2026"></svg>
+      </div>
+      <div class="legend"><span><i class="sw"></i>Price</span><span><i class="sw r"></i>Turnover per minute</span><span><i class="sw p"></i>Normal turnover profile°</span><span class="dim">Hover the trace for exact values</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-h"><h2>Was it us or the market?</h2><p>The day's move split into its parts.</p></div>
+    <div class="decomp">
+      <div class="dbar" aria-hidden="true">
+        <div style="width:3.9%;background:var(--pencil);color:#fff"></div>
+        <div style="width:2.6%;background:color-mix(in srgb,var(--pencil) 55%,var(--sheet))"></div>
+        <div style="width:93.5%;background:var(--red);color:#fff">stock-specific −21.7%</div>
+      </div>
+      <div class="dkey"><span><b class="ph">−0.9%</b>Whole market (DAX futures)</span><span><b class="ph">−0.6%</b>MDAX peers on top of market</span><span><b class="neg">−21.7%</b>CTS Eventim alone</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-h"><h2>Readings</h2></div>
+    <div class="readings">
+      <div class="reading"><span class="lab">Turnover</span><span class="val">8.6<small>×</small></span><span class="ctx">≈ €112m vs ≈ €13m normal</span></div>
+      <div class="reading"><span class="lab">Client order balance</span><span class="val neg">−36<small>%</small></span><span class="ctx">clients sold aggressively</span></div>
+      <div class="reading"><span class="lab">Cost to trade €25k</span><span class="val ph">14<small>bps</small></span><span class="ctx">normal <span class="ph">7 bps</span></span></div>
+      <div class="reading"><span class="lab">Closing auction</span><span class="val">€25.8<small>m</small></span><span class="ctx">23% of the day</span></div>
+      <div class="reading"><span class="lab">Gap at the open</span><span class="val">−2.3<small>%</small></span><span class="ctx">news priced during the day</span></div>
+    </div>
+  </div>
+
+  <div class="section cols">
+    <div class="blk"><h3>Aftershocks</h3><p class="sub">Days until turnover and spread were back within 1.2× of normal.</p>
+      <div class="paper" style="padding:12px 12px 6px"><svg id="after" viewBox="0 0 560 220" role="img" aria-label="Turnover and spread ratio after the event"></svg></div>
+      <div class="legend"><span><i class="sw"></i>Turnover ÷ normal</span><span><i class="sw p"></i>Spread ÷ normal°</span><span><i class="sw r" style="height:2px;width:16px"></i>Back to normal</span></div></div>
+    <div class="blk"><h3>Who sold</h3><p class="sub">Share of turnover on 27 Mar against the normal mix.</p>
+      <div id="whoDay" style="display:flex;flex-direction:column;gap:14px;margin-top:6px"></div>
+      <p class="dim" style="font-size:13px;margin:0">Clients (agent orders) took a larger share than usual and sold into the market. Market makers absorbed the flow.</p></div>
+  </div>
+
+  <div class="section">
+    <div class="note">
+      <div class="side"><span class="eyebrow">Note for the CFO</span><span class="check">✓ 7 of 7 figures verified</span><span>Written by the AI from the numbers on this page only. Underlined figures show their source.</span></div>
+      <div>
+        <div class="body" id="noteBody"></div>
+        <div class="acts"><button class="btn small" id="copyNote">Copy note</button><button class="btn small line" data-go="compare">Compare with similar days</button><button class="btn small line" id="rawJson">Show raw numbers</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== COMPARE =============================== -->
+<section class="view" data-name="compare" hidden>
+  <p class="sentence">Show me <select class="pick" aria-label="Event type"><option>notable days</option><option>results days</option><option>dividend ex-days</option><option>ad hoc releases</option></select> in the <select class="pick" aria-label="Index"><option>MDAX</option><option>DAX</option><option>SDAX</option><option>whole market</option></select> during <select class="pick" aria-label="Period"><option>2026</option><option>Q1 2026</option><option>H1 2026</option></select>, and where 27 March sits.</p>
+  <div class="section">
+    <div class="paper" style="padding:16px 16px 8px"><svg id="scatter" viewBox="0 0 1200 460" role="img" aria-label="Abnormal return against turnover ratio for comparable events"></svg></div>
+    <div class="legend"><span><i class="sw dot" style="background:var(--pen)"></i>CTS Eventim</span><span><i class="sw dot" style="background:var(--pencil)"></i>Other MDAX events<span class="ph"></span></span><span class="dim">Dot size = change in trading cost</span></div>
+  </div>
+  <div class="section">
+    <div class="rank">
+      <div><b>2nd<span class="ph"></span></b><span>strongest stock-specific move of 48° MDAX events</span></div>
+      <div><b>Top 6%<span class="ph"></span></b><span>for turnover against normal</span></div>
+      <div><b>1 day<span class="ph"></span></b><span>to normal turnover; peers median 3 days°</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== ASK =============================== -->
+<section class="view" data-name="ask" hidden>
+  <div class="ask">
+    <p class="lede" style="margin:0">Ask about your share. Answers use only the Xetra numbers in this app.</p>
+    <div class="qs" id="qs">
+      <button class="q">Has our liquidity improved since Q1?</button>
+      <button class="q">Explain 27 March to the CFO in three sentences.</button>
+      <button class="q">How does our closing auction share compare with the MDAX?</button>
+    </div>
+    <div class="thread" id="thread" aria-live="polite"></div>
+    <label class="input"><input id="askInput" placeholder="Type a question…" autocomplete="off"><span class="hint">ENTER</span><button class="btn small" id="askBtn">Ask</button></label>
+    <span class="disclaimer">Explains past trading. No forecasts, no investment advice.</span>
+  </div>
+</section>
+
+<!-- =============================== LAB: next ideas =============================== -->
+<section class="view" data-name="lab" hidden>
+  <p class="lede">What IR teams could get next, and the data each idea needs.</p>
+  <div class="ideas-grid">
+    <div class="idea"><span class="no">01</span><h3>Index watch</h3><p>Early warning when the share drifts toward an index exit. Gerresheimer fell 31% on 11 Feb and left the SDAX on 9 Apr.</p><div class="data"><b>have</b> turnover, index lists · <i>need</i> free-float market cap, Selection List rank</div></div>
+    <div class="idea"><span class="no">02</span><h3>Liquidity category monitor</h3><p>Alert before the share falls out of Xetra category A and needs a Designated Sponsor (the Heidelberger Druck case).</p><div class="data"><b>have</b> XLM, turnover · <i>need</i> nothing new</div></div>
+    <div class="idea"><span class="no">03</span><h3>Announcement planner</h3><p>Pick dates for results and capital markets days that avoid index reviews, expiries and peers’ results, when turnover is distorted.</p><div class="data"><b>have</b> index review days · <i>need</i> peers’ financial calendars</div></div>
+    <div class="idea"><span class="no">04</span><h3>Before-the-news monitor</h3><p>Unusual turnover or options positioning in the days before an announcement, flagged for compliance.</p><div class="data"><b>have</b> 1-min bars · <i>need</i> Eurex single-stock open interest (in the excerpt)</div></div>
+    <div class="idea"><span class="no">05</span><h3>Buyback timing</h3><p>When in the day the share is cheapest to trade, so a buyback moves the price least.</p><div class="data"><b>have</b> 1-min bars, auctions · <i>need</i> nothing new</div></div>
+    <div class="idea"><span class="no">06</span><h3>Surprise vs. consensus</h3><p>Put the reaction next to how far results were from analyst expectations.</p><div class="data"><i>need</i> consensus estimates (licensed)</div></div>
+  </div>
+</section>
+
+<!-- =============================== design notes =============================== -->
+<details class="notes">
+  <summary>Design notes for the team (C3) · how this maps to Streamlit</summary>
+  <p>Full guide: <span class="mono">docs/design/DESIGN.md</span>. Short version:</p>
+<pre>Top navigation      st.navigation(pages, position="top")      (Streamlit ≥ 1.46)
+Year strip          plotly bar chart + st.plotly_chart(..., on_select="rerun")  → click opens the event
+Seismograph trace   st.components.v1.html(TEMPLATE.format(json=bars))           → the draw-in animation lives here
+Readings            st.markdown(HTML, unsafe_allow_html=True) with the CSS from components.inject_css()
+Event line          st.segmented_control / st.pills over events + notable days
+Compare sentence    three st.selectbox in st.columns with label_visibility="collapsed"
+Note for the CFO    ai.narrate.narrate(card, lang) → render with the .note CSS
+Export snapshot     report.export.to_pdf(to_html(card, text, lang)) → st.download_button</pre>
+</details>
+</main>
+
+<div class="tip" id="tip" role="tooltip"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<dialog id="report" aria-label="IR snapshot preview">
+  <div class="sheet">
+    <div class="a4">
+      <span style="font-family:'Martian Mono',monospace;font-size:10px;color:#585e64">IR SNAPSHOT · CTS EVENTIM · MDAX · DE0005470306</span>
+      <h4 id="rTitle">27 March 2026: a stock-specific move of −21.7%</h4>
+      <div class="k"><div><b style="color:#df3f27">−21.7%</b>vs peers</div><div><b>8.6×</b>turnover</div><div><b style="color:#df3f27">−36%</b>client balance</div><div><b>€25.8m</b>closing auction</div></div>
+      <div class="mini"></div>
+      <p id="rText" style="margin:0;line-height:1.6;font-size:12.5px"></p>
+      <span style="margin-top:auto;font-size:10px;color:#979da3">Source: Deutsche Börse Xetra (OHLC, Flow Dynamics, XLM, on-book trades). Explains past trading; not investment advice.</span>
+    </div>
+    <div class="opts">
+      <b style="font-family:'Bricolage Grotesque',sans-serif;font-size:18px">Export snapshot</b>
+      <label><input type="checkbox" checked id="o1"> Event reading</label>
+      <label><input type="checkbox" checked id="o2"> Intraday trace</label>
+      <label><input type="checkbox" checked id="o3"> Normal state (Part A)</label>
+      <label><input type="checkbox" id="o4"> Comparison with peers</label>
+      <div class="lang" role="group" aria-label="Report language" style="width:max-content"><button aria-pressed="true" data-rl="en">EN</button><button aria-pressed="false" data-rl="de">DE</button></div>
+      <span style="flex:1"></span>
+      <button class="btn" id="dl">Download PDF</button>
+      <button class="btn line" id="closeR">Close</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const NS = "http://www.w3.org/2000/svg";
+  const rng = s => () => (s = (s * 16807) % 2147483647) / 2147483647;
+  function canvas(id){ const el = document.getElementById(id); el.innerHTML = "";
+    const mk = (tag, a = {}, txt) => { const n = document.createElementNS(NS, tag); for (const k in a) n.setAttribute(k, a[k]); if (txt !== undefined) n.textContent = txt; el.appendChild(n); return n; };
+    mk.el = el; return mk; }
+  const txt = (mk, x, y, s, o = {}) => mk("text", Object.assign({x, y, "font-size": 11, fill: css("--ink2"), "font-family": "Instrument Sans, sans-serif"}, o), s);
+  const mono = (mk, x, y, s, o = {}) => txt(mk, x, y, s, Object.assign({"font-family": "Martian Mono, monospace", "font-size": 9.5}, o));
+  const tip = $("#tip");
+  const showTip = (e, html) => { tip.innerHTML = html; tip.style.opacity = 1; tip.style.left = Math.min(e.clientX + 14, innerWidth - 220) + "px"; tip.style.top = (e.clientY + 14) + "px"; };
+  const hideTip = () => tip.style.opacity = 0;
+  const toast = m => { const t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 1800); };
+
+  /* ---------------- navigation ---------------- */
+  function go(v){
+    $$(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.v === v));
+    $$(".view").forEach(s => s.hidden = s.dataset.name !== v);
+    scrollTo({top: 0});
+    draw(v);
+  }
+  $$(".tab").forEach(t => t.addEventListener("click", () => go(t.dataset.v)));
+  document.addEventListener("click", e => { const g = e.target.closest("[data-go]"); if (g) go(g.dataset.go); });
+  addEventListener("keydown", e => {
+    if (e.target.closest("input,select,textarea") || e.metaKey || e.ctrlKey) return;
+    const m = {"1": "overview", "2": "event", "3": "compare", "4": "ask", "5": "lab"}[e.key]; if (m) go(m);
+  });
+  $$(".evline .ev").forEach(b => b.addEventListener("click", () => {
+    $$(".evline .ev").forEach(x => x.setAttribute("aria-pressed", x === b));
+    if (!b.classList.contains("hot") || b.querySelector(".d").textContent !== "27 Mar") toast("Mockup: only 27 Mar is filled in. In the app every pin opens its own reading.");
+  }));
+
+  /* ---------------- language ---------------- */
+  let lang = "en";
+  const NOTE = {
+    en: [`On 27 March CTS Eventim fell <span class="ref" title="price.ret · daily_features">23.2%</span> while its MDAX peers lost only <span class="ref" title="price.peer_ret">1.5%</span>, so <span class="ref" title="price.abn_ret">−21.7%</span> was specific to the company.`,
+         `Turnover reached <span class="ref" title="volume.ratio">8.6 times</span> its normal level and client orders were clearly on the sell side (<span class="ref" title="participants.agent_aggr_imbalance">−36%</span> balance).`,
+         `The price did not gap at the open (<span class="ref" title="price.gap_open">−2.3%</span>); it slid through the whole session to a low at <span class="ref" title="intraday.time_of_low">16:44</span>, and <span class="ref" title="intraday.close_auction_eur">€25.8m</span> changed hands in the closing auction.`],
+    de: [`Am 27. März fiel CTS Eventim um <span class="ref" title="price.ret">23,2 %</span>, während die MDAX-Vergleichswerte nur <span class="ref" title="price.peer_ret">1,5 %</span> verloren. <span class="ref" title="price.abn_ret">−21,7 %</span> waren damit unternehmensspezifisch.`,
+         `Der Umsatz lag beim <span class="ref" title="volume.ratio">8,6-Fachen</span> des Normalniveaus, Kundenaufträge waren klar auf der Verkaufsseite (<span class="ref" title="participants.agent_aggr_imbalance">−36 %</span>).`,
+         `Zur Eröffnung gab es kaum eine Lücke (<span class="ref" title="price.gap_open">−2,3 %</span>); der Kurs fiel über den ganzen Handelstag bis zum Tief um <span class="ref" title="intraday.time_of_low">16:44 Uhr</span>, in der Schlussauktion wurden <span class="ref" title="intraday.close_auction_eur">25,8 Mio. €</span> gehandelt.`]
+  };
+  const renderNote = () => { $("#noteBody").innerHTML = NOTE[lang].map(p => `<p>${p}</p>`).join(""); $("#rText").innerHTML = NOTE[lang].join(" "); };
+  $$(".top .lang button").forEach(b => b.addEventListener("click", () => { lang = b.dataset.lang; $$(".top .lang button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderNote(); toast(lang === "de" ? "Sprache: Deutsch" : "Language: English"); }));
+  $$("[data-rl]").forEach(b => b.addEventListener("click", () => { lang = b.dataset.rl; $$("[data-rl]").forEach(x => x.setAttribute("aria-pressed", x === b)); renderNote(); $("#rTitle").textContent = lang === "de" ? "27. März 2026: unternehmensspezifische Bewegung von −21,7 %" : "27 March 2026: a stock-specific move of −21.7%"; }));
+  renderNote();
+  $("#copyNote").addEventListener("click", () => { const t = $("#noteBody").innerText; (navigator.clipboard?.writeText(t) || Promise.reject()).then(() => toast("Note copied"), () => toast("Select the text to copy")); });
+  $("#rawJson").addEventListener("click", () => toast("Opens the impact_card JSON the AI saw"));
+  $("#exportBtn").addEventListener("click", () => $("#report").showModal());
+  $("#closeR").addEventListener("click", () => $("#report").close());
+  $("#dl").addEventListener("click", () => { $("#report").close(); toast("IR_snapshot_EVD_2026-03-27.pdf · report.export.to_pdf()"); });
+
+  /* ---------------- YEAR STRIP ---------------- */
+  const N = 213, r1 = rng(4), days = [];
+  const start = new Date(2026, 0, 2);
+  for (let i = 0, d = new Date(start); i < N; d.setDate(d.getDate() + 1)) { if (d.getDay() % 6 === 0) continue; days.push({d: new Date(d), v: Math.exp((r1() - .5) * .9)}); i++; }
+  const mark = {"2026-03-27": [8.6, "Stock fell 23.2%, peers 1.5%"], "2026-03-30": [3.9, "Aftershock"], "2026-06-19": [2.7, "Index review day"], "2026-10-27": [2.2, "83% in closing auction"]};
+  const key = d => d.toISOString().slice(0, 10);
+  days.forEach(o => { const k = key(new Date(o.d.getTime() - o.d.getTimezoneOffset() * 6e4)); o.k = k; if (mark[k]) { o.v = mark[k][0]; o.note = mark[k][1]; } });
+  function strip(){
+    const mk = canvas("strip"), W = 1200, H = 200, L = 40, R = 8, mid = 120, x = i => L + i * (W - L - R) / N, bw = (W - L - R) / N - 1.2;
+    const y = v => mid - Math.log2(v) * 26;
+    [[8, "8×"], [4, "4×"], [2, "2×"], [1, "normal"], [.5, "½×"]].forEach(([v, s]) => { mk("line", {x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: v === 1 ? css("--ink") : css("--rule"), "stroke-width": v === 1 ? 1 : 1, "stroke-dasharray": v === 1 ? "" : "2 4"}); mono(mk, L - 6, y(v) + 3, s, {"text-anchor": "end"}); });
+    days.forEach((o, i) => {
+      const hot = !!o.note, top = Math.min(y(o.v), y(1)), h = Math.max(1, Math.abs(y(o.v) - y(1)));
+      const r = mk("rect", {x: x(i), y: top, width: bw, height: h, fill: hot ? css("--red") : css("--pen"), opacity: hot ? 1 : .55});
+      const hit = mk("rect", {x: x(i) - 1, y: 4, width: bw + 2, height: H - 30, fill: "transparent", style: "cursor:pointer"});
+      hit.addEventListener("mousemove", e => { r.setAttribute("opacity", 1); showTip(e, `<b>${o.d.toLocaleDateString("en-GB", {day: "numeric", month: "short"})}</b> · ${o.v.toFixed(1)}× normal<br><span class="mono">${o.note || "click to open the day"}</span>`); });
+      hit.addEventListener("mouseleave", () => { r.setAttribute("opacity", hot ? 1 : .55); hideTip(); });
+      hit.addEventListener("click", () => { hideTip(); go("event"); });
+      if (hot && o.v > 3) { mk("line", {x1: x(i) + bw / 2, x2: x(i) + bw / 2 + 18, y1: top - 4, y2: top - 22, stroke: css("--red")}); txt(mk, x(i) + bw / 2 + 22, top - 22, o.k === "2026-03-27" ? "27 Mar · −23.2% · 8.6×" : "30 Mar", {fill: css("--red"), "font-weight": 600, "font-size": 12}); }
+    });
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"].forEach((m, k) => { const i = days.findIndex(o => o.d.getMonth() === k); mk("line", {x1: x(i), x2: x(i), y1: H - 24, y2: H - 18, stroke: css("--ink3")}); txt(mk, x(i) + 3, H - 6, m, {"font-size": 11.5}); });
+  }
+
+  /* ---------------- XLM ---------------- */
+  function xlm(){
+    const mk = canvas("xlm"), W = 560, H = 230, L = 34, R = 8, T = 10, B = 24, n = 160, r = rng(9);
+    const x = i => L + i / (n - 1) * (W - L - R), y = v => T + (22 - v) / 22 * (H - T - B);
+    [0, 5, 10, 15, 20].forEach(v => mono(mk, L - 6, y(v) + 3, v, {"text-anchor": "end"}));
+    let top = "", bot = ""; for (let i = 0; i < n; i++) top += (i ? "L" : "M") + x(i) + "," + y(11.5); for (let i = n - 1; i >= 0; i--) bot += "L" + x(i) + "," + y(6.5);
+    mk("path", {d: top + bot + "Z", fill: css("--pencil"), opacity: .14});
+    mk("line", {x1: L, x2: W - R, y1: y(9), y2: y(9), stroke: css("--pencil"), "stroke-dasharray": "4 3", "stroke-width": 1.5});
+    const a = []; for (let i = 0; i < n; i++) a.push(7.6 + (r() - .5) * 1.8 + (i >= 39 && i < 44 ? (6.5 - (i - 39) * 1.5) : 0) - i * .004);
+    mk("path", {d: a.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1)).join(""), fill: "none", stroke: css("--pen"), "stroke-width": 1.8});
+    mk("circle", {cx: x(39), cy: y(a[39]), r: 4, fill: css("--red")}); txt(mk, x(39) + 8, y(a[39]) - 4, "27 Mar", {fill: css("--red"), "font-weight": 600});
+    ["Jan", "Mar", "May", "Jul", "Sep"].forEach((m, k) => txt(mk, x(k * 32), H - 6, m));
+  }
+
+  /* ---------------- who trades (overview) ---------------- */
+  function who(){
+    const mk = canvas("who"), W = 560, H = 230, L = 34, R = 8, T = 10, B = 24, n = 160, r = rng(21);
+    const x = i => L + i / (n - 1) * (W - L - R), y = v => T + (1 - v) * (H - T - B);
+    const ag = [], pr = []; let a = .45, p = .33;
+    for (let i = 0; i < n; i++) { a += (r() - .5) * .012 + (.46 - a) * .08; p += (r() - .5) * .01 + (.33 - p) * .08; ag.push(a + (i >= 39 && i < 41 ? .09 : 0)); pr.push(p); }
+    const area = (lo, hi, fill, op) => mk("path", {d: hi.map((v, i) => (i ? "L" : "M") + x(i) + "," + y(v)).join("") + lo.slice().reverse().map((v, i) => "L" + x(n - 1 - i) + "," + y(v)).join("") + "Z", fill, opacity: op});
+    const zero = ag.map(() => 0), s2 = ag.map((v, i) => v + pr[i]), one = ag.map(() => 1);
+    area(s2, one, css("--rule"), 1); area(ag, s2, css("--pencil"), .55); area(zero, ag, css("--pen"), .8);
+    [0, .5, 1].forEach(v => mono(mk, L - 6, y(v) + 3, (v * 100) + "%", {"text-anchor": "end"}));
+    ["Jan", "Mar", "May", "Jul", "Sep"].forEach((m, k) => txt(mk, x(k * 32), H - 6, m));
+  }
+
+  /* ---------------- liquidity rulers ---------------- */
+  function rulers(){
+    const make = (id, max, thr, me, unit, rev) => {
+      const el = document.getElementById(id); el.innerHTML = "";
+      for (let i = 0; i <= 20; i++) { const t = document.createElement("span"); t.className = "tick"; t.style.left = (i * 5) + "%"; t.style.height = (i % 5 ? 6 : 12) + "px"; el.appendChild(t); }
+      const th = document.createElement("span"); th.className = "thr"; th.style.left = (thr / max * 100) + "%"; th.innerHTML = `<span>${rev ? "≤" : "≥"} ${unit(thr)}</span>`; el.appendChild(th);
+      const m = document.createElement("span"); m.className = "me"; m.style.left = (me / max * 100) + "%"; el.appendChild(m);
+    };
+    make("r1", 140, 100, 7, v => v + " bps", true);
+    make("r2", 16, 2.5, 12.8, v => "€" + v + "m", false);
+  }
+
+  /* ---------------- SEISMOGRAPH ---------------- */
+  let seisDone = false;
+  function seis(){
+    const mk = canvas("seis"), W = 900, H = 360, L = 46, R = 70, T = 24, mid = 236, B = 30;
+    const t0 = 540, t1 = 1060, x = m => L + (m - t0) / (t1 - t0) * (W - L - R);
+    const yP = p => T + (p - 1) / (-27) * (mid - T - 14);         // +1% … −26%
+    const yV = v => H - B - Math.min(v, 1.15) * 80;                  // turnover per minute (€m) → px, capped
+    [0, -5, -10, -15, -20, -25].forEach(p => mono(mk, L - 8, yP(p) + 3, (p ? p : "0") + "%", {"text-anchor": "end"}));
+    mk("line", {x1: L, x2: W - R, y1: yP(0), y2: yP(0), stroke: css("--ink"), "stroke-width": 1});
+    mono(mk, W - R + 6, yP(0) + 3, "prev. close");
+    mk("line", {x1: L, x2: W - R, y1: H - B, y2: H - B, stroke: css("--ink"), "stroke-width": 1});
+    // normal turnover profile (pencil, dashed)
+    const r = rng(7), prof = [];
+    for (let m = t0; m < 1050; m += 5) prof.push([m, .05 + (m < 600 ? .09 * (600 - m) / 60 : 0) + (m > 960 ? .05 : 0)]);
+    mk("path", {d: prof.map(([m, v], i) => (i ? "L" : "M") + x(m) + "," + yV(v * 2.2)).join(""), fill: "none", stroke: css("--pencil"), "stroke-dasharray": "3 3", "stroke-width": 1.4});
+    // turnover needles per minute (seismograph style)
+    for (let m = t0; m < 1050; m++) { const v = (.06 + (m - t0) / 520 * .12 + (r() ** 4) * .8) * (m < t0 + 15 ? 1.8 : 1); mk("line", {x1: x(m), x2: x(m), y1: H - B, y2: yV(v), stroke: css("--red"), "stroke-width": .8, opacity: .42}); }
+    // closing auction
+    const ca = 1055, caH = 25.8;
+    mk("rect", {x: x(1050), y: T - 8, width: x(1060) - x(1050), height: H - B - T + 8, fill: css("--red"), opacity: .07});
+    mk("line", {x1: x(ca), x2: x(ca), y1: H - B, y2: mid + 2, stroke: css("--red"), "stroke-width": 5});
+    mk("path", {d: `M${x(ca) - 7},${mid + 14} l14,-5 M${x(ca) - 7},${mid + 20} l14,-5`, stroke: css("--sheet"), "stroke-width": 3});  // axis break: the auction is off the scale
+    // price trace
+    const pts = []; let p = -2.3; const r2 = rng(5);
+    for (let m = t0; m <= 1050; m += 1) {
+      const low = 1004; const target = m <= low ? -2.3 + (m - t0) / (low - t0) * (-25.1 + 2.3) : -25.1 + (m - low) / 46 * 1.6;
+      p += (target - p) * .18 + (r2() - .5) * .55; if (m === low) p = -25.1; pts.push([m, p]);
+    }
+    pts.push([ca, -23.2]);
+    const d = pts.map(([m, v], i) => (i ? "L" : "M") + x(m).toFixed(1) + "," + yP(v).toFixed(1)).join("");
+    const path = mk("path", {d, fill: "none", stroke: css("--pen"), "stroke-width": 1.7, "stroke-linejoin": "round", class: "trace"});
+    path.style.setProperty("--len", Math.ceil(path.getTotalLength()));
+    // annotations (red pen)
+    const ann = (delay, g) => { g.forEach(n => { n.classList.add("ann"); n.style.animationDelay = delay + "s"; }); };
+    const onset = 563;
+    ann(.5, [mk("line", {x1: x(onset), x2: x(onset), y1: T - 10, y2: H - B, stroke: css("--red"), "stroke-dasharray": "5 4"}),
+             txt(mk, x(onset) + 6, T - 2, "reaction starts 09:23°", {fill: css("--red"), "font-weight": 600, "font-size": 11.5})]);
+    ann(.25, [mk("circle", {cx: x(t0), cy: yP(-2.3), r: 4.5, fill: css("--sheet"), stroke: css("--pen"), "stroke-width": 2}),
+              txt(mk, x(t0) + 10, yP(-2.3) + 26, "open −2.3%", {fill: css("--ink"), "font-weight": 600, "font-size": 11.5})]);
+    ann(1.9, [mk("circle", {cx: x(1004), cy: yP(-25.1), r: 5, fill: css("--red")}),
+              txt(mk, x(1004) - 9, yP(-25.1) + 4, "low 16:44", {"text-anchor": "end", fill: css("--red"), "font-weight": 700, "font-size": 12})]);
+    ann(2.2, [txt(mk, x(1050) - 6, mid + 12, "closing auction €25.8m", {"text-anchor": "end", fill: css("--red"), "font-weight": 600, "font-size": 11.5}),
+              mk("circle", {cx: x(ca), cy: yP(-23.2), r: 5, fill: css("--sheet"), stroke: css("--red"), "stroke-width": 2}),
+              txt(mk, x(ca) + 10, yP(-23.2) + 4, "−23.2%", {fill: css("--red"), "font-weight": 800, "font-size": 14, "font-family": "Bricolage Grotesque, sans-serif"})]);
+    [["09:00", t0], ["11:00", 660], ["13:00", 780], ["15:00", 900], ["17:35", ca]].forEach(([s, m]) => mono(mk, x(m), H - 10, s, {"text-anchor": "middle"}));
+    // crosshair
+    const cl = mk("line", {x1: 0, x2: 0, y1: T - 10, y2: H - B, stroke: css("--ink"), "stroke-width": 1, opacity: 0, class: "cross"});
+    const cd = mk("circle", {cx: 0, cy: 0, r: 4, fill: css("--pen"), opacity: 0, class: "cross"});
+    const hit = mk("rect", {x: L, y: T - 10, width: W - L - R + 10, height: H - B - T + 10, fill: "transparent"});
+    hit.addEventListener("mousemove", e => {
+      const box = mk.el.getBoundingClientRect(), sx = (e.clientX - box.left) / box.width * W;
+      const m = Math.round(t0 + (sx - L) / (W - L - R) * (t1 - t0)); const pt = pts.reduce((a, b) => Math.abs(b[0] - m) < Math.abs(a[0] - m) ? b : a);
+      cl.setAttribute("x1", x(pt[0])); cl.setAttribute("x2", x(pt[0])); cl.setAttribute("opacity", .4);
+      cd.setAttribute("cx", x(pt[0])); cd.setAttribute("cy", yP(pt[1])); cd.setAttribute("opacity", 1);
+      const hh = String(Math.floor(pt[0] / 60)).padStart(2, "0"), mm = String(pt[0] % 60).padStart(2, "0");
+      showTip(e, `<b class="mono">${hh}:${mm}</b> · ${pt[1] >= 0 ? "+" : ""}${pt[1].toFixed(1)}%<br><span class="mono">turnover ${(0.1 + Math.random() * .3).toFixed(2)}m°</span>`);
+    });
+    hit.addEventListener("mouseleave", () => { cl.setAttribute("opacity", 0); cd.setAttribute("opacity", 0); hideTip(); });
+    requestAnimationFrame(() => requestAnimationFrame(() => mk.el.classList.add("go")));
+    // magnitude count-up + needle
+    const target = 8.4, el = $("#mag"), needle = $("#needle"), sc = $("#scale");
+    if (!sc.querySelector(".t")) for (let i = 0; i <= 10; i++) { const t = document.createElement("span"); t.className = "t"; t.style.left = (i * 10) + "%"; t.style.height = (i % 5 ? 7 : 13) + "px"; sc.appendChild(t);
+      if (i % 2 === 0) { const l = document.createElement("span"); l.className = "lbl"; l.style.left = (i * 10) + "%"; l.textContent = i; sc.appendChild(l); } }
+    needle.style.left = "0%"; requestAnimationFrame(() => requestAnimationFrame(() => needle.style.left = (target * 10) + "%"));
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches; const st = performance.now();
+    const tick = now => { const k = reduce ? 1 : Math.min(1, (now - st) / 1400), v = target * (1 - Math.pow(1 - k, 3)); el.innerHTML = v.toFixed(1) + '<small>/10</small>'; if (k < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }
+
+  /* ---------------- aftershocks ---------------- */
+  function after(){
+    const mk = canvas("after"), W = 560, H = 220, L = 34, R = 10, T = 12, B = 26;
+    const xs = d => L + (d + 5) / 15 * (W - L - R), y = v => T + (1 - Math.log2(v) / Math.log2(10)) * (H - T - B);
+    [1, 2, 4, 8].forEach(v => { mk("line", {x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: css("--rule"), "stroke-dasharray": v === 1 ? "" : "2 4"}); mono(mk, L - 6, y(v) + 3, v + "×", {"text-anchor": "end"}); });
+    mk("rect", {x: L, y: y(1.2), width: W - L - R, height: y(1) - y(1.2) + (H - B - y(1)), fill: css("--green"), opacity: .07});
+    const vol = [1, .9, 1.1, 1, 1.05, 8.6, 3.9, 1.6, 1.15, 1.1, 1, .95, 1, 1.05, .9, 1];
+    const spr = [1, 1, 1.05, .95, 1, 2, 1.7, 1.45, 1.3, 1.1, 1.05, 1, 1, .95, 1, 1];
+    const line = (arr, c, dash) => mk("path", {d: arr.map((v, i) => (i ? "L" : "M") + xs(i - 5) + "," + y(v)).join(""), fill: "none", stroke: c, "stroke-width": 1.8, "stroke-dasharray": dash || ""});
+    line(spr, css("--pencil"), "4 3"); line(vol, css("--pen"));
+    [[3, vol[8], "turnover normal: t+3"], [4, spr[9], "spread normal: t+4°"]].forEach(([d, v, s], k) => { mk("circle", {cx: xs(d), cy: y(v), r: 4.5, fill: css("--red")}); txt(mk, xs(d) + 8, y(v) - 10 - k * 14, s, {fill: css("--red"), "font-weight": 600}); });
+    mk("line", {x1: xs(0), x2: xs(0), y1: T, y2: H - B, stroke: css("--ink"), "stroke-dasharray": "2 3"});
+    [-5, 0, 5, 10].forEach(d => mono(mk, xs(d), H - 8, d === 0 ? "t0" : (d > 0 ? "t+" + d : "t" + d), {"text-anchor": "middle"}));
+  }
+
+  function whoDay(){
+    const rows = [["27 Mar", [58, 27, 15], 1], ["normal", [46, 33, 21], .45]];
+    $("#whoDay").innerHTML = rows.map(([lab, v, o]) => `<div style="display:grid;grid-template-columns:70px minmax(0,1fr);gap:12px;align-items:center;font-size:12.5px;color:var(--ink2)"><span class="mono" style="font-size:11px">${lab}</span><div style="display:flex;height:22px;border:1px solid var(--ink)">
+      <span style="width:${v[0]}%;background:var(--pen);opacity:${o};color:#fff;font-size:11px;display:flex;align-items:center;padding-left:6px" class="mono">${v[0]}%°</span><span style="width:${v[1]}%;background:var(--pencil);opacity:${o}"></span><span style="width:${v[2]}%;background:var(--rule)"></span></div></div>`).join("") +
+      `<div class="legend" style="margin:0"><span><i class="sw dot" style="background:var(--pen)"></i>Clients</span><span><i class="sw dot" style="background:var(--pencil)"></i>Proprietary</span><span><i class="sw dot" style="background:var(--rule)"></i>Market makers</span></div>`;
+  }
+
+  /* ---------------- compare scatter ---------------- */
+  function scatter(){
+    const mk = canvas("scatter"), W = 1200, H = 460, L = 60, R = 20, T = 20, B = 50, r = rng(17);
+    const x = v => L + (v + 26) / 38 * (W - L - R), y = v => T + (1 - Math.log2(v) / Math.log2(24)) * (H - T - B);
+    [1, 2, 4, 8, 16].forEach(v => { mk("line", {x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: css("--rule"), "stroke-dasharray": "2 4"}); mono(mk, L - 8, y(v) + 3, v + "×", {"text-anchor": "end"}); });
+    [-25, -20, -15, -10, -5, 0, 5, 10].forEach(v => mono(mk, x(v), H - B + 20, (v > 0 ? "+" : "") + v + "%", {"text-anchor": "middle"}));
+    mk("line", {x1: x(0), x2: x(0), y1: T, y2: H - B, stroke: css("--ink")});
+    txt(mk, (W + L) / 2, H - 6, "Stock-specific move on the reaction day", {"text-anchor": "middle", "font-size": 12.5, fill: css("--ink")});
+    txt(mk, 16, (H - B) / 2, "Turnover vs normal", {"text-anchor": "middle", transform: `rotate(-90 16 ${(H - B) / 2})`, "font-size": 12.5, fill: css("--ink")});
+    txt(mk, x(-25), T + 14, "big and stock-specific ↖", {fill: css("--ink3"), "font-size": 12});
+    txt(mk, x(8), y(1.15), "barely noticed", {fill: css("--ink3"), "font-size": 12});
+    for (let i = 0; i < 47; i++) { const ar = (r() - .5) * 16 + (r() < .5 ? -1.5 : 1.5), vr = 1 + r() * 2.4 + Math.abs(ar) * .2, s = 4 + r() * 6;
+      const c = mk("circle", {cx: x(ar), cy: y(Math.min(vr, 20)), r: s, fill: css("--pencil"), opacity: .38, style: "cursor:pointer"});
+      c.addEventListener("mousemove", e => showTip(e, `MDAX notable day<br><span class="mono">${ar >= 0 ? "+" : ""}${ar.toFixed(1)}% · ${vr.toFixed(1)}×°</span>`)); c.addEventListener("mouseleave", hideTip); }
+    const cx = x(-21.7), cy = y(8.6);
+    mk("ellipse", {cx, cy, rx: 30, ry: 22, fill: "none", stroke: css("--red"), "stroke-width": 2, transform: `rotate(-12 ${cx} ${cy})`});
+    mk("circle", {cx, cy, r: 9, fill: css("--pen")});
+    mk("path", {d: `M${cx + 28},${cy - 16} q40,-40 90,-34`, fill: "none", stroke: css("--red"), "stroke-width": 1.5});
+    txt(mk, cx + 124, cy - 46, "CTS Eventim · 27 Mar", {fill: css("--ink"), "font-weight": 700, "font-size": 14, "font-family": "Bricolage Grotesque, sans-serif"});
+    mono(mk, cx + 124, cy - 30, "−21.7% · 8.6× normal");
+  }
+
+  /* ---------------- ask ---------------- */
+  const ANSWERS = {
+    "Has our liquidity improved since Q1?": [["kpis(EVD, days=60)", "profile(EVD, 2026-01-02 … 2026-10-30)"], "Slightly. The cost to trade €25k fell from 9 bps° in Q1 to 7 bps° over the last 60 days, below the MDAX median of 9 bps°. Daily turnover held at about €13m°, so CTS Eventim stays comfortably in Xetra category A."],
+    "Explain 27 March to the CFO in three sentences.": [["impact_card(EVD, 2026-03-27)"], "On 27 March our share fell 23.2% while MDAX peers lost 1.5%, so the move was specific to us. Turnover was 8.6 times normal and client orders were net sellers. The decline built up during the whole day rather than at the open, which points to news being digested during the session."],
+    "How does our closing auction share compare with the MDAX?": [["kpis(EVD, days=60)"], "About 54%° of our turnover trades in the closing auction, in line with the MDAX median of 52%. On 27 October it reached 83%, which matches index-related flows rather than company news."]
+  };
+  function ask(q){
+    const a = ANSWERS[q] || [["kpis(EVD)"], "In the app this question goes to ai.agent.ask(). The answer would use only figures from the engine."];
+    const th = $("#thread"); const wrap = document.createElement("div"); wrap.style.cssText = "display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--rule);padding-top:16px";
+    wrap.innerHTML = `<div class="msg-q">${q}</div><div class="trace-tools"></div><div class="msg-a"><span class="caret"></span></div>`; th.prepend(wrap);
+    const tt = wrap.querySelector(".trace-tools"), ans = wrap.querySelector(".msg-a");
+    a[0].forEach((t, i) => setTimeout(() => tt.insertAdjacentHTML("beforeend", `<span>✓ ${t}</span>`), 250 + i * 300));
+    let i = 0; const words = a[1].split(" ");
+    setTimeout(function step(){ if (i < words.length) { ans.innerHTML = words.slice(0, ++i).join(" ") + ' <span class="caret"></span>'; setTimeout(step, 28); } else ans.textContent = a[1]; }, 300 + a[0].length * 300);
+  }
+  $$(".q").forEach(b => b.addEventListener("click", () => ask(b.textContent)));
+  const send = () => { const v = $("#askInput").value.trim(); if (v) { ask(v); $("#askInput").value = ""; } };
+  $("#askBtn").addEventListener("click", e => { e.preventDefault(); send(); });
+  $("#askInput").addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+
+  /* ---------------- draw ---------------- */
+  function draw(v){
+    if (v === "overview") { strip(); xlm(); who(); rulers(); }
+    if (v === "event") { seis(); after(); whoDay(); }
+    if (v === "compare") scatter();
+  }
+  draw("event");
+  const redraw = () => draw($$(".tab").find(t => t.getAttribute("aria-selected") === "true").dataset.v);
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw); } catch (e) {}
+})();
+</script>
+</body>
+</html>
