@@ -1,6 +1,6 @@
 # How we work (32 hours, no exceptions)
 
-1. `main` always runs. The demo is shown from `main`.
+1. `data_formating.py` always runs. The demo is shown from `data_formating.py`.
 2. Short-lived branches: `feat/<name>-<topic>` or `fix/<name>-<topic>`.
 3. Merge small, at least every 1–2 hours. The tech lead merges or approves.
 4. Run `pytest` and `streamlit run app/Home.py` before you merge.

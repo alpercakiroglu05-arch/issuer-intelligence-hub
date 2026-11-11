@@ -128,7 +128,7 @@ All schemas (`daily_features`, `intraday_bars`, `events.csv`, `impact_card` JSON
 
 ## Conventions
 See **[CONTRIBUTING.md](CONTRIBUTING.md)**. In short:
-- `main` must always run: `streamlit run app/Home.py` and `pytest`. Use branches `feat/<name>-<topic>` and small PRs.
+- `data_formating.py` must always run: `streamlit run app/Home.py` and `pytest`. Use branches `feat/<name>-<topic>` and small PRs.
 - Paths and thresholds go in `config.py` only. Never commit data or `.env`.
 - Engine functions return plain dicts and DataFrames, never Streamlit objects.
 - No investment advice in any text. The tool explains the past and does not predict.

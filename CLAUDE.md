@@ -45,7 +45,7 @@ pip install -r requirements.txt
 streamlit run app/Home.py                 # http://localhost:8501
 pytest                                    # 7 tests; data tests skip if data/ is empty
 ```
-- Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
+- Branch `feat/<name>-<topic>` → PR → lead merges. `data_formating.py` must always run (see `CONTRIBUTING.md`).
 - Before a PR, run `pytest` **and** a headless page check:
   ```python
   from streamlit.testing.v1 import AppTest
