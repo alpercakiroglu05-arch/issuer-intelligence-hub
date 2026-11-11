@@ -9,6 +9,8 @@ The challenge asks: "compare events of the same type, e.g. all quarterly results
     percentile(card, table)                -> dict, where this card sits in the table
     comparison_for(card)                   -> dict | None, fills card["comparison"]
     sector_peers(isin)                     -> list[str] of ISINs (events/sectors.csv, fallback: same index)
+    size_peers(isin) / size_cohort(isin)   -> turnover cohort (size proxy, NOT market cap): large / mid / small
+    peer_group(isin, by)                   -> dict, by = "index" | "sector" | "size"
 
 Event sources
 -------------
@@ -26,7 +28,8 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from config import ANOMALY_Z, BASELINE_DAYS, BASELINE_GAP, CAR_DAYS, COMPARE_MIN_GROUP, SECTORS_CSV
+from config import (ANOMALY_Z, BASELINE_DAYS, BASELINE_GAP, CAR_DAYS, COMPARE_MIN_GROUP, SECTORS_CSV,
+                    SIZE_COHORT_DAYS, SIZE_COHORT_LABELS)
 from engine.data import daily, events
 
 AUTO_TYPE = "NOTABLE_DAY"
@@ -150,18 +153,73 @@ def comparison_for(card: dict) -> dict | None:
     return None
 
 
+# ---------- peer groups: index / sector / turnover cohort (size proxy) ----------
+PEER_BY = ("index", "sector", "size")
+SIZE_LABEL = "Turnover cohort (size proxy)"
+
+
+def _latest() -> pd.DataFrame:
+    return daily().drop_duplicates("isin", keep="last")[["isin", "ticker", "idx_latest"]]
+
+
+@lru_cache(maxsize=1)
+def _sectors() -> pd.Series:
+    """isin -> sector from events/sectors.csv (11 groups from Deutsche Boerse Prime Standard sectors)."""
+    try:
+        sec = pd.read_csv(SECTORS_CSV, dtype=str)
+    except FileNotFoundError:
+        return pd.Series(dtype=str)
+    return sec.dropna(subset=["sector"]).drop_duplicates("isin").set_index("isin")["sector"]
+
+
+@lru_cache(maxsize=1)
+def size_cohorts() -> pd.Series:
+    """isin -> "large" / "mid" / "small": terciles of each stock's median turnover over its last
+    SIZE_COHORT_DAYS trading days. A size PROXY (market cap is not in the data)."""
+    d = daily().sort_values("date")
+    med = d.groupby("isin").tail(SIZE_COHORT_DAYS).groupby("isin")["turnover_eur"].median()
+    rank = med.rank(method="first", ascending=False)   # 1 = highest turnover
+    return pd.qcut(rank, len(SIZE_COHORT_LABELS), labels=list(SIZE_COHORT_LABELS)).astype(str)
+
+
+def size_cohort(isin: str) -> str | None:
+    return size_cohorts().get(isin)
+
+
+def peer_group(isin: str, by: str = "index") -> dict:
+    """Peers of `isin` (the stock itself and other ISINs of the same ticker excluded).
+    by="sector" falls back to the index when the sector is unknown or has no other member."""
+    if by not in PEER_BY:
+        raise ValueError(f"by must be one of {PEER_BY}")
+    u = _latest()
+    me = u[u["isin"] == isin]
+    if me.empty:
+        raise ValueError(f"Unknown ISIN {isin}")
+    others = u[u["ticker"] != me["ticker"].iloc[0]]
+    idx = me["idx_latest"].iloc[0]
+    fallback = None
+    if by == "sector":
+        sector = _sectors().get(isin)
+        peers = others[others["isin"].map(_sectors()) == sector] if sector else others.iloc[0:0]
+        if len(peers):
+            return {"by": "sector", "name": sector, "label": f"Sector: {sector}",
+                    "isins": peers["isin"].tolist(), "n": len(peers), "fallback": None}
+        fallback = "index"
+    if by == "size":
+        cohort = size_cohort(isin)
+        peers = others[others["isin"].map(size_cohorts()) == cohort]
+        return {"by": "size", "name": cohort, "label": f"{SIZE_LABEL}: {cohort}",
+                "isins": peers["isin"].tolist(), "n": len(peers), "fallback": None}
+    peers = others[others["idx_latest"] == idx]
+    return {"by": "index", "name": idx, "label": f"Index: {idx}",
+            "isins": peers["isin"].tolist(), "n": len(peers), "fallback": fallback}
+
+
 def sector_peers(isin: str) -> list[str]:
     """ISINs in the same sector (events/sectors.csv); fallback: same latest index."""
-    u = daily().drop_duplicates("isin", keep="last")[["isin", "ticker", "idx_latest"]]
-    try:
-        sec = pd.read_csv(SECTORS_CSV, dtype=str).dropna(subset=["sector"])
-        sec = sec.merge(u, on="ticker")
-        mine = sec.loc[sec["isin_y"] == isin, "sector"]
-        if len(mine):
-            peers = sec.loc[(sec["sector"] == mine.iloc[0]) & (sec["isin_y"] != isin), "isin_y"].tolist()
-            if peers:
-                return peers
-    except (FileNotFoundError, KeyError):
-        pass
-    idx = u.loc[u["isin"] == isin, "idx_latest"]
-    return u.loc[(u["idx_latest"] == idx.iloc[0]) & (u["isin"] != isin), "isin"].tolist() if len(idx) else []
+    return peer_group(isin, "sector")["isins"]
+
+
+def size_peers(isin: str) -> list[str]:
+    """ISINs in the same turnover cohort (size proxy, not market cap)."""
+    return peer_group(isin, "size")["isins"]

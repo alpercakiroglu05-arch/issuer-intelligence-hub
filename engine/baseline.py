@@ -4,17 +4,18 @@ Part A - the "normal state" of a stock.  OWNER: C2 (engine).  STATUS: v1 works.
     profile(isin)              daily time series for the dashboard
     index_benchmark(idx, col)  median of a column across the stock's index, per day
     anomalies(isin)            unusual days ("notable days") with a reason
-    kpis(isin)                 headline numbers vs. index median + Xetra liquidity check
+    kpis(isin)                 headline numbers vs. index, sector and size-proxy medians + Xetra liquidity check
     liquidity_trend(isin)      "has our liquidity improved?" last 60 vs previous 60 trading days
     anomaly_episodes(isin)     consecutive unusual days merged into one episode
 
-TODO C2:
-  - sector peers instead of index peers once events/sectors.csv is filled
+Peer groups (index / sector / turnover cohort as size proxy) come from engine.compare.peer_group.
 """
 import numpy as np
 import pandas as pd
 
-from config import ANOMALY_Z, DS_LOOKBACK_DAYS, DS_TURNOVER_MIN_EUR, DS_XLM_MAX_BPS, LIQUIDITY_TREND_TOL
+from config import (ANOMALY_Z, DS_LOOKBACK_DAYS, DS_TURNOVER_MIN_EUR, DS_XLM_MAX_BPS, LIQUIDITY_TREND_TOL,
+                    MIN_PEER_GROUP)
+from engine.compare import peer_group
 from engine.data import daily, stock
 
 PROFILE_COLS = [
@@ -68,8 +69,24 @@ def kpis(isin: str, days: int = 60) -> dict:
     xlm = float(lookback["xlm_25k"].median())
     category = "A" if (xlm <= DS_XLM_MAX_BPS and avg_turnover >= DS_TURNOVER_MIN_EUR) else "B"
 
+    # Sector and turnover-cohort (size proxy) medians, computed like the index median (group incl. the stock)
+    kcols = ["turnover_eur", "xlm_25k", "auction_share", "agent_share"]
+    groups = {by: peer_group(isin, by) for by in ("index", "sector", "size")}
+    group_med = {}
+    for by in ("sector", "size"):
+        g = groups[by]
+        members = d[d["isin"].isin(g["isins"] + [isin]) & (d["date"] >= recent["date"].min())]
+        group_med[by] = members.groupby("isin")[kcols].median().median()
+    flags = ["small_peer_group"] if any(g["n"] < MIN_PEER_GROUP for g in groups.values()) else []
+    if groups["sector"]["fallback"]:
+        flags.append("no_sector")  # sector unknown -> the sector median is the index median
+
+    def _num(v):
+        return None if pd.isna(v) else float(v)
+
     def pair(col):
-        return {"stock": float(recent[col].median()), "index_median": float(peer_med[col])}
+        return {"stock": float(recent[col].median()), "index_median": float(peer_med[col]),
+                "sector_median": _num(group_med["sector"][col]), "size_median": _num(group_med["size"][col])}
 
     return {
         "isin": isin, "ticker": s["ticker"].iloc[-1], "name": s["name"].iloc[-1], "index": idx,
@@ -85,6 +102,8 @@ def kpis(isin: str, days: int = 60) -> dict:
                     "category B needs a Designated Sponsor for continuous trading.",
         },
         "anomaly_days_last_period": int((anomalies(isin)["date"] >= recent["date"].min()).sum()),
+        "peer_groups": {by: {k: g[k] for k in ("name", "label", "n", "fallback")} for by, g in groups.items()},
+        "flags": flags,
     }
 
 
@@ -162,6 +181,23 @@ def liquidity_trend(isin: str, window: int = 60) -> dict:
         own = [k for k in moved if ichg[k] is None or abs(chg[k] - ichg[k]) >= LIQUIDITY_TREND_TOL]
         vs_index = "stock-specific" if own else "market-wide"
 
+    # Same check against the sector median (vs_sector); only when the sector group is real and big enough.
+    sec = peer_group(isin, "sector")
+    d = daily()
+    sbench = d[d["isin"].isin(sec["isins"] + [isin])].groupby("date")[["xlm_25k", "turnover_eur"]].median()
+    sector_vals = {k: {"before": _med(sbench[col].reindex(before["date"]), nd[col]),
+                       "now": _med(sbench[col].reindex(now["date"]), nd[col])} for k, col in metrics}
+    schg = {k: _chg(v["now"], v["before"]) for k, v in sector_vals.items()}
+    vs_sector = None
+    if sec["fallback"]:
+        flags.append("no_sector")
+    elif sec["n"] < MIN_PEER_GROUP:
+        flags.append("small_peer_group")
+    elif verdict in ("improved", "worsened", "mixed"):
+        moved = [k for k, c in chg.items() if c is not None and abs(c) >= LIQUIDITY_TREND_TOL]
+        own = [k for k in moved if schg[k] is None or abs(chg[k] - schg[k]) >= LIQUIDITY_TREND_TOL]
+        vs_sector = "stock-specific" if own else "sector-wide"
+
     ds = {"now": _ds_category(s.tail(DS_LOOKBACK_DAYS)),
           "before": _ds_category(s.iloc[max(0, n - 2 * DS_LOOKBACK_DAYS): max(0, n - DS_LOOKBACK_DAYS)])}
 
@@ -195,7 +231,9 @@ def liquidity_trend(isin: str, window: int = 60) -> dict:
         "stock": stock_vals, "index_median": index_vals,
         "xlm_25k_change_pct": chg["xlm_25k_bps"], "turnover_change_pct": chg["turnover_eur"],
         "index_xlm_25k_change_pct": ichg["xlm_25k_bps"], "index_turnover_change_pct": ichg["turnover_eur"],
-        "verdict": verdict, "vs_index": vs_index, "help": TREND_HELP[verdict],
+        "sector": None if sec["fallback"] else sec["name"], "sector_median": sector_vals,
+        "sector_xlm_25k_change_pct": schg["xlm_25k_bps"], "sector_turnover_change_pct": schg["turnover_eur"],
+        "verdict": verdict, "vs_index": vs_index, "vs_sector": vs_sector, "help": TREND_HELP[verdict],
         "ds_category": ds, "monthly": monthly, "summary": summary, "flags": flags,
     }
 

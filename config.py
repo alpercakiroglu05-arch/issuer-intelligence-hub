@@ -67,6 +67,12 @@ LIQUIDITY_TREND_TOL = 0.10
 # Same-type comparison (engine/compare.py): smallest group worth a percentile
 COMPARE_MIN_GROUP = 5
 
+# Peer groups (engine/compare.py peer_group): market cap is not in the data, so "size" is a
+# turnover cohort: median daily turnover over the last SIZE_COHORT_DAYS, terciles over all stocks.
+SIZE_COHORT_DAYS = 60
+SIZE_COHORT_LABELS = ("large", "mid", "small")   # top / middle / bottom third by turnover
+MIN_PEER_GROUP = 3                               # fewer peers -> flag "small_peer_group"
+
 # News onset detection (engine/onset.py): first minute where price AND volume break from normal
 ONSET_PRICE_K = 2.0               # |move vs previous close| >= 2 x daily return std (baseline)
 ONSET_VOLUME_K = 3.0              # cumulative turnover >= 3 x normal for the time of day

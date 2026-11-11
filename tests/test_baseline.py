@@ -35,7 +35,8 @@ def test_anomalies_runs_for_every_stock():
 QIA_OLD_ISIN = "NL0015002CX3"  # Qiagen's previous ISIN: only 4 trading days in the data
 TREND_KEYS = {"isin", "ticker", "index", "window", "period", "stock", "index_median", "xlm_25k_change_pct",
               "turnover_change_pct", "index_xlm_25k_change_pct", "index_turnover_change_pct", "verdict",
-              "vs_index", "help", "ds_category", "monthly", "summary", "flags"}
+              "vs_index", "help", "ds_category", "monthly", "summary", "flags",
+              "sector", "sector_median", "sector_xlm_25k_change_pct", "sector_turnover_change_pct", "vs_sector"}
 
 
 @pytest.mark.parametrize("xlm, to, verdict", [
@@ -137,3 +138,46 @@ def test_liquidity_trend_hag_full_history():
     from engine.data import isin_of
     t = liquidity_trend(isin_of("HAG"))
     assert t["verdict"] in ("improved", "worsened", "mixed", "stable") and t["flags"] == []
+
+
+@needs_data
+def test_kpis_keeps_index_keys_and_adds_sector_and_size():
+    from engine.baseline import kpis
+    from engine.data import isin_of
+    k = kpis(isin_of("EVD"))
+    for key in ("median_turnover_eur", "median_xlm_25k_bps", "median_auction_share", "median_agent_share"):
+        assert {"stock", "index_median", "sector_median", "size_median"} <= set(k[key])
+        assert k[key]["index_median"] is not None and k[key]["sector_median"] is not None
+    assert k["peer_groups"]["sector"]["name"] == "Media & Telecom"
+    assert k["peer_groups"]["size"]["label"] == "Turnover cohort (size proxy): mid"
+    assert k["liquidity_check"]["category_estimate"] in ("A", "B") and k["flags"] == []
+
+
+@needs_data
+def test_kpis_small_peer_group_flag():
+    """Utilities has only E.ON and RWE in the universe -> 1 sector peer -> flagged."""
+    from engine.baseline import kpis
+    from engine.data import isin_of
+    k = kpis(isin_of("RWE"))
+    assert k["peer_groups"]["sector"]["n"] == 1 and "small_peer_group" in k["flags"]
+
+
+@needs_data
+def test_kpis_and_trend_without_sector_fall_back_to_index():
+    """Kloeckner (KCO) is not in the Deutsche Boerse list -> blank sector -> index group."""
+    from engine.baseline import kpis, liquidity_trend
+    from engine.data import isin_of
+    k = kpis(isin_of("KCO"))
+    assert k["peer_groups"]["sector"]["fallback"] == "index" and "no_sector" in k["flags"]
+    assert k["median_xlm_25k_bps"]["sector_median"] == k["median_xlm_25k_bps"]["index_median"]
+    t = liquidity_trend(isin_of("KCO"))
+    assert t["vs_sector"] is None and t["sector"] is None and "no_sector" in t["flags"]
+
+
+@needs_data
+def test_liquidity_trend_vs_sector_hdd():
+    from engine.baseline import liquidity_trend
+    from engine.data import isin_of
+    t = liquidity_trend(isin_of("HDD"))
+    assert t["sector"] == "Industrials" and t["vs_sector"] == "stock-specific"
+    assert t["sector_xlm_25k_change_pct"] is not None and t["sector_turnover_change_pct"] is not None

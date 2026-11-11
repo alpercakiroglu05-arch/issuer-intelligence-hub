@@ -122,3 +122,97 @@ def test_comparison_summary_gxi_is_biggest():
     c = impact_card(isin_of("GXI"), "2026-02-11")["comparison"]
     assert c["abs_abn_ret_pctile"] == 1.0 and c["rank_abs_abn_ret"] == 1
     assert "was the biggest of them" in c["summary"] and "100%" not in c["summary"]
+
+
+# ---------- peer groups: sector (events/sectors.csv) and turnover cohort (size proxy) ----------
+def test_sectors_csv_shape():
+    """events/sectors.csv: one row per universe ISIN, 11 groups, every filled row has a source."""
+    from config import SECTORS_CSV
+    sec = pd.read_csv(SECTORS_CSV, dtype=str)
+    assert list(sec.columns) == ["ticker", "isin", "name", "sector", "source_url"]
+    assert sec["isin"].is_unique
+    assert sec["sector"].dropna().nunique() == 11
+    assert sec.loc[sec["sector"].notna(), "source_url"].notna().all()
+    assert sec.loc[sec["sector"].isna(), "source_url"].isna().all()
+    # ISIN changes in 2026: both ISINs of a company carry the same sector
+    for t in ("FRE", "QIA"):
+        assert sec.loc[sec["ticker"] == t, "sector"].nunique() == 1 and (sec["ticker"] == t).sum() == 2
+
+
+@needs_data
+def test_sectors_csv_covers_universe():
+    from config import SECTORS_CSV
+    from engine.data import universe
+    sec = pd.read_csv(SECTORS_CSV, dtype=str)
+    assert set(sec["isin"]) == set(universe()["isin"])
+
+
+@needs_data
+def test_sector_peers_evd():
+    from engine.compare import _sectors, peer_group, sector_peers
+    from engine.data import isin_of
+    evd = isin_of("EVD")
+    assert _sectors()[evd] == "Media & Telecom"
+    peers = sector_peers(evd)
+    assert evd not in peers and len(peers) >= 3
+    assert all(_sectors()[p] == "Media & Telecom" for p in peers)
+    assert peer_group(evd, "sector")["fallback"] is None
+
+
+@needs_data
+def test_sector_peers_exclude_other_isin_of_same_company():
+    from engine.compare import sector_peers
+    from engine.data import universe
+    u = universe()
+    fre = u.loc[u["ticker"] == "FRE", "isin"].tolist()
+    for i in fre:
+        assert not set(fre) & set(sector_peers(i))
+
+
+@needs_data
+def test_size_cohorts_are_terciles():
+    from config import SIZE_COHORT_LABELS
+    from engine.compare import size_cohorts
+    counts = size_cohorts().value_counts()
+    assert set(counts.index) == set(SIZE_COHORT_LABELS) and counts.sum() == 174
+    assert counts.max() - counts.min() <= 1                     # 58 / 58 / 58
+
+
+@needs_data
+def test_size_peers_same_cohort():
+    from engine.compare import peer_group, size_cohort, size_peers
+    from engine.data import isin_of
+    sap = isin_of("SAP")
+    assert size_cohort(sap) == "large"
+    assert sap not in size_peers(sap)
+    assert {size_cohort(p) for p in size_peers(sap)} == {"large"}
+    assert peer_group(sap, "size")["label"] == "Turnover cohort (size proxy): large"
+
+
+@needs_data
+def test_missing_sector_falls_back_to_index(tmp_path, monkeypatch):
+    """A stock with a blank sector (here EVD, blanked in a temp copy) gets its index members."""
+    import engine.compare as compare
+    from config import SECTORS_CSV
+    from engine.data import isin_of
+    evd = isin_of("EVD")
+    sec = pd.read_csv(SECTORS_CSV, dtype=str)
+    sec.loc[sec["isin"] == evd, "sector"] = None
+    tmp = tmp_path / "sectors.csv"
+    sec.to_csv(tmp, index=False)
+    monkeypatch.setattr(compare, "SECTORS_CSV", tmp)
+    compare._sectors.cache_clear()
+    try:
+        g = compare.peer_group(evd, "sector")
+        assert g["fallback"] == "index" and g["by"] == "index"
+        assert g["isins"] == compare.peer_group(evd, "index")["isins"]
+    finally:
+        compare._sectors.cache_clear()
+
+
+@needs_data
+def test_peer_group_rejects_unknown_by():
+    from engine.compare import peer_group
+    from engine.data import isin_of
+    with pytest.raises(ValueError):
+        peer_group(isin_of("EVD"), "market_cap")
