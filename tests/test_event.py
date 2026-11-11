@@ -161,4 +161,4 @@ def test_no_duplicate_ticker_type_date(header_and_rows):
             problems.append((line_numbers[1], f"Duplikat von ticker={ticker}, type={typ}, date={d} "
                                               f"(auch in Zeile(n) {line_numbers[:1] + line_numbers[2:]})"))
     if problems:
-        _fail("Doppelte Einträge", sorted(problems))
+        _fail("Doppelte Einträge", sorted(problems))gi
