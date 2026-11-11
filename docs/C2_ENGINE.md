@@ -92,13 +92,14 @@ or `"size"`. The stock itself and other ISINs of the same ticker (FRE, QIA) are 
 - **Source:** Deutsche Börse, *Listed Companies Frankfurt Stock Exchange* (Issuer Services), file
   [Listed-companies.xlsx](https://www.cashmarket.deutsche-boerse.com/resource/blob/67858/c0cedb209ed3143463ce6675b641225b/data/Listed-companies.xlsx).
   The file is dated 31 Oct 2026 (Excel date 46327) and covers the Prime Standard, General Standard, Scale and Basic Board sheets.
-- **Matching:** matched on **ISIN**, using the `Sector` and `Subsector` columns. 168 of the 174 universe ISINs match directly.
+- **Matching:** matched on **ISIN**, using the `Sector` and `Subsector` columns. 169 of the 174 universe ISINs match directly.
+  Cells are stripped first; some ISIN cells end with a non-breaking space, e.g. Vincorion's.
 - **Classification:** one classification, the Deutsche Börse **Prime Standard sectors** (18). They are mapped to
   **11 groups** so that each group has enough peers:
 
 | Group | Deutsche Börse Prime Standard sector | Stocks |
 |---|---|---|
-| Industrials | Industrial, Construction | 46 |
+| Industrials | Industrial, Construction | 47 |
 | Technology | Software, Technology | 22 |
 | Consumer | Consumer, Food & Beverages, Retail | 20 |
 | Healthcare | Pharma & Healthcare | 18 |
@@ -116,14 +117,19 @@ or `"size"`. The stock itself and other ISINs of the same ticker (FRE, QIA) are 
   - QIA `NL0015002CX3` → `NL0015002SN0`
   - ACT (Alzchem, old) `DE000A2YNT30` → `DE000A41YHG1` (= our ACT0)
   - VRV (Verve) `SE0018538068` → `IE000ZVY0237` (same name and trading symbol VRV)
-- **Left blank on purpose** (not in the Deutsche Börse file, no guess):
-  - **KCO** Klöckner & Co `DE000KC01000`
-  - **V1NC** Vincorion `DE000VNC0014`
-
-  For these two, `peer_group(..., "sector")` falls back to the index (`fallback: "index"`, flag `no_sector`).
-- **How it was built:** the xlsx was parsed with Python's standard library, labels were stripped and their case
-  normalised (`Financial services` → `Financial Services`), then the mapping above was applied. To refresh, download the
-  file again and repeat; every filled row carries the source URL.
+- **Left blank on purpose** (not in the Deutsche Börse file, no guess): **KCO** Klöckner & Co `DE000KC01000`.
+  For it, `peer_group(..., "sector")` falls back to the index (`fallback: "index"`, flag `no_sector`).
+- **Rebuild:** `ingest/build_sectors.py` takes the xlsx as a local path **or** a URL. The xlsx is not committed.
+  ```bash
+  python ingest/build_sectors.py https://www.cashmarket.deutsche-boerse.com/resource/blob/67858/c0cedb209ed3143463ce6675b641225b/data/Listed-companies.xlsx
+  python ingest/build_sectors.py path/to/Listed-companies.xlsx [out.csv]   # default out: events/sectors.csv
+  ```
+  - The script reads the xlsx with the standard library (no `openpyxl`), strips labels and normalises their case
+    (`Financial services` → `Financial Services`), then applies `GROUP` and `SAME_COMPANY`.
+  - It stops with an error if a new Deutsche Börse sector has no group.
+  - Every filled row carries the source URL. Download page:
+    https://www.cashmarket.deutsche-boerse.com/cash-en/Data-Tech/statistics/listed-companies (the blob URL changes when
+    Deutsche Börse publishes a new file).
 
 ### Size: turnover cohort (size proxy), NOT market cap
 
@@ -214,7 +220,7 @@ c[1].metric("Median turnover", f"€{k['median_turnover_eur']['stock'] / 1e6:.1f
 - Medians over 60 trading days react slowly; one huge day hardly moves them (by design).
 - DS category is an estimate (order book turnover only, XLM median), not the official Deutsche Börse classification.
 - `monthly` covers Jan–Oct 2026 (the data excerpt); the first and last months can be partial.
-- Sectors are a snapshot (Deutsche Börse list of 31 Oct 2026); 2 stocks are blank. Utilities has only 2 stocks.
+- Sectors are a snapshot (Deutsche Börse list of 31 Oct 2026); 1 stock (KCO) is blank. Utilities has only 2 stocks.
 - The turnover cohort is a size proxy: a large but rarely traded company can land in `small`. Old ISINs (FRE, QIA,
   ACT) are ranked on their own last 60 trading days.
 - Alzchem's two ISINs have different tickers (ACT, ACT0), so they can appear in each other's peer lists.
