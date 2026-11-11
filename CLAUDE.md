@@ -42,8 +42,9 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 
 ```bash
 pip install -r requirements.txt
-streamlit run app/Home.py                 # http://localhost:8501
-pytest                                    # 69 tests; data tests skip if data/ is empty
+python web/server.py                      # demo UI (web front end, C3): http://127.0.0.1:8600
+streamlit run app/Home.py                 # backup UI and analyst view: http://localhost:8501
+pytest                                    # 79 tests (incl. web API); data tests skip if data/ is empty
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
 - Before a PR, run `pytest` **and** a headless page check:
@@ -125,6 +126,7 @@ Done on `main`:
   - `compare`: same-type percentiles, with Kaan's summary sentence.
 - **AI:** template narrative DE/EN + LLM wrapper; assistant v1. **No LLM connected** (`LLM_PROVIDER=none`).
 - **Report:** HTML/PDF snapshot of the impact card.
+- **Two front ends on the same engine.** `web/` by Alper (#27, fixed in #30) is the **demo UI**: Issuer Services look, ISIN entry, dashboard, impact card, compare, assistant, report (Part A + B) and ideas, served by a small JSON API in `web/server.py`. `app/` (Streamlit) is the backup and analyst view, and also has the order-size cost curve and the market-context column. `tests/test_web.py` tests every web API over HTTP.
 - **Dashboard:**
   - Compare with Index / Sector / Size (#20, #21).
   - Liquidity trend and episodes with linked events plus market context (#19, #24, #25).
