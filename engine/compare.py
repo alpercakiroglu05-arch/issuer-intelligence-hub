@@ -20,6 +20,7 @@ Event sources
 Metrics use exactly the impact-card definitions (baseline t-65..t-6, see engine/impact.py), computed
 vectorised for all stocks, so a card and its comparison table always agree.
 """
+import math
 from functools import lru_cache
 
 import numpy as np
@@ -108,6 +109,26 @@ def percentile(card: dict, table: pd.DataFrame) -> dict:
     return out
 
 
+def _share(p: float) -> str:
+    """Percentile as text, rounded down so 0.995 never reads as "100%" (round() first kills float noise)."""
+    return f"{math.floor(round(p * 100, 6))}%"
+
+
+def _summary(card: dict, group: str, res: dict) -> str:
+    """One English sentence; every number comes from the card or the percentile result."""
+    abn, vol = card["price"]["abn_ret"], card["volume"]["ratio"]
+    parts = []
+    if res["abs_abn_ret_pctile"] is not None:
+        p = res["abs_abn_ret_pctile"]
+        rank = "the biggest of them" if p == 1.0 else f"bigger than {_share(p)} of them"
+        parts.append(f"the stock-specific move ({abn * 100:+.1f}%) was {rank}")
+    if res["vol_ratio_pctile"] is not None:
+        parts.append(f"turnover ({vol:.1f}x normal) was higher than {_share(res['vol_ratio_pctile'])}")
+    if not parts:
+        return f"Compared with {res['n']} {group}; not enough data on this day for a ranking."
+    return f"Compared with {res['n']} {group}, " + " and ".join(parts) + "."
+
+
 def comparison_for(card: dict) -> dict | None:
     """Same type in the same index if there are enough events, else all indices, else unusual days."""
     day = pd.Timestamp(card["event"]["reaction_day"])
@@ -123,8 +144,9 @@ def comparison_for(card: dict) -> dict | None:
         if res["n"] >= COMPARE_MIN_GROUP:
             label = "unusual trading days" if t == AUTO_TYPE else f"{t} events"
             period = f"{m['date'].min():%b} – {m['date'].max():%b %Y}"
-            return {"group_type": t, "group_index": idx or "DAX+MDAX+SDAX",
-                    "group": f"{label}, {idx or 'DAX, MDAX and SDAX'}, {period}", **res}
+            group = f"{label}, {idx or 'DAX, MDAX and SDAX'}, {period}"
+            return {"group_type": t, "group_index": idx or "DAX+MDAX+SDAX", "group": group, **res,
+                    "summary": _summary(card, group, res)}
     return None
 
 

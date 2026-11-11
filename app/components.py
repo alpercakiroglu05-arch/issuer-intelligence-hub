@@ -5,6 +5,8 @@ TODO C3:
   - visual design of the impact card (this is THE demo moment) - use the designer's sketch
   - consistent colors: stock vs peers vs normal band
 """
+import math
+
 import _bootstrap  # noqa: F401
 import pandas as pd
 import streamlit as st
@@ -24,6 +26,11 @@ def pct(x):
 
 def pct0(x):
     return "n/a" if _na(x) else f"{x * 100:.0f}%"
+
+
+def pctile0(x):
+    """Percentile, rounded down so 0.995 never shows as "100%"."""
+    return "n/a" if _na(x) else f"{math.floor(round(x * 100, 6))}%"
 
 
 def times(v):
@@ -91,10 +98,12 @@ def render_card(card: dict) -> None:
     cmp = card.get("comparison")
     if cmp:
         rank = f" (#{cmp['rank_abs_abn_ret']} of {cmp['n'] + 1})" if cmp.get("rank_abs_abn_ret") else ""
-        st.info(f"📐 **Compared with {cmp['n']} {cmp['group']}:** the stock-specific move was bigger than "
-                f"**{pct0(cmp['abs_abn_ret_pctile'])}** of them{rank}, turnover vs normal bigger than "
-                f"**{pct0(cmp['vol_ratio_pctile'])}**, trading cost vs normal higher than "
-                f"**{pct0(cmp['xlm_ratio_pctile'])}**.")
+        move = ("**the biggest of them**" if cmp["abs_abn_ret_pctile"] == 1.0
+                else f"bigger than **{pctile0(cmp['abs_abn_ret_pctile'])}** of them")
+        st.info(f"📐 **Compared with {cmp['n']} {cmp['group']}:** the stock-specific move was "
+                f"{move}{rank}, turnover vs normal bigger than "
+                f"**{pctile0(cmp['vol_ratio_pctile'])}**, trading cost vs normal higher than "
+                f"**{pctile0(cmp['xlm_ratio_pctile'])}**.")
     c2 = st.columns(5)
     c2[0].metric("Gap at open", pct(p["gap_open"]))
     c2[1].metric("Move during session", pct(p["ret_intraday"]))
