@@ -147,9 +147,8 @@ Done on `main`:
   `docs/REQUIREMENTS.md` (brief item -> page), `docs/C2_ENGINE.md`.
 
 Open:
-1. **Assistant policy (decide):** the dock shows a model answer that fails the numbers check with a warning
-   ("N figure(s) not found"), while card summaries fall back to the template. Today no cached answer is flagged;
-   a new live question could be.
+1. ~~Assistant policy~~ ✅ Decided: a dock answer with a figure that is not in the tool outputs is replaced by the
+   deterministic answer, the same rule as the card summary (`ai/agent._checked`).
 2. **Thu morning:** demo dry run on the web UI; backup video at 12:00 on the web UI; Streamlit open as the
    live fallback. Run the demo from Oğuzhan's laptop (key and caches are local). Open the page early (first
    load 8-10 s). Do not press "Regenerate" in the demo (it asks the model again).
