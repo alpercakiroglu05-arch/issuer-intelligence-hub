@@ -288,6 +288,32 @@ C2 does not touch `app/`; this is a suggestion.
 - Word it as "index day" / "possible index or calendar effect", never "no news": the flags give a likely reason,
   not proof.
 
+## Part A report: `report.export.part_a_html(isin, lang="en", peer_by="index") -> str`
+
+Brief: the dashboard result "can be exported as a short report for the IR department". The Dashboard has an
+**Export IR report** area at the bottom (language EN/DE, HTML and PDF buttons; PDF via `to_pdf(html)`, xhtml2pdf).
+`peer_by` follows the Dashboard's "Compare with" choice and is printed in the report.
+
+Template `report/template_part_a.html`, data from `part_a_data(isin, peer_by)`. **No new numbers**: every value
+comes from the engine and is only formatted (`_fmt()`, same as the impact card snapshot).
+
+| Section | Source |
+|---|---|
+| 1. Header: name, ticker, index, sector, size group, data period | `kpis()["peer_groups"]`, `data.stock()` dates |
+| 2. KPIs vs index / sector / size + DS category estimate | `kpis()` |
+| 3. Liquidity trend: verdict, vs index / sector, before/now/change, DS category, summary, help | `liquidity_trend()` |
+| 4. Cost by order size vs the `peer_by` group | `xlm.curve_summary(xlm.cost_curve(isin, peer_by))` |
+| 5. Unusual episodes (largest 8 by severity, newest first) + linked event + market context explanations | `anomaly_episodes()`, `events.csv`, `CONTEXT_HELP` |
+| 6. Footer: source, "numbers computed in code; no investment advice" | fixed text |
+
+- **DE/EN are templates, no LLM.** `liquidity_trend()["summary"]` and `help` are English only, so the DE report
+  builds the summary from the same fields (`_summary_de`); verdict, help, reasons and context words have DE tables
+  in `export.py`. Number format stays `-23.2%` in both languages (README C4 "German formatting" is separate).
+- Missing data never fails: no XLM (GXI after April, old QIA ISIN) → note in section 4; short history → verdict
+  n/a; no sector (KCO) → "sector unknown, the index is used"; no episodes (HAG) → "No unusual days".
+- Tests: `tests/test_report_part_a.py` (EVD, HDD, HAG, GXI, KCO, old QIA; DE+EN HTML, `%PDF`, numbers equal to
+  `kpis()` / `liquidity_trend()` / `curve_summary()`).
+
 ## Known limits
 
 - The index median uses `idx_latest`, so a stock that changed index is compared with its current index.

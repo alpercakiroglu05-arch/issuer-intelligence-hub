@@ -37,3 +37,32 @@ def test_llm_text_with_only_known_numbers_is_used(monkeypatch):
     monkeypatch.setattr(llm, "model_name", lambda: "kolibri-1")
     out = narrate.narrate_with_meta(CARD, "en")
     assert out["source"] == "llm" and out["text"].startswith("TEST AG fell 23.2%")
+
+
+def test_numbers_check_accepts_percentiles_rounded_down():
+    """The UI never rounds a percentile up (0.939 -> 'bigger than 93 %'), so the check must accept it."""
+    from ai.checks import unsupported_numbers
+    card = {"comparison": {"n": 214, "vol_ratio_pctile": 0.939}}
+    assert unsupported_numbers("Turnover was bigger than 93% of 214 days.", card) == []
+
+
+def test_numbers_check_rejects_complements():
+    """'top 6 %' from a 0.939 percentile is a computed number, not one from the JSON."""
+    from ai.checks import unsupported_numbers
+    card = {"comparison": {"n": 214, "vol_ratio_pctile": 0.939}}
+    assert unsupported_numbers("Turnover was in the top 6.1% of days.", card) == ["6.1"]
+
+
+def test_assistant_answer_with_invented_number_falls_back(monkeypatch):
+    """The assistant's answer must pass the numbers check against its context, else a safe answer is used."""
+    import os
+    from config import DATA_DIR
+    if not (DATA_DIR / "daily_features.parquet").exists():
+        import pytest
+        pytest.skip("data missing")
+    from ai import agent, llm
+    from engine.data import isin_of
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: SimpleNamespace(content="Liquidity improved by 47.3%.", tool_calls=None))
+    out = agent.ask("Has our liquidity improved?", isin_of("EVD"))
+    assert "47.3" not in out and "Stable" in out   # deterministic answer = liquidity_trend summary
+    assert os.environ["LLM_PROVIDER"] == "none"

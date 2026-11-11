@@ -2,7 +2,6 @@
 
 TODO C3:
   - date range filter; peer selection (index / sector) once sectors.csv is filled
-  - "Export IR snapshot (Part A)" button (with C4)
   - nicer anomaly markers (hover: reason, abnormal return, volume ratio)
 """
 import sys
@@ -18,6 +17,7 @@ import pandas as pd  # noqa: E402
 
 from components import bps, eur, pct, pct0, setup  # noqa: E402
 from engine import baseline, compare, data, xlm  # noqa: E402
+from report.export import part_a_html, to_pdf  # noqa: E402
 
 isin = setup("Dashboard")
 
@@ -180,3 +180,25 @@ if len(show):
     if st.button("⚡ Generate impact card", type="primary"):
         st.session_state["impact_day"] = str(opts[pick].peak_date)
         st.switch_page("pages/2_Impact_Card.py")
+
+# Part A report (brief: "the result can be exported as a short report for the IR department")
+st.markdown("### Export IR report")
+st.caption(f"Short report of this page: key figures vs index / sector / size, liquidity trend, trading cost by "
+           f"order size (vs **{g['label']}**, the 'Compare with' choice above) and unusual days.")
+
+
+@st.cache_data
+def part_a_report(isin: str, lang: str, by: str) -> tuple[str, bytes | None]:
+    html = part_a_html(isin, lang, peer_by=by)
+    return html, to_pdf(html)
+
+
+rl, rh, rp = st.columns([1, 1, 1])
+lang = rl.segmented_control("Language", ["EN", "DE"], default="EN", key="part_a_lang") or "EN"
+report_html, report_pdf = part_a_report(isin, lang.lower(), by)
+fname = f"IR_report_{k['ticker']}_{lang}"
+rh.download_button("⬇ IR report (HTML)", report_html, file_name=f"{fname}.html", mime="text/html")
+if report_pdf:
+    rp.download_button("⬇ IR report (PDF)", report_pdf, file_name=f"{fname}.pdf", mime="application/pdf")
+else:
+    rp.caption("PDF needs xhtml2pdf (pip install -r requirements.txt)")

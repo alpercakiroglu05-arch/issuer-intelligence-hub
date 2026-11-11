@@ -96,3 +96,5 @@ in the direction of the day's move, still holding 5 minutes later. Thresholds in
 | `ai.agent.ask(question, isin)` | str | C4 |
 | `ai.agent.run(question, isin, history, context, lang)` | dict: `text, source, model, steps[{tool,args}], actions[{view,isin,day,event_id,event_type,index}], check{total,unsupported}` | C4 (v2 by C3) |
 | `report.export.to_html(card, text, lang)` / `to_pdf(html)` | str / bytes | C4 |
+| `report.export.part_a_html(isin, lang="en", peer_by="index")` | str: Part A IR report (DE/EN, `template_part_a.html`): header, KPIs vs index/sector/size, liquidity trend, cost by order size vs `peer_by` group, top 8 episodes + linked events + context. Only formats engine output; PDF via `to_pdf(html)` | C2 (for C4) |
+| `report.export.part_a_data(isin, peer_by="index")` | dict: the engine output behind the report (`kpis`, `trend`, `curve` (= `curve_summary` + `peer_largest_absorbed_label`), `episodes`, `n_episodes`, `period`, `peer_by`) | C2 (for C4) |
