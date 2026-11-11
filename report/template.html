@@ -43,6 +43,12 @@
         <div class="base">{{ L.normal }} &plusmn;{{ pct1(card.auctions.close_auction_move_baseline_abs) }}</div></td>
   </tr></table>
 
+  {% if card.comparison %}
+  <div class="base">{{ L.cmp_pre }} {{ card.comparison.n }} {{ card.comparison.group }}:
+    {{ L.cmp_abn }} {{ pct0(card.comparison.abs_abn_ret_pctile) }},
+    {{ L.cmp_vol }} {{ pct0(card.comparison.vol_ratio_pctile) }}.</div>
+  {% endif %}
+
   <div class="text">{{ narrative }}</div>
 
   <div class="foot">{{ L.foot }}</div>

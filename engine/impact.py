@@ -12,8 +12,9 @@ abnormal return = stock return - equal-weighted return of the other index member
 volume z = (log turnover t0 - mean log turnover baseline) / std
 CAR      = sum of abnormal returns t0 .. t+5
 
+comparison block: percentile of this event vs. events of the same type (engine/compare.py)
+
 TODO C2:
-  - comparison block: percentile of this event vs. all events of the same type (engine/compare.py)
   - intraday block: news onset ("market started pricing at HH:MM") is in engine/onset.py (C1, done)
   - unit tests on GXI 2026-02-11 (known values: ret -31.4%, abn -30.5%, vol ratio ~20x)
 """
@@ -22,6 +23,7 @@ import pandas as pd
 
 from config import BASELINE_DAYS, BASELINE_GAP, CAR_DAYS, SPREAD_NORMAL_TOL
 from engine.auctions import auction_profile
+from engine.compare import comparison_for
 from engine.data import intraday, stock
 from engine.onset import onset
 
@@ -162,7 +164,11 @@ def impact_card(isin: str, day, event: dict | None = None) -> dict:
             "prop_share": _f(row["prop_share"], 4), "mm_share": _f(row["mm_share"], 4),
         },
         "intraday": intra,
-        "comparison": None,   # TODO C2: engine/compare.py
+        "comparison": None,
         "flags": flags,
     }
+    try:  # the card must never fail because of the comparison
+        card["comparison"] = comparison_for(card)
+    except Exception:  # noqa: BLE001
+        card["flags"].append("comparison_failed")
     return card

@@ -43,7 +43,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 ```bash
 pip install -r requirements.txt
 streamlit run app/Home.py                 # http://localhost:8501
-pytest                                    # 10 tests; data tests skip if data/ is empty
+pytest                                    # 11 tests; data tests skip if data/ is empty
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
 - Before a PR, run `pytest` **and** a headless page check:
@@ -123,7 +123,7 @@ Done and merged: PR #1 (skeleton) and PR #2 (intraday).
 
 Open (see README checklists):
 1. ~~Event timing from data~~ ✅ `engine/onset.py` → `card["intraday"]["onset"]`; fills `event.timing` when the time is unknown. Hits 17 of 19 days with |abn z| ≥ 3. Onsets: EVT/GXI 08:02 pre-market, EVD 09:03, HDD 29 Oct 12:02.
-2. `engine/compare.py` (C2): same-type event table + percentiles → `card["comparison"]`. Depends on `events.csv`.
+2. ~~`engine/compare.py`~~ ✅ v1: same-type table + percentiles → `card["comparison"]`. Falls back to auto-detected unusual days (871 in 2026: DAX 211, MDAX 215, SDAX 445) until `events.csv` has enough typed events. EVD 27 Mar = #3 of 215 unusual MDAX days by stock-specific move.
 3. LLM: JAIF endpoint/key from the organisers → `.env`. Then a numbers check (every number in the text must exist in the JSON) and an answer cache for the live demo (C4).
 4. `events/events.csv`: the research team adds verified events **with time of day**, plus DAX results dates. Today the rows are `TBD` seeds.
 5. UI polish of the impact card (the demo moment), the compare page and the intraday chart with an event marker (C3).
