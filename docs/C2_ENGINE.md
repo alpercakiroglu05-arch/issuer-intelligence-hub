@@ -308,7 +308,13 @@ comes from the engine and is only formatted (`_fmt()`, same as the impact card s
 
 - **DE/EN are templates, no LLM.** `liquidity_trend()["summary"]` and `help` are English only, so the DE report
   builds the summary from the same fields (`_summary_de`); verdict, help, reasons and context words have DE tables
-  in `export.py`. Number format stays `-23.2%` in both languages (README C4 "German formatting" is separate).
+  in `export.py`.
+- **Number and date format** comes from `report/fmt.py` (`formatters(lang)`), shared with `ai/narrate.py` and the
+  impact card snapshot. EN: `-23.2%`, `EUR 2.5m`, `8.6x`, `2026-03-27`. DE: `−23,2 %`, `2,5 Mio. EUR` / `561 Tsd. EUR`,
+  `8,6-fach`, `27.03.2026`; bps stays `21 bps`. The PDF base font has no U+2212, so `to_pdf()` prints an ASCII `-`
+  (the HTML keeps the real minus). Event titles from `events.csv` are source text and stay as written.
+- The DE comparison label (`report.fmt.group_label(cmp, "de")`, e.g. "auffälligen Handelstagen, MDAX, Jan.–Okt. 2026")
+  is built from `comparison.group_type`, `group_index`, `period_start`, `period_end`.
 - Missing data never fails: no XLM (GXI after April, old QIA ISIN) → note in section 4; short history → verdict
   n/a; no sector (KCO) → "sector unknown, the index is used"; no episodes (HAG) → "No unusual days".
 - Tests: `tests/test_report_part_a.py` (EVD, HDD, HAG, GXI, KCO, old QIA; DE+EN HTML, `%PDF`, numbers equal to

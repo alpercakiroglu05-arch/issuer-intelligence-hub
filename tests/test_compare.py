@@ -66,8 +66,9 @@ def test_percentile_text_rounds_down(p, text):
     from engine.compare import _share
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
     from components import pctile0
-    from ai.narrate import _pctile
-    assert _share(p) == pctile0(p) == _pctile(p) == text
+    from report.fmt import formatters
+    assert _share(p) == pctile0(p) == formatters("en")["pctile"](p) == text
+    assert formatters("de")["pctile"](p) == text.replace("%", " %")
 
 
 def test_narrative_comparison_never_says_100_percent():
@@ -80,9 +81,9 @@ def test_narrative_comparison_never_says_100_percent():
         "comparison": {"group_type": "NOTABLE_DAY", "group_index": "MDAX", "n": 214,
                        "group": "unusual trading days, MDAX, Jan – Oct 2026", "abs_abn_ret_pctile": 0.995},
     }
-    for lang in ("en", "de"):
+    for lang, pct in (("en", "%"), ("de", " %")):
         t = narrate(card, lang)
-        assert "99%" in t and "100%" not in t
+        assert f"99{pct}" in t and f"100{pct}" not in t
 
 
 @needs_data

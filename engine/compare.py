@@ -151,6 +151,7 @@ def comparison_for(card: dict) -> dict | None:
             period = f"{m['date'].min():%b} – {m['date'].max():%b %Y}"
             group = f"{label}, {idx or 'DAX, MDAX and SDAX'}, {period}"
             return {"group_type": t, "group_index": idx or "DAX+MDAX+SDAX", "group": group, **res,
+                    "period_start": f"{m['date'].min():%Y-%m-%d}", "period_end": f"{m['date'].max():%Y-%m-%d}",
                     "summary": _summary(card, group, res)}
     return None
 
