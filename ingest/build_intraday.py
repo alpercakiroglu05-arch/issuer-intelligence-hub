@@ -1,47 +1,122 @@
 #!/usr/bin/env python3
 """
-build_intraday.py - OWNER: C1 (data).  STATUS: skeleton, to be implemented.
+build_intraday.py - 1-minute bars from every single Xetra trade.  OWNER: C1 (data).
 
-Builds 1-minute bars from XETRA_ONBOOK_TRADES (every single trade, 1.7 GB gz)
-for the hero stocks (config.HERO_TICKERS) and, if time allows, their peers.
+Reads XETRA_ONBOOK_TRADES (213 daily files, 1.7 GB gz) for a few stocks and writes
+data/intraday_bars.parquet (schema: docs/API_CONTRACT.md -> intraday_bars).
+
+Resumable: each trading day is written to data/intraday_parts/<YYYYMMDD>.parquet and
+skipped on the next run, so a slow laptop can process the year in several runs.
 
 Usage:
-    python3 ingest/build_intraday.py            # hero stocks
-    python3 ingest/build_intraday.py GXI EVD    # explicit tickers
+    python3 ingest/build_intraday.py                       # hero stocks from config
+    python3 ingest/build_intraday.py GXI EVD               # explicit tickers
+    python3 ingest/build_intraday.py --max-seconds 150     # stop after ~150 s, rerun to continue
+    python3 ingest/build_intraday.py --rebuild             # ignore existing day parts
 
-Output: data/intraday_bars.parquet  (schema in README -> "intraday_bars")
+Raw data location: config.RAW_DIR (env IIH_RAW_DIR) or --raw <path>.
 
-Steps
------
-1. ISINs: map tickers -> ISIN via data/universe.csv.
-2. Read with DuckDB, ONE MONTH AT A TIME (the laptop has little RAM):
-       read_csv('{RAW_DIR}/XETRA/XETRA_ONBOOK_TRADES/XETRA_ONBOOK_TRADES_202602*.csv.gz',
-                all_varchar=true) WHERE ISIN IN (...) AND CURRENCY = 'EUR'
-   Columns: FACT_TIMESTAMP (UTC, ns), ISIN, QUANTITY, PRICE, SIDE (1 buy / 2 sell / empty = auction).
-3. Timestamps are UTC -> convert to Europe/Berlin (DST!). Keep 08:00-17:45 local.
-4. Flag trades:
-       is_auction   = SIDE is empty
-       session      = 'pre' (<09:00) | 'open_auction' | 'continuous' | 'close_auction' (>=17:30)
-5. Aggregate per isin x minute:
-       open/high/low/close (trade prices), vwap, volume_eur = sum(qty*price), n_trades,
-       aggr_buy_eur (SIDE=1), aggr_sell_eur (SIDE=2), auction_eur (SIDE empty), is_auction (any)
-6. Sanity check: per day, sum(volume_eur) must be close to daily_features.turnover_eur
-   (small differences = off-book/TES, which is not in this file).
-7. Write data/intraday_bars.parquet.
-
-Quick check that already worked (GXI on 2026-02-11): 10,820 trades, EUR 77.2m,
-20% of the day's turnover in the first 15 minutes after 09:00.
+Data notes (XETRA_ONBOOK_TRADES/NOTES.md):
+    - FACT_TIMESTAMP is UTC -> converted to Europe/Berlin (DST aware)
+    - SIDE: 1 = aggressive buy, 2 = aggressive sell, empty = auction trade (no aggressor)
+    - trading runs ~08:00-22:00 local; we keep everything, consumers filter the session
+    - one ISIN can trade in several currencies -> EUR only
 """
+import argparse
 import sys
+import time
 from pathlib import Path
 
+import duckdb
+import pandas as pd
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from config import DATA_DIR, HERO_TICKERS, RAW_DIR  # noqa: E402,F401
+from config import DATA_DIR, HERO_TICKERS, RAW_DIR, TZ  # noqa: E402
+
+PARTS = DATA_DIR / "intraday_parts"
+OUT = DATA_DIR / "intraday_bars.parquet"
 
 
-def build(tickers: list[str]) -> None:
-    raise NotImplementedError("C1: implement steps 1-7 from the module docstring")
+def isins_for(tickers: list[str]) -> dict[str, str]:
+    uni = pd.read_csv(DATA_DIR / "universe.csv")
+    m = dict(zip(uni["ticker"], uni["isin"]))
+    missing = [t for t in tickers if t not in m]
+    if missing:
+        raise SystemExit(f"Unknown tickers: {missing}")
+    return {m[t]: t for t in tickers}
+
+
+def bars_for_day(con: duckdb.DuckDBPyConnection, path: Path, isins: list[str]) -> pd.DataFrame:
+    in_list = ", ".join(f"'{i}'" for i in isins)
+    t = con.execute(f"""
+        SELECT ISIN AS isin, FACT_TIMESTAMP AS ts,
+               CAST(QUANTITY AS DOUBLE) AS qty, CAST(PRICE AS DOUBLE) AS px, SIDE AS side
+        FROM read_csv('{path.as_posix()}', all_varchar=true, header=true)
+        WHERE ISIN IN ({in_list}) AND CURRENCY = 'EUR'
+    """).df()
+    if t.empty:
+        return pd.DataFrame()
+    t["ts_local"] = pd.to_datetime(t["ts"], utc=True, format="ISO8601").dt.tz_convert(TZ).dt.floor("min")
+    t["eur"] = t["qty"] * t["px"]
+    side = t["side"].fillna("")
+    t["aggr_buy_eur"] = t["eur"].where(side == "1", 0.0)
+    t["aggr_sell_eur"] = t["eur"].where(side == "2", 0.0)
+    t["auction_eur"] = t["eur"].where(side == "", 0.0)
+    g = t.sort_values("ts").groupby(["isin", "ts_local"], sort=True)
+    b = g.agg(open=("px", "first"), high=("px", "max"), low=("px", "min"), close=("px", "last"),
+              shares=("qty", "sum"), volume_eur=("eur", "sum"), n_trades=("px", "size"),
+              aggr_buy_eur=("aggr_buy_eur", "sum"), aggr_sell_eur=("aggr_sell_eur", "sum"),
+              auction_eur=("auction_eur", "sum")).reset_index()
+    b["vwap"] = b["volume_eur"] / b["shares"]
+    b["is_auction"] = b["auction_eur"] > 0
+    return b
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("tickers", nargs="*", default=HERO_TICKERS)
+    ap.add_argument("--raw", default=str(RAW_DIR))
+    ap.add_argument("--max-seconds", type=float, default=None)
+    ap.add_argument("--rebuild", action="store_true")
+    args = ap.parse_args()
+
+    isin_map = isins_for(args.tickers)
+    files = sorted((Path(args.raw) / "XETRA" / "XETRA_ONBOOK_TRADES").glob("XETRA_ONBOOK_TRADES_*.csv.gz"))
+    if not files:
+        raise SystemExit(f"No trade files under {args.raw}/XETRA/XETRA_ONBOOK_TRADES")
+    PARTS.mkdir(parents=True, exist_ok=True)
+    tag = "_".join(sorted(isin_map.values()))
+    tag_file = PARTS / "TICKERS.txt"  # day parts are only valid for one ticker set
+    if tag_file.exists() and tag_file.read_text() != tag:
+        print(f"ticker set changed ({tag_file.read_text()} -> {tag}): rebuilding all days")
+        args.rebuild = True
+    tag_file.write_text(tag)
+
+    con = duckdb.connect()
+    con.execute("SET threads=2; SET memory_limit='1500MB'")
+    start, done, skipped = time.time(), 0, 0
+    for f in files:
+        day = f.name.split("_")[-1][:8]
+        part = PARTS / f"{day}.parquet"
+        if part.exists() and not args.rebuild:
+            skipped += 1
+            continue
+        if args.max_seconds and time.time() - start > args.max_seconds:
+            break
+        bars_for_day(con, f, list(isin_map)).to_parquet(part, index=False)
+        done += 1
+
+    remaining = len(files) - skipped - done
+    print(f"days processed now: {done}, already done: {skipped}, remaining: {remaining} "
+          f"({time.time() - start:.0f}s)")
+    if remaining:
+        print("-> run again to continue")
+        return
+
+    bars = pd.concat([pd.read_parquet(p) for p in sorted(PARTS.glob("2*.parquet"))], ignore_index=True)
+    bars.to_parquet(OUT, index=False)
+    print(f"{len(bars):,} bars for {sorted(isin_map.values())} -> {OUT}")
 
 
 if __name__ == "__main__":
-    build(sys.argv[1:] or HERO_TICKERS)
+    main()

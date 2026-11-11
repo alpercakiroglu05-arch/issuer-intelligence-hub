@@ -64,3 +64,28 @@ def test_dashboard_functions_run_for_heroes():
         k = baseline.kpis(isin_of(t))
         assert k["ticker"] == t
         assert len(baseline.profile(isin_of(t))) > 100
+
+
+HAS_BARS = (DATA_DIR / "intraday_bars.parquet").exists()
+
+
+@pytest.mark.skipif(not (HAS_DATA and HAS_BARS), reason="intraday_bars.parquet missing")
+def test_intraday_bars_match_daily_turnover():
+    """Sum of 1-min bars per day must equal Xetra on-book turnover."""
+    import pandas as pd
+    from engine.data import daily, intraday
+    b = intraday().copy()
+    b["date"] = b["ts_local"].dt.tz_localize(None).dt.normalize()
+    s = b.groupby(["isin", "date"])["volume_eur"].sum().rename("bars").reset_index()
+    m = s.merge(daily()[["isin", "date", "turnover_eur"]], on=["isin", "date"])
+    assert (m["bars"] / m["turnover_eur"]).median() == pytest.approx(1.0, abs=0.001)
+
+
+@pytest.mark.skipif(not (HAS_DATA and HAS_BARS), reason="intraday_bars.parquet missing")
+def test_impact_card_intraday_block():
+    """CTS Eventim, 27 Mar 2026: EUR ~25.8m in the closing auction (checked against raw trades)."""
+    from engine.data import isin_of
+    from engine.impact import impact_card
+    i = impact_card(isin_of("EVD"), "2026-03-27")["intraday"]
+    assert i is not None
+    assert i["close_auction_eur"] == pytest.approx(25.8e6, rel=0.02)

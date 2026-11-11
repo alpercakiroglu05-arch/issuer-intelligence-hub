@@ -26,7 +26,7 @@ cp .env.example .env                                   # optional: add LLM key
 ```
 
 **Data.** Raw data is never in git. Copy the processed files into `data/` from the shared OneDrive folder:
-`daily_features.parquet`, `universe.csv` (and later `intraday_bars.parquet`).
+`daily_features.parquet`, `universe.csv`, `events.parquet`, `intraday_bars.parquet`.
 
 ```bash
 streamlit run app/Home.py      # demo UI -> http://localhost:8501
@@ -38,7 +38,7 @@ Rebuild the processed data. Only the data owner (C1) needs the 8.9 GB raw excerp
 ```bash
 python ingest/build_daily.py "<path to Futury MDS Data Excerpt>" data     # ~25 s → daily_features.parquet, universe.csv, hero_candidates.csv
 python ingest/build_events.py                    # events/events.csv → data/events.parquet
-python ingest/build_intraday.py GXI EVD HDD      # C1 TODO → data/intraday_bars.parquet
+python ingest/build_intraday.py EVD EVT HDD GXI  # ~2 min → data/intraday_bars.parquet (resumable: --max-seconds 150)
 ```
 
 ---
@@ -67,7 +67,7 @@ python ingest/build_intraday.py GXI EVD HDD      # C1 TODO → data/intraday_bar
 ```
 futury-build-days-2026/
 ├── config.py              paths, windows, thresholds (single source of truth)
-├── ingest/                build_daily.py ✅ · build_events.py ✅ · build_intraday.py 🔲
+├── ingest/                build_daily.py ✅ · build_events.py ✅ · build_intraday.py ✅
 ├── engine/                data.py ✅ · baseline.py ✅ · impact.py ✅ (v1) · compare.py 🔲
 ├── ai/                    llm.py ✅ · narrate.py ✅ · agent.py ✅ (v1)
 ├── report/                template.html ✅ · export.py ✅
@@ -85,8 +85,9 @@ futury-build-days-2026/
 Everyone works on their own files, so merge conflicts are rare. Contracts between modules are fixed (see below).
 
 ### C1 · Data. Owner: ________
-- [ ] `ingest/build_intraday.py`: 1-min bars from `XETRA_ONBOOK_TRADES` for the hero stocks (steps are in the docstring)
-- [ ] Sanity check: daily sum of bars ≈ `turnover_eur` in daily_features
+- [x] `ingest/build_intraday.py`: 1-min bars for EVD, EVT, HDD, GXI (163k bars)
+- [x] Sanity check: daily sum of bars = `turnover_eur` (ratio 1.000 on all 213 days × 4 stocks)
+- [ ] Peers' intraday bars for the comparison view (rerun with more tickers)
 - [ ] Run `build_events.py` whenever the research team updates `events.csv`, and share outputs on OneDrive
 - [ ] Optional: Eurex single-stock options and futures open interest (`EUREX_OPEN_INTEREST_DYNAMICS_EQUITYINDEX`, join on `ISIN_UNDERLYING`) to show derivatives positioning before events
 
