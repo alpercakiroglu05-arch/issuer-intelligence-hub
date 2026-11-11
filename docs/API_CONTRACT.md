@@ -27,17 +27,25 @@ Types: `FY Q1 H1 Q3 DIVIDEND_EX AGM ADHOC GUIDANCE MA CMD`.
 ### `impact_card()`: JSON (engine → app, AI, report)
 ```json
 { "schema_version": "1.0", "isin": "…", "ticker": "GXI", "name": "…", "index": "SDAX",
-  "event":        {"event_id", "type", "title", "datetime_local", "timing", "source_url", "reaction_day"},
+  "event":        {"event_id", "type", "title", "datetime_local", "timing", "timing_source", "source_url", "reaction_day"},
   "baseline":     {"window": "t-65..t-6", "days_used": 60},
   "price":        {"ret", "peer_ret", "abn_ret", "abn_ret_z", "gap_open", "ret_intraday", "car_0_5"},
   "volume":       {"turnover_eur", "baseline_eur", "ratio", "z"},
   "liquidity":    {"xlm_25k_bps", "xlm_25k_baseline_bps", "ratio", "days_to_normal"},
   "auctions":     {"auction_share", "auction_share_baseline"},
   "participants": {"agent_share", "agent_share_baseline", "agent_aggr_imbalance", "agent_aggr_imbalance_baseline", "agent_aggr_net_eur", "prop_share", "mm_share"},
-  "intraday":     {"volume_share_first_15min", "volume_share_first_60min", "open_auction_eur", "close_auction_eur", "intraday_low", "intraday_high", "time_of_low"} | null,
+  "intraday":     {"volume_share_first_15min", "volume_share_first_60min", "open_auction_eur", "close_auction_eur", "intraday_low", "intraday_high", "time_of_low", "onset"} | null,
   "comparison":   null,
   "flags":        ["flow_censored", "short_baseline", …] }
 ```
+`event.timing_source`: `announcement` (from events.csv), `inferred_from_trading` (time unknown, filled from `intraday.onset`) or null.
+
+`intraday.onset` (engine/onset.py), the minute the market started pricing the news, or null without bars:
+`{method, sigma_daily, volatility_interruptions: ["HH:MM", …], time: "HH:MM" | null, session: pre_market|opening_auction|at_open|continuous,
+inferred_timing: pre_open|intraday, ret_at_onset, ret_15min_after, share_of_day_move_15min_after, volume_ratio_at_onset, lag_minutes}`.
+Rule: first minute where |move vs previous close| >= 2 sigma (daily) **and** cumulative turnover >= 3x normal for that clock time,
+in the direction of the day's move, still holding 5 minutes later. Thresholds in `config.ONSET_*`.
+
 **Changing the schema? Tell C3 and C4 first.**
 
 ---
@@ -50,6 +58,7 @@ Types: `FY Q1 H1 Q3 DIVIDEND_EX AGM ADHOC GUIDANCE MA CMD`.
 | `engine.baseline.kpis(isin, days=60)` | dict: medians vs index + liquidity category estimate | C2 |
 | `engine.baseline.anomalies(isin)` | DataFrame: unusual days with `reason`, `severity` | C2 |
 | `engine.impact.impact_card(isin, day, event=None)` | dict (schema above) | C2 |
+| `engine.onset.onset(isin, day, event_time=None)` | dict: news onset minute (see `intraday.onset`) | C1 |
 | `engine.compare.same_type_events(type, index)` / `percentile(card, table)` | DataFrame / dict | C2 |
 | `ai.narrate.narrate(card, lang)` | str (DE/EN), template fallback without LLM | C4 |
 | `ai.agent.ask(question, isin)` | str | C4 |

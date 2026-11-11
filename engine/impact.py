@@ -14,7 +14,7 @@ CAR      = sum of abnormal returns t0 .. t+5
 
 TODO C2:
   - comparison block: percentile of this event vs. all events of the same type (engine/compare.py)
-  - intraday block: refine once C1 delivers bars (price path, minutes to price discovery)
+  - intraday block: news onset ("market started pricing at HH:MM") is in engine/onset.py (C1, done)
   - unit tests on GXI 2026-02-11 (known values: ret -31.4%, abn -30.5%, vol ratio ~20x)
 """
 import numpy as np
@@ -22,6 +22,7 @@ import pandas as pd
 
 from config import BASELINE_DAYS, BASELINE_GAP, CAR_DAYS, SPREAD_NORMAL_TOL
 from engine.data import intraday, stock
+from engine.onset import onset
 
 SCHEMA_VERSION = "1.0"
 
@@ -35,7 +36,7 @@ def _f(x, nd: int = 6):
     return None if np.isnan(x) else round(x, nd)
 
 
-def _intraday_block(isin: str, day: pd.Timestamp) -> dict | None:
+def _intraday_block(isin: str, day: pd.Timestamp, event_time: str | None = None) -> dict | None:
     bars = intraday()
     if bars is None:
         return None
@@ -53,6 +54,7 @@ def _intraday_block(isin: str, day: pd.Timestamp) -> dict | None:
         "close_auction_eur": _f(b.loc[b["is_auction"] & (hhmm >= "17:30"), "volume_eur"].sum(), 0),
         "intraday_low": _f(cont["low"].min()), "intraday_high": _f(cont["high"].max()),
         "time_of_low": cont.loc[cont["low"].idxmin(), "ts_local"].strftime("%H:%M") if len(cont) else None,
+        "onset": onset(isin, day, event_time),
     }
 
 
@@ -86,6 +88,14 @@ def impact_card(isin: str, day, event: dict | None = None) -> dict:
         flags.append("short_baseline")
 
     ev = event or {}
+    event_time = ev.get("time_local") if isinstance(ev.get("time_local"), str) and ev.get("time_local") else None
+    intra = _intraday_block(isin, day, event_time)
+    timing = ev.get("timing", "unknown")
+    if not isinstance(timing, str) or timing in ("", "unknown"):
+        timing = "unknown"
+    timing_source = "announcement" if timing != "unknown" else None
+    if timing == "unknown" and intra and intra.get("onset") and intra["onset"].get("inferred_timing"):
+        timing, timing_source = intra["onset"]["inferred_timing"], "inferred_from_trading"
     card = {
         "schema_version": SCHEMA_VERSION,
         "isin": isin, "ticker": row["ticker"], "name": row["name"], "index": row["idx_latest"],
@@ -93,7 +103,7 @@ def impact_card(isin: str, day, event: dict | None = None) -> dict:
             "event_id": ev.get("event_id"), "type": ev.get("type", "NOTABLE_DAY"),
             "title": ev.get("title", "Unusual trading day (detected automatically)"),
             "datetime_local": f"{pd.Timestamp(ev['date']).date()} {ev.get('time_local', '')}".strip() if ev else None,
-            "timing": ev.get("timing", "unknown"), "source_url": ev.get("source_url") or None,
+            "timing": timing, "timing_source": timing_source, "source_url": ev.get("source_url") or None,
             "reaction_day": str(day.date()),
         },
         "baseline": {"window": f"t-{BASELINE_GAP + BASELINE_DAYS}..t-{BASELINE_GAP + 1}", "days_used": len(base)},
@@ -122,7 +132,7 @@ def impact_card(isin: str, day, event: dict | None = None) -> dict:
             "agent_aggr_net_eur": _f(row["agent_aggr_net_eur"], 0),
             "prop_share": _f(row["prop_share"], 4), "mm_share": _f(row["mm_share"], 4),
         },
-        "intraday": _intraday_block(isin, day),
+        "intraday": intra,
         "comparison": None,   # TODO C2: engine/compare.py
         "flags": flags,
     }
