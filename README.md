@@ -29,7 +29,8 @@ cp .env.example .env                                   # optional: add LLM key
 `events.parquet` is rebuilt from `events/events.csv` automatically when the CSV is newer.
 
 ```bash
-streamlit run app/Home.py      # demo UI -> http://localhost:8501
+python web/server.py           # demo UI (web front end) -> http://127.0.0.1:8600
+streamlit run app/Home.py      # backup UI / analyst view -> http://localhost:8501
 pytest                         # smoke tests (data tests skip if data/ is empty)
 ```
 
@@ -145,7 +146,7 @@ All schemas (`daily_features`, `intraday_bars`, `events.csv`, `impact_card` JSON
 
 ## Conventions
 See **[CONTRIBUTING.md](CONTRIBUTING.md)**. In short:
-- `main` must always run: `streamlit run app/Home.py` and `pytest`. Use branches `feat/<name>-<topic>` and small PRs.
+- `main` must always run: `python web/server.py`, `streamlit run app/Home.py` and `pytest`. Use branches `feat/<name>-<topic>` and small PRs.
 - Paths and thresholds go in `config.py` only. Never commit data or `.env`.
 - Engine functions return plain dicts and DataFrames, never Streamlit objects.
 - No investment advice in any text. The tool explains the past and does not predict.
