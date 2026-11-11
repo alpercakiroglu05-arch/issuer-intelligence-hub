@@ -44,7 +44,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 pip install -r requirements.txt
 python web/server.py                      # demo UI (web front end, C3): http://127.0.0.1:8600
 streamlit run app/Home.py                 # backup UI and analyst view: http://localhost:8501
-pytest                                    # 137 tests (incl. web API); data tests skip if data/ is empty
+pytest                                    # 146 tests (incl. web API); data tests skip if data/ is empty
 python web/warm_cache.py                  # re-warm the demo caches (summaries + assistant) after ANY prompt, card or engine change
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
@@ -115,38 +115,50 @@ Hero stocks (max 3 per challenge, set in `config.HERO_TICKERS`; the team may sti
 
 Xetra liquidity rule (Being Public Guide p. 32): XLM (EUR 25k) ≤ 100 bps **and** ≥ EUR 2.5m/day (4-month average) means category A; otherwise a Designated Sponsor is needed. `engine.baseline.kpis()` gives an estimate.
 
-## Status (Wed ~22:30, all PRs up to #31 merged, 108 tests green)
+## Status (Thu ~01:00, all PRs up to #41 merged, 146 tests green)
 
 Done on `main`:
 - **Ingest:** daily (174 stocks x 213 days), events (80 sourced events), intraday (44 event stocks, 3.8M bars).
 - **Engine:**
-  - `baseline`: KPIs, anomalies, liquidity trend, episodes.
-  - `impact`: card incl. auctions vs normal.
-  - `onset`: news onset.
-  - `auctions`: exact uncross volumes.
-  - `compare`: same-type percentiles, with Kaan's summary sentence.
-- **AI:** template narrative DE/EN + LLM wrapper; assistant v1. **No LLM connected** (`LLM_PROVIDER=none`).
-- **Report:** HTML/PDF snapshot of the impact card.
-- **Two front ends on the same engine.** `web/` by Alper (#27, fixed in #30) is the **demo UI**: Issuer Services look, ISIN entry, dashboard, impact card, compare, assistant, report (Part A + B) and ideas, served by a small JSON API in `web/server.py`. `app/` (Streamlit) is the backup and analyst view, and also has the order-size cost curve and the market-context column. `tests/test_web.py` tests every web API over HTTP.
-- **Dashboard:**
-  - Compare with Index / Sector / Size (#20, #21).
-  - Liquidity trend and episodes with linked events plus market context (#19, #24, #25).
-  - Trading cost by order size (`engine/xlm.py`).
-  - Readable company names (`events/names.csv`, #23).
-- **Pitch:** `docs/PITCH.md` has the relevance lines from the Being Public Guide and a jury-scorecard map (Idea, Execution, Relevance, Pitch).
-- **Docs:** `docs/SUBMISSION.md` is the submission text (13:30, "what data, model, logic"); keep its numbers in sync if the engine changes. `docs/C2_ENGINE.md` documents the C2 functions.
+  - `baseline`: KPIs, anomalies with market context, liquidity trend, episodes.
+  - `impact`: card incl. auctions vs normal; `onset`: news onset; `auctions`: exact uncross volumes.
+  - `compare`: same-type percentiles, summary sentence, one rank text "rank 3 of 215 (incl. this day)" (#38).
+  - **One peer benchmark** (#37): `compare.peer_medians()` feeds the web, Streamlit, the Part A report and the
+    assistant. Size = the 10 stocks closest in turnover. A test checks that web and `kpis()` agree.
+  - `xlm`: trading cost by order size.
+- **AI** (JAIF, `hIP_1.0-Mistral/Mistral-Medium-3.5-128B`):
+  - Card summary DE/EN with **numbers check** (`ai/checks.py`) and **meaning check** (#38: "the share fell X %"
+    must use the share's own move, not the abnormal return). German short dates and English thousands in event
+    titles are understood (#40). A failed check shows the template text.
+  - **IR analyst dock** on every web page (#36, Alper): the model calls engine functions as tools (find_company,
+    company_overview, peer_benchmark, trading_cost_curve, unusual_days, event_calendar, impact_card,
+    compare_events, show) and answers from their outputs; without a key a deterministic router answers.
+- **Caches warmed** on the code of #40 (#41 changed no prompt or card): 58 card summaries for EVD, EVT, HDD
+  (56 from the model, 2 templates: EVT 10 Mar and 6 May EN, where the check caught a number) and 36 assistant
+  answers (0 flagged). EVD 27 Mar EN/DE are served from the cache without network.
+  **After ANY prompt, card or engine change run `python web/warm_cache.py`** (~4 min).
+- **Web (`web/`) = demo UI:** ISIN entry, dashboard (trading over time, peers, liquidity trend, cost by order
+  size, unusual days with calendar and market context), impact card, compare, report, ideas, IR analyst dock.
+  Own calendar (brief VI): add an event or import CSV/ICS on the card page (`/api/calendar`, #36).
+  **One-click PDF** (#41): *Export IR report (PDF)* on every card (snapshot + checked summary) and on the
+  dashboard (Part A), DE/EN.
+- **Streamlit (`app/`) = backup and analyst view.** Deleted by a direct push to main (2bd0c3c), restored in #39.
+- **Docs:** `docs/SUBMISSION.md` (submission text), `docs/PITCH.md` (relevance lines, scorecard map, Q&A),
+  `docs/REQUIREMENTS.md` (brief item -> page), `docs/C2_ENGINE.md`.
 
-Open (see README checklists):
-1. ~~JAIF key~~ ✅ The key is in `.env`, taken from the top of the JAIF Model Handbook HTML. The model is **`hIP_1.0-Mistral/Mistral-Medium-3.5-128B`**, chosen after testing on EVD 27 Mar in EN and DE:
-   - **Kolibri-1** is fast, but its texts had *meaning* errors ("shares fell 21.7 %" where 21.7 % is the abnormal return; "09:03 before the open"). The numbers check cannot catch these, because the numbers are right.
-   - **GLM-5.3-Flash** is accurate but takes 20 s or more and writes long texts.
-   - **Mistral-Medium-3.5** is accurate, takes 5–7 s and writes clean German.
-   - Cache warm-up: 22 demo texts are in `data/llm_cache.json` (11 events, EN and DE). 21 passed the check. EVD Q1 (EN) was rejected because the model wrote "top 22 %", a number it derived itself, so the template is shown there.
-2. **German formatting** in the DE texts and snapshots (Kaan, tonight).
-3. **Web:** market context in *Unusual days*; optional the cost-by-order-size block (Kaan with Alper).
-4. **Thu morning:** demo dry run on the web UI; backup video at 12:00 on the web UI; Streamlit open as the live fallback.
-5. **Human check:** spot-check the hero rows in `events.csv` (source link, time) before the pitch.
+Open:
+1. **Assistant policy (decide):** the dock shows a model answer that fails the numbers check with a warning
+   ("N figure(s) not found"), while card summaries fall back to the template. Today no cached answer is flagged;
+   a new live question could be.
+2. **Thu morning:** demo dry run on the web UI; backup video at 12:00 on the web UI; Streamlit open as the
+   live fallback. Run the demo from Oğuzhan's laptop (key and caches are local). Open the page early (first
+   load 8-10 s). Do not press "Regenerate" in the demo (it asks the model again).
+3. **Human check:** spot-check the hero rows in `events.csv` (source link, time) before the pitch.
+4. **Deliverables:** 13:30 submission (`docs/SUBMISSION.md` + link or video), 14:30 deck (3-5 slides, `docs/PITCH.md`).
+5. Optional, cosmetic: the DE model text writes dates as "27. 03. 2026" (a prompt change means a re-warm).
 
 Decided: Eurex open interest is skipped (participant split censored for >90 % of small-cap series), and Xetra TES is a "what's next" idea.
+
+Team rule: nothing goes to `main` without a PR (a direct push deleted the Streamlit app on Wed night).
 
 Housekeeping: the empty repo `Bthn28/issuer-intelligence-hub` can be deleted, and merged branches can be removed.
