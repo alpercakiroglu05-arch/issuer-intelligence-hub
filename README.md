@@ -121,7 +121,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] **Numbers check** (`ai/checks.py`, PR #28): every number in a model text must be in the card JSON, else the template is shown; both UIs say which text it is
 - [x] **Assistant without a model**: short answer + liquidity summary instead of a JSON dump (Streamlit, PR #28); the web has its own fallback answers
 - [x] **Answer cache** (`LLM_CACHE`, PR #28) so the live demo survives Wi-Fi/API outages
-- [x] **German formatting** in the DE texts, snapshot and Part A report: `−23,2 %`, `27.03.2026`, `8,6-fach`, `2,5 Mio. EUR` (one place: `report/fmt.py`); the comparison group label is German too (`report.fmt.group_label`). EN output unchanged (Kaan, PR #33)
+- [x] **German formatting** in the DE texts, snapshot, Part A report and the model prompt: `−23,2 %`, `27.03.2026`, `8,6-fach`, `2,5 Mio. EUR` (one place: `report/fmt.py`); the comparison group label is German too (`report.fmt.group_label`). EN output unchanged (Kaan, PR #33)
 - [x] **JAIF**: gateway `https://hip-gw.hessian.ai/v1`, model `hIP_1.0-Mistral/Mistral-Medium-3.5-128B` (accurate, 5–7 s, good German; Kolibri-1 made meaning errors). The key is at the top of the JAIF Model Handbook HTML in Discord. The demo texts are pre-cached
 - [ ] Optional: `agent.py` v2 with tool calling
 
