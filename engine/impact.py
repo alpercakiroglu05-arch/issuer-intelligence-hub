@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 from config import BASELINE_DAYS, BASELINE_GAP, CAR_DAYS, SPREAD_NORMAL_TOL
+from engine.auctions import auction_profile
 from engine.data import intraday, stock
 from engine.onset import onset
 
@@ -36,6 +37,34 @@ def _f(x, nd: int = 6):
     return None if np.isnan(x) else round(x, nd)
 
 
+def _ratio(x, base):
+    return _f(x / base, 2) if x is not None and base and base > 0 and not np.isnan(base) else None
+
+
+def _auction_block(isin: str, row: pd.Series, base: pd.DataFrame) -> dict:
+    """Opening and closing auction vs normal: volume (from trade bars) and price formation."""
+    prof = auction_profile(isin).set_index("date")
+    today = prof.loc[row["date"]] if row["date"] in prof.index else pd.Series(dtype=float)
+    b = prof.reindex(base["date"])
+    open_eur, close_eur = _f(today.get("open_auction_eur"), 0), _f(today.get("close_auction_eur"), 0)
+    open_base, close_base = b["open_auction_eur"].median(), b["close_auction_eur"].median()
+    return {
+        "auction_share": _f(row["auction_share"], 4),
+        "auction_share_baseline": _f(base["auction_share"].median(), 4),
+        "open_auction_eur": open_eur, "open_auction_eur_baseline": _f(open_base, 0),
+        "open_auction_ratio": _ratio(open_eur, open_base),
+        "close_auction_eur": close_eur, "close_auction_eur_baseline": _f(close_base, 0),
+        "close_auction_ratio": _ratio(close_eur, close_base),
+        "close_auction_share": _f(today.get("close_auction_share"), 4),
+        "close_auction_share_baseline": _f(b["close_auction_share"].median(), 4),
+        # price formation: opening auction vs previous close, closing auction vs last continuous trade
+        "open_auction_move": _f(row["gap_open"]),
+        "open_auction_move_baseline_abs": _f(base["gap_open"].abs().median()),
+        "close_auction_move": _f(today.get("close_auction_move")),
+        "close_auction_move_baseline_abs": _f(b["close_auction_move"].abs().median()),
+    }
+
+
 def _intraday_block(isin: str, day: pd.Timestamp, event_time: str | None = None) -> dict | None:
     bars = intraday()
     if bars is None:
@@ -47,11 +76,14 @@ def _intraday_block(isin: str, day: pd.Timestamp, event_time: str | None = None)
     total = b["volume_eur"].sum()
     share = lambda mask: _f(b.loc[mask, "volume_eur"].sum() / total)  # noqa: E731
     cont = b[(hhmm >= "09:00") & (hhmm < "17:30")]
+    auct = auction_profile(isin).set_index("date")
+    today = auct.loc[day] if day in auct.index else pd.Series(dtype=float)
     return {
         "volume_share_first_15min": share((hhmm >= "09:00") & (hhmm < "09:15")),
         "volume_share_first_60min": share((hhmm >= "09:00") & (hhmm < "10:00")),
-        "open_auction_eur": _f(b.loc[b["is_auction"] & (hhmm < "09:10"), "volume_eur"].sum(), 0),
-        "close_auction_eur": _f(b.loc[b["is_auction"] & (hhmm >= "17:30"), "volume_eur"].sum(), 0),
+        # exact uncross minute (see engine/auctions.py); kept here for backward compatibility
+        "open_auction_eur": _f(today.get("open_auction_eur"), 0),
+        "close_auction_eur": _f(today.get("close_auction_eur"), 0),
         "intraday_low": _f(cont["low"].min()), "intraday_high": _f(cont["high"].max()),
         "time_of_low": cont.loc[cont["low"].idxmin(), "ts_local"].strftime("%H:%M") if len(cont) else None,
         "onset": onset(isin, day, event_time),
@@ -121,10 +153,7 @@ def impact_card(isin: str, day, event: dict | None = None) -> dict:
             "xlm_25k_bps": _f(row["xlm_25k"], 2), "xlm_25k_baseline_bps": _f(xlm_base, 2),
             "ratio": _f(row["xlm_25k"] / xlm_base, 2), "days_to_normal": days_to_normal,
         },
-        "auctions": {
-            "auction_share": _f(row["auction_share"], 4),
-            "auction_share_baseline": _f(base["auction_share"].median(), 4),
-        },
+        "auctions": _auction_block(isin, row, base),
         "participants": {
             "agent_share": _f(row["agent_share"], 4), "agent_share_baseline": _f(base["agent_share"].median(), 4),
             "agent_aggr_imbalance": _f(row["agent_aggr_imbalance"], 4),

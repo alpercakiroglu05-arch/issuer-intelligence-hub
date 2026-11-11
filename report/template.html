@@ -32,6 +32,17 @@
         <div class="base">{{ L.auction }} {{ pct0(card.auctions.auction_share) }} ({{ L.normal }} {{ pct0(card.auctions.auction_share_baseline) }})</div></td>
   </tr></table>
 
+  <table class="kpi"><tr>
+    <td><div class="label">{{ L.open_vol }}</div><div class="value">{{ eur(card.auctions.open_auction_eur) }}</div>
+        <div class="base">{{ x(card.auctions.open_auction_ratio) }} {{ L.normal }} ({{ eur(card.auctions.open_auction_eur_baseline) }})</div></td>
+    <td><div class="label">{{ L.open_px }}</div><div class="value">{{ pct(card.auctions.open_auction_move) }}</div>
+        <div class="base">{{ L.normal }} &plusmn;{{ pct1(card.auctions.open_auction_move_baseline_abs) }}</div></td>
+    <td><div class="label">{{ L.close_vol }}</div><div class="value">{{ eur(card.auctions.close_auction_eur) }}</div>
+        <div class="base">{{ x(card.auctions.close_auction_ratio) }} {{ L.normal }} ({{ eur(card.auctions.close_auction_eur_baseline) }})</div></td>
+    <td><div class="label">{{ L.close_px }}</div><div class="value">{{ pct(card.auctions.close_auction_move) }}</div>
+        <div class="base">{{ L.normal }} &plusmn;{{ pct1(card.auctions.close_auction_move_baseline_abs) }}</div></td>
+  </tr></table>
+
   <div class="text">{{ narrative }}</div>
 
   <div class="foot">{{ L.foot }}</div>

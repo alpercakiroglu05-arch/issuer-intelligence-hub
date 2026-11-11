@@ -32,12 +32,24 @@ Types: `FY Q1 H1 Q3 DIVIDEND_EX AGM ADHOC GUIDANCE MA CMD`.
   "price":        {"ret", "peer_ret", "abn_ret", "abn_ret_z", "gap_open", "ret_intraday", "car_0_5"},
   "volume":       {"turnover_eur", "baseline_eur", "ratio", "z"},
   "liquidity":    {"xlm_25k_bps", "xlm_25k_baseline_bps", "ratio", "days_to_normal"},
-  "auctions":     {"auction_share", "auction_share_baseline"},
+  "auctions":     {"auction_share", "auction_share_baseline",
+                   "open_auction_eur", "open_auction_eur_baseline", "open_auction_ratio",
+                   "close_auction_eur", "close_auction_eur_baseline", "close_auction_ratio",
+                   "close_auction_share", "close_auction_share_baseline",
+                   "open_auction_move", "open_auction_move_baseline_abs",
+                   "close_auction_move", "close_auction_move_baseline_abs"},
   "participants": {"agent_share", "agent_share_baseline", "agent_aggr_imbalance", "agent_aggr_imbalance_baseline", "agent_aggr_net_eur", "prop_share", "mm_share"},
   "intraday":     {"volume_share_first_15min", "volume_share_first_60min", "open_auction_eur", "close_auction_eur", "intraday_low", "intraday_high", "time_of_low", "onset"} | null,
   "comparison":   null,
   "flags":        ["flow_censored", "short_baseline", …] }
 ```
+`auctions` (engine/auctions.py): volumes in EUR from the trade bars at the exact uncross minute (OHLC auction timestamps),
+so pre-market, volatility-interruption and after-close trades are excluded. `*_baseline` = median over the baseline window,
+`*_ratio` = day / baseline. `open_auction_move` = opening auction price vs previous close (= `price.gap_open`);
+`close_auction_move` = closing auction price vs last continuous trade before 17:30; `*_move_baseline_abs` = median |move|.
+Volume fields are null for stocks without trade bars; `open_auction_move` comes from daily OHLC and exists for all.
+Check: open + close auction (bars) = 97.6–99.7 % of flow auction turnover (median, hero stocks).
+
 `event.timing_source`: `announcement` (from events.csv), `inferred_from_trading` (time unknown, filled from `intraday.onset`) or null.
 
 `intraday.onset` (engine/onset.py), the minute the market started pricing the news, or null without bars:
@@ -59,6 +71,7 @@ in the direction of the day's move, still holding 5 minutes later. Thresholds in
 | `engine.baseline.anomalies(isin)` | DataFrame: unusual days with `reason`, `severity` | C2 |
 | `engine.impact.impact_card(isin, day, event=None)` | dict (schema above) | C2 |
 | `engine.onset.onset(isin, day, event_time=None)` | dict: news onset minute (see `intraday.onset`) | C1 |
+| `engine.auctions.auction_profile(isin)` | DataFrame per day: open/close auction EUR, close auction share and price move | C1 |
 | `engine.compare.same_type_events(type, index)` / `percentile(card, table)` | DataFrame / dict | C2 |
 | `ai.narrate.narrate(card, lang)` | str (DE/EN), template fallback without LLM | C4 |
 | `ai.agent.ask(question, isin)` | str | C4 |
