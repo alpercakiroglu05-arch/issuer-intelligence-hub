@@ -33,6 +33,7 @@ RAW_DIR = Path(os.getenv("IIH_RAW_DIR", REPO_ROOT.parent))
 
 EVENTS_CSV = REPO_ROOT / "events" / "events.csv"
 SECTORS_CSV = REPO_ROOT / "events" / "sectors.csv"
+NAMES_CSV = REPO_ROOT / "events" / "names.csv"   # readable company names for the event stocks
 
 # Stocks we showcase (max 3 per the challenge). Proposed - team decides.
 #   EVD  CTS Eventim (MDAX): 27 Mar -23%, sell-off all day, 23% of turnover in the closing auction

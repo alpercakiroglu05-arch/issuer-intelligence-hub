@@ -24,7 +24,7 @@ import pandas as pd
 from config import BASELINE_DAYS, BASELINE_GAP, CAR_DAYS, SPREAD_NORMAL_TOL
 from engine.auctions import auction_profile
 from engine.compare import comparison_for
-from engine.data import intraday, stock
+from engine.data import display_name, intraday, stock
 from engine.onset import onset
 
 SCHEMA_VERSION = "1.0"
@@ -132,7 +132,7 @@ def impact_card(isin: str, day, event: dict | None = None) -> dict:
         timing, timing_source = intra["onset"]["inferred_timing"], "inferred_from_trading"
     card = {
         "schema_version": SCHEMA_VERSION,
-        "isin": isin, "ticker": row["ticker"], "name": row["name"], "index": row["idx_latest"],
+        "isin": isin, "ticker": row["ticker"], "name": display_name(isin), "index": row["idx_latest"],
         "event": {
             "event_id": ev.get("event_id"), "type": ev.get("type", "NOTABLE_DAY"),
             "title": ev.get("title", "Unusual trading day (detected automatically)"),

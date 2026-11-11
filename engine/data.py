@@ -3,7 +3,7 @@ from functools import lru_cache
 
 import pandas as pd
 
-from config import DATA_DIR, EVENTS_CSV
+from config import DATA_DIR, EVENTS_CSV, NAMES_CSV
 
 
 @lru_cache(maxsize=1)
@@ -55,6 +55,35 @@ def events() -> pd.DataFrame:
         return pd.read_parquet(p)
     from ingest.build_events import build
     return build()
+
+
+_SHARE_CLASS = {"NA", "INH", "INH.", "VZO", "ST", "NAM", "O.N.", "ON", "VNA", "ZO", "SP.ADR"}
+_LEGAL = {"AG": "AG", "SE": "SE", "KGAA": "KGaA", "NV": "N.V.", "SA": "SA", "PLC": "plc", "GMBH": "GmbH",
+          "AG+CO.KGAA": "AG & Co. KGaA", "SE+CO.KGAA": "SE & Co. KGaA"}
+
+
+def _clean_name(raw: str) -> str:
+    """'ADIDAS AG NA O.N.' -> 'Adidas AG': drop share-class tokens, keep legal forms upper case."""
+    words = str(raw).split()
+    while words and (words[-1].upper() in _SHARE_CLASS or words[-1].upper().startswith(("EO", "-,"))):
+        words.pop()
+    return " ".join(_LEGAL.get(w.upper(), w.capitalize()) for w in words) or str(raw)
+
+
+@lru_cache(maxsize=1)
+def _display_names() -> dict:
+    p = NAMES_CSV
+    return dict(pd.read_csv(p, dtype=str).itertuples(index=False)) if p.exists() else {}
+
+
+def display_name(isin: str) -> str:
+    """Readable company name: curated list (events/names.csv) for the event stocks, else a cleaned exchange name."""
+    u = universe()
+    row = u[u["isin"] == isin]
+    if row.empty:
+        return isin
+    ticker, raw = row["ticker"].iloc[0], row["name"].iloc[0]
+    return _display_names().get(ticker) or _clean_name(raw)
 
 
 def isin_of(ticker: str) -> str:

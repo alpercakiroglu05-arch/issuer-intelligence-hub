@@ -57,6 +57,7 @@ st.info(summary)
 bars = data.intraday(isin)
 if bars is not None:
     b = bars[bars["ts_local"].dt.date == pd.Timestamp(day).date()]
+    b = b[b["ts_local"].dt.strftime("%H:%M").between("08:00", "17:45")]  # hide thin after-close trading
     if len(b):
         f = go.Figure()
         f.add_scatter(x=b["ts_local"], y=b["close"], mode="lines", name="Price")
