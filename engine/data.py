@@ -17,11 +17,35 @@ def universe() -> pd.DataFrame:
     return pd.read_csv(DATA_DIR / "universe.csv")
 
 
+INTRADAY = DATA_DIR / "intraday_bars.parquet"
+
+
 @lru_cache(maxsize=1)
-def intraday() -> pd.DataFrame | None:
-    """1-minute bars from ingest/build_intraday.py, or None until C1 has built them."""
-    p = DATA_DIR / "intraday_bars.parquet"
-    return pd.read_parquet(p) if p.exists() else None
+def _intraday_all() -> pd.DataFrame:
+    return pd.read_parquet(INTRADAY)
+
+
+@lru_cache(maxsize=64)
+def _intraday_one(isin: str) -> pd.DataFrame:
+    # the file is sorted by isin with small row groups, so this reads only this stock's row groups
+    return pd.read_parquet(INTRADAY, filters=[("isin", "==", isin)])
+
+
+@lru_cache(maxsize=1)
+def intraday_isins() -> frozenset[str]:
+    """Stocks that have 1-minute bars (empty set until C1 has built them)."""
+    if not INTRADAY.exists():
+        return frozenset()
+    return frozenset(pd.read_parquet(INTRADAY, columns=["isin"])["isin"].unique())
+
+
+def intraday(isin: str | None = None) -> pd.DataFrame | None:
+    """1-minute bars from ingest/build_intraday.py, or None until C1 has built them.
+    Pass an ISIN: only that stock is read (fast, little memory). Without an ISIN the whole file is
+    loaded (millions of rows): use only in tests and validation scripts."""
+    if not INTRADAY.exists():
+        return None
+    return _intraday_all() if isin is None else _intraday_one(isin)
 
 
 def events() -> pd.DataFrame:

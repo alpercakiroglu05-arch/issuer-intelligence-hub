@@ -17,7 +17,7 @@ Rolling baselines (`*_med60`, `vol_z`, `abn_ret_z`) use the previous 60 trading 
 
 ### `data/intraday_bars.parquet`: one row per (isin, minute). C1 builds this.
 `isin, ts_local (tz Europe/Berlin, minute start), open, high, low, close (trade prices), shares, vwap, volume_eur, n_trades, aggr_buy_eur, aggr_sell_eur, auction_eur, is_auction`
-All trading hours (08:00–22:00) are kept. Filter the session you need. `is_auction` = minute contains auction trades (empty SIDE): opening ~09:00, intraday ~13:00, closing ~17:35.
+All trading hours (08:00–22:00) are kept. Filter the session you need. The file is sorted by `isin` with small row groups: **read it with `engine.data.intraday(isin)`** (one stock, fast); `intraday()` without an ISIN loads millions of rows and is only for tests/validation. `engine.data.intraday_isins()` lists the stocks that have bars. `is_auction` = minute contains auction trades (empty SIDE): opening ~09:00, intraday ~13:00, closing ~17:35.
 
 ### `events/events.csv`, filled by hand
 `ticker, isin (optional), type, date (YYYY-MM-DD), time_local (HH:MM), title, source_url, verified (0/1)`
@@ -77,7 +77,7 @@ in the direction of the day's move, still holding 5 minutes later. Thresholds in
 ### Engine functions (Python API used by app/ and ai/)
 | Function | Returns | Owner |
 |---|---|---|
-| `engine.data.daily()` / `stock(isin)` / `events()` / `intraday()` | DataFrames | C1/C2 |
+| `engine.data.daily()` / `stock(isin)` / `events()` / `intraday(isin)` / `intraday_isins()` | DataFrames / set | C1/C2 |
 | `engine.baseline.profile(isin, start, end)` | daily time series for the dashboard | C2 |
 | `engine.baseline.kpis(isin, days=60)` | dict: medians vs index + liquidity category estimate | C2 |
 | `engine.baseline.anomalies(isin)` | DataFrame: unusual days with `reason`, `severity` | C2 |

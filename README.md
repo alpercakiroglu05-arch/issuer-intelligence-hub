@@ -85,11 +85,11 @@ futury-build-days-2026/
 Everyone works on their own files, so merge conflicts are rare. Contracts between modules are fixed (see below).
 
 ### C1 · Data. Owner: Oguzhan
-- [x] `ingest/build_intraday.py`: 1-min bars for EVD, EVT, HDD, GXI (163k bars)
+- [x] `ingest/build_intraday.py`: 1-min bars (first EVD, EVT, HDD, GXI; now all event stocks)
 - [x] Sanity check: daily sum of bars = `turnover_eur` (ratio 1.000 on all 213 days × 4 stocks)
 - [x] News onset (`engine/onset.py`, PR #5): "the market started pricing the news at HH:MM" on the card; infers the timing when the announcement time is unknown; lists volatility interruptions
 - [x] Opening/closing auctions (`engine/auctions.py`, PR #6): volume vs normal and price formation, measured at the exact uncross minute (= 97.6–99.7 % of flow auction turnover)
-- [ ] Intraday bars for more stocks (every stock in `events.csv`), so onset and auction volumes work beyond the hero stocks. Needs per-ISIN loading in `engine.data.intraday()` first (memory)
+- [x] Intraday bars for all 44 stocks in `events.csv` (3.8M bars, ~170 MB; every ISIN of a ticker, FRE and QIA changed ISIN), read per stock with `engine.data.intraday(isin)`. Onset and auction volumes now work for the DAX H1 events too
 - [ ] Ongoing: share `data/events.parquet` on OneDrive when `events.csv` changes (the app already rebuilds it from the CSV by itself)
 - [ ] Optional: Eurex single-stock options and futures open interest (`EUREX_OPEN_INTEREST_DYNAMICS_EQUITYINDEX`, join on `ISIN_UNDERLYING`) to show derivatives positioning before events
 

@@ -38,12 +38,13 @@ OUT = DATA_DIR / "intraday_bars.parquet"
 
 
 def isins_for(tickers: list[str]) -> dict[str, str]:
+    """All ISINs of these tickers. A ticker can have several over the year (FRE and QIA changed ISIN in 2026)."""
     uni = pd.read_csv(DATA_DIR / "universe.csv")
-    m = dict(zip(uni["ticker"], uni["isin"]))
-    missing = [t for t in tickers if t not in m]
+    missing = [t for t in tickers if t not in set(uni["ticker"])]
     if missing:
         raise SystemExit(f"Unknown tickers: {missing}")
-    return {m[t]: t for t in tickers}
+    hit = uni[uni["ticker"].isin(tickers)]
+    return dict(zip(hit["isin"], hit["ticker"]))
 
 
 def bars_for_day(con: duckdb.DuckDBPyConnection, path: Path, isins: list[str]) -> pd.DataFrame:
@@ -114,7 +115,9 @@ def main() -> None:
         return
 
     bars = pd.concat([pd.read_parquet(p) for p in sorted(PARTS.glob("2*.parquet"))], ignore_index=True)
-    bars.to_parquet(OUT, index=False)
+    # sorted by stock + small row groups: engine.data.intraday(isin) reads only that stock's row groups
+    bars = bars.sort_values(["isin", "ts_local"]).reset_index(drop=True)
+    bars.to_parquet(OUT, index=False, row_group_size=50_000)
     print(f"{len(bars):,} bars for {sorted(isin_map.values())} -> {OUT}")
 
 

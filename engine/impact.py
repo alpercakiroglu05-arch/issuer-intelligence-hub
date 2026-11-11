@@ -68,10 +68,10 @@ def _auction_block(isin: str, row: pd.Series, base: pd.DataFrame) -> dict:
 
 
 def _intraday_block(isin: str, day: pd.Timestamp, event_time: str | None = None) -> dict | None:
-    bars = intraday()
-    if bars is None:
+    bars = intraday(isin)
+    if bars is None or bars.empty:
         return None
-    b = bars[(bars["isin"] == isin) & (bars["ts_local"].dt.date == day.date())]
+    b = bars[bars["ts_local"].dt.date == day.date()]
     if b.empty:
         return None
     hhmm = b["ts_local"].dt.strftime("%H:%M")
