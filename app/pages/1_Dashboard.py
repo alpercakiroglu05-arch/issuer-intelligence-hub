@@ -1,0 +1,204 @@
+"""Part A - the normal state.  OWNER: C3 (frontend).
+
+TODO C3:
+  - date range filter; peer selection (index / sector) once sectors.csv is filled
+  - nicer anomaly markers (hover: reason, abnormal return, volume ratio)
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _bootstrap  # noqa: E402,F401
+import plotly.graph_objects as go  # noqa: E402
+import streamlit as st  # noqa: E402
+from plotly.subplots import make_subplots  # noqa: E402
+
+import pandas as pd  # noqa: E402
+
+from components import bps, eur, pct, pct0, setup  # noqa: E402
+from engine import baseline, compare, data, xlm  # noqa: E402
+from report.export import part_a_html, to_pdf  # noqa: E402
+
+isin = setup("Dashboard")
+
+
+@st.cache_data
+def load(isin):
+    return (baseline.profile(isin), baseline.anomalies(isin), baseline.kpis(isin),
+            baseline.liquidity_trend(isin), baseline.anomaly_episodes(isin))
+
+
+prof, anom, k, trend, episodes = load(isin)
+
+
+@st.cache_data
+def peer_median(isin: str, by: str, col: str) -> pd.Series:
+    """Daily median of `col` across the stock's peer group (index, sector or turnover cohort)."""
+    if by == "index":
+        return baseline.index_benchmark(k["index"], col)
+    isins = compare.peer_group(isin, by)["isins"]
+    d = data.daily()
+    return d[d["isin"].isin(isins)].groupby("date")[col].median()
+st.title(f"{data.display_name(isin)} · how the share trades")
+
+# Peer benchmarking by index, sector or size (brief point II; engine.compare.peer_group, C2)
+PEERS = {"Index": "index", "Sector": "sector", "Size": "size"}
+choice = st.segmented_control("Compare with", list(PEERS), default="Index") or "Index"
+by = PEERS[choice]
+key = f"{by}_median"
+g = k["peer_groups"][by]
+peer = g["name"] if by != "size" else f"{g['name']} cohort"
+st.caption(f"{k['period']} · compared with the median stock of **{g['label']}** ({g['n']} peers)"
+           + (" · sector unknown, showing the index" if g["fallback"] else "")
+           + (" · size = turnover cohort (market cap is not in the data)" if by == "size" else ""))
+if g["n"] < 3:
+    st.warning("Small peer group: these medians rest on fewer than 3 other stocks.")
+
+c = st.columns(5)
+c[0].metric("Median daily turnover", eur(k["median_turnover_eur"]["stock"]),
+            f"{peer} {eur(k['median_turnover_eur'][key])}", delta_color="off")
+c[1].metric("Trading cost XLM 25k", bps(k["median_xlm_25k_bps"]["stock"]),
+            f"{peer} {bps(k['median_xlm_25k_bps'][key])}", delta_color="off")
+c[2].metric("Auction share", pct0(k["median_auction_share"]["stock"]),
+            f"{peer} {pct0(k['median_auction_share'][key])}", delta_color="off")
+c[3].metric("Agent (client) share", pct0(k["median_agent_share"]["stock"]),
+            f"{peer} {pct0(k['median_agent_share'][key])}", delta_color="off")
+lc = k["liquidity_check"]
+c[4].metric("Liquidity category (est.)", lc["category_estimate"],
+            f"4m: {eur(lc['avg_turnover_eur_4m'])}/day · {bps(lc['median_xlm_25k_bps_4m'])}", delta_color="off")
+
+# "Has our liquidity improved?" (engine.baseline.liquidity_trend, C2)
+st.markdown(f"**Has our liquidity improved?** · {trend['period']}")
+s, ds = trend["stock"], trend["ds_category"] or {}
+lt = st.columns(4)
+lt[0].metric("Liquidity trend", trend["verdict"].capitalize() if trend["verdict"] else "n/a",
+             {"stock-specific": "stock-specific", "market-wide": "market-wide"}.get(trend["vs_index"], ""),
+             delta_color="off", help=trend["help"])
+lt[1].metric("Trading cost XLM 25k", bps(s["xlm_25k_bps"]["now"]),
+             None if trend["xlm_25k_change_pct"] is None else pct(trend["xlm_25k_change_pct"]),
+             delta_color="inverse", help="Lower is better. Median of the last 60 trading days vs the 60 before.")
+lt[2].metric("Median daily turnover", eur(s["turnover_eur"]["now"]),
+             None if trend["turnover_change_pct"] is None else pct(trend["turnover_change_pct"]),
+             help="Higher is better. Median of the last 60 trading days vs the 60 before.")
+lt[3].metric("Designated Sponsor category (est.)", ds.get("now") or "n/a",
+             "unchanged" if ds.get("now") and ds.get("now") == ds.get("before")
+             else (f"was {ds['before']}" if ds.get("before") else ""), delta_color="off")
+st.caption(trend["summary"])
+
+# Price + turnover with anomaly markers
+fig = make_subplots(specs=[[{"secondary_y": True}]])
+fig.add_bar(x=prof["date"], y=prof["turnover_eur"], name="Turnover (EUR)", opacity=0.35, secondary_y=True)
+fig.add_scatter(x=prof["date"], y=prof["price"], name="Price (closing auction)", mode="lines", secondary_y=False)
+a = prof.merge(anom[["date", "reason"]], on="date")
+fig.add_scatter(x=a["date"], y=a["price"], mode="markers", name="Unusual day", text=a["reason"],
+                marker=dict(size=10, symbol="circle-open", line=dict(width=2)), secondary_y=False)
+fig.update_layout(height=380, margin=dict(l=10, r=10, t=30, b=10), legend=dict(orientation="h"))
+st.plotly_chart(fig, width="stretch")
+
+left, right = st.columns(2)
+with left:
+    st.markdown(f"**Trading cost (XLM, EUR 25k order) vs {peer} median**")
+    bench = peer_median(isin, by, "xlm_25k")
+    f2 = go.Figure()
+    f2.add_scatter(x=prof["date"], y=prof["xlm_25k"], name=k["ticker"], mode="lines")
+    f2.add_scatter(x=bench.index, y=bench.values, name=f"{peer} median", mode="lines", line=dict(dash="dot"))
+    f2.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), yaxis_title="bps", legend=dict(orientation="h"))
+    st.plotly_chart(f2, width="stretch")
+with right:
+    st.markdown("**Who trades (share of turnover, 10-day average)**")
+    f3 = go.Figure()
+    for col, name in [("agent_share", "Agent (clients)"), ("prop_share", "Proprietary"), ("mm_share", "Market makers")]:
+        f3.add_scatter(x=prof["date"], y=prof[col].rolling(10, min_periods=3).mean(), name=name, mode="lines")
+    f3.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), yaxis_tickformat=".0%",
+                     legend=dict(orientation="h"))
+    st.plotly_chart(f3, width="stretch")
+
+# Trading cost by order size (engine.xlm, C1): the on-demand version of the XLM table in DB's Stock Report
+st.markdown(f"**Trading cost by order size** · median of the last 60 trading days vs {peer} median")
+curve = xlm.cost_curve(isin, by)
+cs = xlm.curve_summary(curve)
+if cs["largest_absorbed_eur"] is None:
+    st.info("No XLM for this stock in the last 60 days. Deutsche Börse publishes XLM only for index members "
+            "(e.g. Gerresheimer after it left the SDAX).")
+else:
+    cl, cr = st.columns([2, 1])
+    with cl:
+        f4 = go.Figure()
+        f4.add_scatter(x=curve["label"], y=curve["stock_bps"], name=k["ticker"], mode="lines+markers")
+        f4.add_scatter(x=curve["label"], y=curve["peer_bps"], name=f"{peer} median", mode="lines+markers",
+                       line=dict(dash="dot"))
+        f4.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h"),
+                         yaxis=dict(title="bps (round trip)", type="log"), xaxis_title="order size")
+        st.plotly_chart(f4, width="stretch")
+    with cr:
+        peer_ok = curve[curve["peer_bps"].notna()]
+        cr.metric("Largest order the book absorbed on most days", cs["largest_absorbed_label"],
+                  f"{peer}: {peer_ok['label'].iloc[-1] if len(peer_ok) else 'n/a'}", delta_color="off",
+                  help="XLM is only published when the Xetra order book could fill an order of that size. "
+                       "'Absorbed on most days' = filled on at least half of the last 60 trading days.")
+        cr.metric("Cost of a €100k order", bps(cs["cost_100k_bps"]), f"{peer} {bps(cs['peer_cost_100k_bps'])}",
+                  delta_color="off", help="XLM = round-trip cost: buying and selling this amount at once on Xetra, in bps of the order value. Median of the last 60 trading days.")
+        cr.metric("Cost of a €1m order", "book too thin" if pd.isna(cs["cost_1m_bps"]) else bps(cs["cost_1m_bps"]),
+                  f"{peer} {bps(cs['peer_cost_1m_bps'])}", delta_color="off", help="XLM = round-trip cost: buying and selling this amount at once on Xetra, in bps of the order value. Median of the last 60 trading days.")
+
+st.markdown("### Unusual days")
+st.caption("Consecutive unusual days are merged into one episode. **Announcement** links each episode to a sourced "
+           "event from events/events.csv (empty = no company news found). **Market context** flags index and calendar "
+           "days (expiries, index reviews, market-wide volume), so you can tell \"our news\" from \"the market\".")
+CONTEXT_WORDS = {"index_event": "index event", "index_change": "index change", "quarterly_expiry": "quarterly expiry",
+                 "monthly_expiry": "monthly expiry", "month_end_review": "month-end (possible MSCI review)",
+                 "market_wide_volume": "market-wide volume"}
+ev = data.events()
+ev = ev[ev["isin"] == isin]
+ev_day = pd.to_datetime(ev["reaction_day"])
+
+
+def linked_event(start, end) -> str:
+    hit = ev[(ev_day >= start) & (ev_day <= end)]
+    return " · ".join(hit["title"])  # titles already name the event type ("FY 2025 results", "Ad hoc: ...")
+
+
+show = episodes.copy()
+show["event"] = [linked_event(a, b) for a, b in zip(show["start"], show["end"], strict=False)]
+show["market"] = [", ".join(CONTEXT_WORDS.get(f.strip(), f.strip()) for f in str(c).split(",") if f.strip())
+                  for c in show.get("context", pd.Series("", index=show.index)).fillna("")]
+for col in ("start", "end", "peak_date"):
+    show[col] = pd.to_datetime(show[col]).dt.date
+st.dataframe(show[["start", "end", "days", "event", "market", "reason", "peak_abn_ret", "total_abn_ret",
+                   "max_vol_ratio"]].style.format(
+    {"peak_abn_ret": "{:+.1%}", "total_abn_ret": "{:+.1%}", "max_vol_ratio": "{:.1f}x"}, na_rep="–"),
+    width="stretch", hide_index=True,
+    column_config={"event": "announcement",
+                   "market": st.column_config.TextColumn(
+                       "market context", help=" · ".join(f"{CONTEXT_WORDS.get(k, k)}: {v}" for k, v in baseline.CONTEXT_HELP.items())),
+                   "peak_abn_ret": "stock-specific move (peak day)",
+                   "total_abn_ret": "stock-specific move (episode)", "max_vol_ratio": "turnover vs normal (max)"})
+if len(show):
+    opts = list(show.itertuples())
+    pick = st.selectbox("Open an impact card for", range(len(opts)),
+                        format_func=lambda i: f"{opts[i].peak_date} · {opts[i].event or opts[i].reason}"[:110])
+    if st.button("⚡ Generate impact card", type="primary"):
+        st.session_state["impact_day"] = str(opts[pick].peak_date)
+        st.switch_page("pages/2_Impact_Card.py")
+
+# Part A report (brief: "the result can be exported as a short report for the IR department")
+st.markdown("### Export IR report")
+st.caption(f"Short report of this page: key figures vs index / sector / size, liquidity trend, trading cost by "
+           f"order size (vs **{g['label']}**, the 'Compare with' choice above) and unusual days.")
+
+
+@st.cache_data
+def part_a_report(isin: str, lang: str, by: str) -> tuple[str, bytes | None]:
+    html = part_a_html(isin, lang, peer_by=by)
+    return html, to_pdf(html)
+
+
+rl, rh, rp = st.columns([1, 1, 1])
+lang = rl.segmented_control("Language", ["EN", "DE"], default="EN", key="part_a_lang") or "EN"
+report_html, report_pdf = part_a_report(isin, lang.lower(), by)
+fname = f"IR_report_{k['ticker']}_{lang}"
+rh.download_button("⬇ IR report (HTML)", report_html, file_name=f"{fname}.html", mime="text/html")
+if report_pdf:
+    rp.download_button("⬇ IR report (PDF)", report_pdf, file_name=f"{fname}.pdf", mime="application/pdf")
+else:
+    rp.caption("PDF needs xhtml2pdf (pip install -r requirements.txt)")
