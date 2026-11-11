@@ -12,7 +12,6 @@ The demo never breaks: without a key every AI feature falls back to templates.
 TODO C4: disk cache for answers (LLM_CACHE) so the live demo survives Wi-Fi/API outages.
 """
 import os
-from pathlib import Path
 from types import SimpleNamespace
 
 
@@ -20,17 +19,7 @@ class LLMUnavailable(RuntimeError):
     pass
 
 
-def _load_dotenv() -> None:
-    env = Path(__file__).resolve().parents[1] / ".env"
-    if env.exists():
-        for line in env.read_text(encoding="utf-8").splitlines():
-            line = line.split("#", 1)[0].strip()
-            if "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip())
-
-
-_load_dotenv()
+import config  # noqa: E402,F401  (loads .env into os.environ)
 
 
 def _provider() -> str:

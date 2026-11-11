@@ -1,8 +1,29 @@
 """Central configuration. Import from here instead of hard-coding paths or constants."""
+import locale
 import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent
+
+
+def load_dotenv(path: Path = REPO_ROOT / ".env") -> None:
+    """Load KEY=VALUE lines from .env into os.environ (existing env vars win).
+    Tolerates Windows editors/PowerShell that save the file as ANSI instead of UTF-8."""
+    if not path.exists():
+        return
+    raw = path.read_bytes()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode(locale.getpreferredencoding(False) or "cp1252", errors="replace")
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+load_dotenv()
 
 # Processed, small files (parquet/csv). Shared via OneDrive/SharePoint, never committed.
 DATA_DIR = Path(os.getenv("IIH_DATA_DIR", REPO_ROOT / "data"))
