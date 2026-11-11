@@ -84,7 +84,7 @@ futury-build-days-2026/
 
 Everyone works on their own files, so merge conflicts are rare. Contracts between modules are fixed (see below).
 
-### C1 · Data. Owner: Oğuzhan (`Bthn28`) + Claude
+### C1 · Data. Owner: Oguzhan (`Bthn28`) + Claude
 - [x] `ingest/build_intraday.py`: 1-min bars for EVD, EVT, HDD, GXI (163k bars)
 - [x] Sanity check: daily sum of bars = `turnover_eur` (ratio 1.000 on all 213 days × 4 stocks)
 - [x] News onset (`engine/onset.py`, PR #5): "the market started pricing the news at HH:MM" on the card; infers the timing when the announcement time is unknown; lists volatility interruptions
@@ -93,13 +93,13 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [ ] Ongoing: share `data/events.parquet` on OneDrive when `events.csv` changes (the app already rebuilds it from the CSV by itself)
 - [ ] Optional: Eurex single-stock options and futures open interest (`EUREX_OPEN_INTEREST_DYNAMICS_EQUITYINDEX`, join on `ISIN_UNDERLYING`) to show derivatives positioning before events
 
-### C2 · Engine. Owner: ________
+### C2 · Engine. Owner: Kaan
 - [x] `engine/compare.py` v1 (PR #7, written by C1 to unblock the demo): `same_type_events`, `percentile`, `comparison_for`, `sector_peers`. Fills `card["comparison"]`; falls back to auto-detected unusual days until `events.csv` has typed events. **C2 owns it from here.**
 - [x] `impact.py`: intraday block refined (news onset, exact auction volumes)
 - [ ] `baseline.py`: liquidity trend ("has liquidity improved?"), merge consecutive anomaly days
 - [x] Unit tests: GXI 2026-02-11 should give ret ≈ −31.4 %, abnormal ≈ −30.5 %, volume ≈ 20× normal (`test_impact_card_known_values`)
 
-### C3 · Frontend. Owner: ________
+### C3 · Frontend. Owner: Alper
 - [ ] Impact card design (the demo moment): follow the designer's sketch
 - [ ] Intraday chart: event-time marker ✅ (onset line, PR #5), highlighted auctions still open
 - [x] Compare page: scatter of abnormal return vs volume ratio, selected stock highlighted (PR #7)
