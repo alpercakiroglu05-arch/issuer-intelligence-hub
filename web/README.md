@@ -46,6 +46,7 @@ Answers are cached in `data/agent_cache.json` for the live demo (`LLM_CACHE`).
 
 1. Type `eventim` or `DE0005470306` → the ISIN boxes fill and the check digit turns blue → Enter.
 2. Dashboard → *Unusual days* → 27 Mar → **Impact card** (one click).
+   On the card, **Export IR report (PDF)** downloads the one-page IR snapshot (DE/EN follows the language switch).
 3. The AI summary writes itself. Switch to DE. "All 14 figures match the impact card".
 4. "See all of them" → **Compare** (871 unusual days, CTS Eventim ranks #10).
 5. Press **A** → IR analyst: "What were our biggest moves this year?" → the answer cites the engine and offers "Open impact card".

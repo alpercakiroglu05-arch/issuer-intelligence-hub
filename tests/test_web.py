@@ -87,3 +87,20 @@ def test_web_compare_and_ai(base):
     assert n["source"] == "template" and "CTS Eventim" in n["text"]
     a = post(base, "/api/ask", {"isin": EVD, "question": "Has our liquidity improved?", "lang": "en"})
     assert a["text"] and a["source"] == "template"
+
+
+@needs_data
+@pytest.mark.parametrize("query, name", [
+    (f"isin={EVD}&day=2026-03-27&event_id=EVD_FY_20260326&lang=de", "IR_snapshot_EVD_2026-03-27_DE"),
+    (f"isin={EVD}&lang=en", "IR_report_EVD_EN"),
+])
+def test_web_one_click_export(base, query, name):
+    """Brief: the card is generated 'with one click ... including an exportable short report'."""
+    with urllib.request.urlopen(f"{base}/api/export?{query}", timeout=180) as r:
+        assert r.status == 200
+        ctype, disp, raw = r.headers["Content-Type"], r.headers["Content-Disposition"], r.read()
+    if ctype == "application/pdf":
+        assert raw.startswith(b"%PDF") and f'filename="{name}.pdf"' in disp
+    else:  # xhtml2pdf missing: the same report as HTML
+        assert ctype.startswith("text/html") and f'filename="{name}.html"' in disp
+

@@ -29,7 +29,7 @@ So the user is an IR person **without a terminal**. They enter their company and
 | V | Visual impact card: volume vs. baseline, spread movement, price formation in the opening/closing auctions | p. 10/11 | Impact card → card body: volume gauge, spread gauge, opening and closing auction blocks, intraday chart | `card.volume`, `card.liquidity`, `card.auctions`, `card.intraday` |
 | VI | Ingest a corporate event calendar and match events to intraday data | p. 11/12 | Impact card → event list (from `events/events.csv`, with type, time, source and verified flag) **+ "Add event" / "Import calendar" (CSV or ICS from Outlook/Google)** for the company's own dates; the time decides the reaction day. "Market started pricing at HH:MM" on the chart | `data.events`, `POST /api/calendar`, `onset.onset`, `intraday_bars` |
 | VII | Compare events of the same type (e.g. all DAX results in the past year) | p. 10/11 | **Compare** tab (type + index filters, table, scatter; the open card is highlighted) | `compare.same_type_events`, `card.comparison` |
-| IV | Package insights into a shareable "IR snapshot" report | p. 11 | **Report** tab (one place for every export) | `report.export.to_html` / `to_pdf` |
+| IV | Package insights into a shareable "IR snapshot" report | p. 11 | **Export IR report (PDF)** on the dashboard (Part A) and on every impact card (snapshot), one click, DE/EN; **Report** tab for a custom mix | `GET /api/export` → `report.export.part_a_html` / `to_html` + `to_pdf` |
 | VIII | Exportable summary for IR teams | p. 10/11 | IR snapshot tab: choose trading profile, peers, liquidity, unusual days and/or impact card, DE/EN, PDF | same |
 | AI | Easy-to-use **AI assistant**: generate an impact card for an event or notable day with one click, plus an exportable short report | p. 10 | **IR analyst** dock on every page (agent with tools over the engine; answers with figures, then offers one-click buttons: open card, compare, report) + **AI summary** box inside the impact card | `ai.agent.run`, `ai.narrate.narrate_with_meta`, `ai.checks` |
 | Ideas | What else could be relevant for IR, and which data it needs | p. 10 | **Ideas** tab (have / need data per idea) | — |
@@ -42,13 +42,15 @@ ISIN entry (full screen) ── enter ISIN / name / ticker ──►  Company wo
                                                             ├─ Dashboard      A1, I, II, III, liquidity verdict, cost by order size
                                                             ├─ Impact card    B1, V, VI (+ own calendar) + AI summary
                                                             ├─ Compare        VII
-                                                            ├─ IR snapshot    IV, VIII (all exports)
+                                                            ├─ IR snapshot    IV, VIII (custom report; one-click PDF on dashboard and card)
                                                             └─ Ideas          next ideas + data needed
                                           IR analyst dock (every page): AI questions; opens the pages above in one click
 ```
 
 - **One company switcher** (the ISIN chip in the header) replaces the old search button, which only repeated the menu.
-- **Exports live only in Report.** The impact card has a "Put in report" link that opens Report with that card selected.
+- **One click to a PDF, Report for a custom mix.** The dashboard and every impact card have *Export IR report (PDF)*
+  (brief: "with one click … including an exportable short report"): the server returns the same PDF as Streamlit
+  (`GET /api/export`, `report/export.py`). The card's *Put in report* link still opens Report with that card selected.
 - **The AI writes words, the engine computes numbers.** Without an LLM key the AI box shows the template text and says so.
 - **The analyst is a dock, not a page**, so it never repeats a page: it answers and hands over to the page that owns the topic.
 - **Data date is explicit:** the excerpt ends with the close on 30 Oct 2026. The header says "Xetra data as of the close on 30 October 2026".
