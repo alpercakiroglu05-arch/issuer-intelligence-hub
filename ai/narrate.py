@@ -69,7 +69,7 @@ def template_narrative(card: dict, lang: str = "en") -> str:
         if cmp and cmp.get("abs_abn_ret_pctile") is not None:
             what = "ungewöhnlichen Handelstagen" if cmp["group_type"] == "NOTABLE_DAY" else f"{cmp['group_type']}-Ereignissen"
             t += (f" Im Vergleich mit {cmp['n']} {what} ({cmp['group_index']}, 2026) war die unternehmensspezifische "
-                  f"Bewegung größer als bei {_pctile(cmp['abs_abn_ret_pctile'])}.")
+                  f"Bewegung {'die größte von allen' if cmp['abs_abn_ret_pctile'] == 1.0 else 'größer als bei ' + _pctile(cmp['abs_abn_ret_pctile'])}.")
         return t
     t = (f"{card['name']} moved {_p(p['ret'])} on {card['event']['reaction_day']} while its {card['index']} peers "
          f"moved {_p(p['peer_ret'])} (stock-specific: {_p(p['abn_ret'])}). "
@@ -85,6 +85,7 @@ def template_narrative(card: dict, lang: str = "en") -> str:
         t += (f" The closing auction was {au['close_auction_ratio']:.1f}x its normal size and moved the price "
               f"{_p(au['close_auction_move'])} vs. the last trade.")
     if cmp and cmp.get("abs_abn_ret_pctile") is not None:
-        t += (f" Compared with {cmp['n']} {cmp['group']}, the stock-specific move was bigger than "
-              f"{_pctile(cmp['abs_abn_ret_pctile'])} of them.")
+        move = ("the biggest of them" if cmp["abs_abn_ret_pctile"] == 1.0
+                else f"bigger than {_pctile(cmp['abs_abn_ret_pctile'])} of them")
+        t += f" Compared with {cmp['n']} {cmp['group']}, the stock-specific move was {move}."
     return t

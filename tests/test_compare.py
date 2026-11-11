@@ -94,3 +94,31 @@ def test_comparison_summary_evd():
     s = c["summary"]
     assert s.startswith(f"Compared with {c['n']} {c['group']}")
     assert "-21.7%" in s and "8.6x normal" in s and "100%" not in s
+
+
+def test_top_percentile_says_biggest():
+    """Percentile 1.0 (the biggest move in the group) reads "the biggest of them", not "bigger than 100%"."""
+    from ai.narrate import narrate
+    from engine.compare import _summary
+    card = {
+        "name": "TEST AG", "index": "SDAX", "event": {"reaction_day": "2026-02-11"},
+        "price": {"ret": -0.314, "peer_ret": -0.009, "abn_ret": -0.305},
+        "volume": {"ratio": 20.1}, "liquidity": {"xlm_25k_bps": 48.0, "ratio": 1.0},
+        "participants": {"agent_aggr_imbalance": -0.44},
+        "comparison": {"group_type": "NOTABLE_DAY", "group_index": "SDAX", "n": 444,
+                       "group": "unusual trading days, SDAX, Jan – Oct 2026", "abs_abn_ret_pctile": 1.0},
+    }
+    s = _summary(card, card["comparison"]["group"], {"n": 444, "abs_abn_ret_pctile": 1.0, "vol_ratio_pctile": 0.95})
+    assert "the stock-specific move (-30.5%) was the biggest of them" in s and "100%" not in s
+    assert "the biggest of them" in narrate(card, "en") and "100%" not in narrate(card, "en")
+    assert "die größte von allen" in narrate(card, "de") and "100%" not in narrate(card, "de")
+
+
+@needs_data
+def test_comparison_summary_gxi_is_biggest():
+    """Gerresheimer, 11 Feb 2026: the biggest stock-specific move among SDAX unusual days."""
+    from engine.data import isin_of
+    from engine.impact import impact_card
+    c = impact_card(isin_of("GXI"), "2026-02-11")["comparison"]
+    assert c["abs_abn_ret_pctile"] == 1.0 and c["rank_abs_abn_ret"] == 1
+    assert "was the biggest of them" in c["summary"] and "100%" not in c["summary"]

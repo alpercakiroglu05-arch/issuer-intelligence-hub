@@ -98,8 +98,10 @@ def render_card(card: dict) -> None:
     cmp = card.get("comparison")
     if cmp:
         rank = f" (#{cmp['rank_abs_abn_ret']} of {cmp['n'] + 1})" if cmp.get("rank_abs_abn_ret") else ""
-        st.info(f"📐 **Compared with {cmp['n']} {cmp['group']}:** the stock-specific move was bigger than "
-                f"**{pctile0(cmp['abs_abn_ret_pctile'])}** of them{rank}, turnover vs normal bigger than "
+        move = ("**the biggest of them**" if cmp["abs_abn_ret_pctile"] == 1.0
+                else f"bigger than **{pctile0(cmp['abs_abn_ret_pctile'])}** of them")
+        st.info(f"📐 **Compared with {cmp['n']} {cmp['group']}:** the stock-specific move was "
+                f"{move}{rank}, turnover vs normal bigger than "
                 f"**{pctile0(cmp['vol_ratio_pctile'])}**, trading cost vs normal higher than "
                 f"**{pctile0(cmp['xlm_ratio_pctile'])}**.")
     c2 = st.columns(5)

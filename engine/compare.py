@@ -119,7 +119,9 @@ def _summary(card: dict, group: str, res: dict) -> str:
     abn, vol = card["price"]["abn_ret"], card["volume"]["ratio"]
     parts = []
     if res["abs_abn_ret_pctile"] is not None:
-        parts.append(f"the stock-specific move ({abn * 100:+.1f}%) was bigger than {_share(res['abs_abn_ret_pctile'])} of them")
+        p = res["abs_abn_ret_pctile"]
+        rank = "the biggest of them" if p == 1.0 else f"bigger than {_share(p)} of them"
+        parts.append(f"the stock-specific move ({abn * 100:+.1f}%) was {rank}")
     if res["vol_ratio_pctile"] is not None:
         parts.append(f"turnover ({vol:.1f}x normal) was higher than {_share(res['vol_ratio_pctile'])}")
     if not parts:
