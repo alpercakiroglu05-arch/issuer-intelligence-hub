@@ -64,6 +64,18 @@
   <footer><div class="wrap" id="foot"></div></footer>
 </div>
 
+<!-- IR analyst: the agent (ai/agent.py), on every page -->
+<aside id="dock" class="dock hidden" aria-label="IR analyst">
+  <button class="dock-fab" id="dock-fab" data-act="dock" aria-controls="dock-panel"></button>
+  <div class="dock-panel" id="dock-panel" role="dialog" aria-labelledby="dock-head">
+    <header class="dock-head" id="dock-head"></header>
+    <div class="dock-ctx" id="dock-ctx"></div>
+    <div class="dock-log" id="dock-log" aria-live="polite"></div>
+    <div class="dock-sugg" id="dock-sugg"></div>
+    <form class="dock-in" id="dockf" autocomplete="off"><input id="dockq" aria-label="Question" maxlength="1000"><button type="submit" aria-label="Ask"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2"/></svg></button></form>
+  </div>
+</aside>
+
 <div id="tip" role="tooltip"></div>
 <div id="toast" role="status"></div>
 <script src="app.js"></script>

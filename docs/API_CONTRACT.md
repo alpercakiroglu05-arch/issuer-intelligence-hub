@@ -94,4 +94,5 @@ in the direction of the day's move, still holding 5 minutes later. Thresholds in
 | `engine.compare.sector_peers(isin)` / `size_peers(isin)` / `size_cohort(isin)` / `size_cohorts()` | list[str] / list[str] / str / Series isin→cohort. Sector from `events/sectors.csv`; size = **turnover cohort (size proxy)**, not market cap | C2 |
 | `ai.narrate.narrate(card, lang)` | str (DE/EN), template fallback without LLM | C4 |
 | `ai.agent.ask(question, isin)` | str | C4 |
+| `ai.agent.run(question, isin, history, context, lang)` | dict: `text, source, model, steps[{tool,args}], actions[{view,isin,day,event_id,event_type,index}], check{total,unsupported}` | C4 (v2 by C3) |
 | `report.export.to_html(card, text, lang)` / `to_pdf(html)` | str / bytes | C4 |

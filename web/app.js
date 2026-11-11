@@ -1,13 +1,14 @@
 /* Issuer Intelligence Hub, web front end.  OWNER: C3.
    Every number comes from the engine through web/server.py (/api/*). Words come from the LLM or the template fallback.
-   One home per requirement (docs/REQUIREMENTS.md): Dashboard = Part A (I, II, III), Impact card = Part B (V, VI) + AI summary,
-   Compare = VII, Assistant = AI Q&A, Report = IV/VIII (all exports), Ideas = next ideas + data. */
+   One home per requirement (docs/REQUIREMENTS.md): Dashboard = trading profile (I, II, III), Impact card = event impact
+   (V, VI, own calendar import) + AI summary, Compare = VII, Report = IV/VIII (all exports), Ideas = next ideas + data.
+   The IR analyst (agent dock, ai/agent.py) is on every page and can open any of them with one click. */
 "use strict";
 
 /* ============================== helpers ============================== */
 const $ = s => document.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const S = {lang: "en", uni: [], status: null, isin: null, iss: null, page: "dashboard", sel: null, cards: {}, ai: {},
-  cmp: {type: null, index: "ALL", data: null}, chat: [], metric: "turnover",
+  cmp: {type: null, index: "ALL", data: null}, chat: [], metric: "turnover", dock: false, busy: false, addEv: false,
   rep: {a: true, peers: true, liq: true, anom: true, card: true, ai: true, key: null}};
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const de = () => S.lang === "de";
@@ -64,8 +65,13 @@ const post = (p, b) => api(p, {method: "POST", headers: {"Content-Type": "applic
 
 function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("on"), 2000); }
 function vt(fn) {
-  if (document.startViewTransition && !reduced && !document.hidden) { const t = document.startViewTransition(fn); [t.ready, t.finished, t.updateCallbackDone].forEach(p => p.catch(() => {})); return t; }
-  fn(); const c = $("#app .content"); c && c.classList.add("enter");
+  let done = false; const run = () => { if (!done) { done = true; fn(); } };
+  if (document.startViewTransition && !reduced && !document.hidden) {
+    const t = document.startViewTransition(run); [t.ready, t.finished, t.updateCallbackDone].forEach(p => p.catch(e => console.warn("view transition:", e)));
+    setTimeout(() => { if (!done) { t.skipTransition && t.skipTransition(); run(); } }, 1200);   /* never leave the page stuck on a stalled transition */
+    return t;
+  }
+  run(); const c = $("#app .content"); c && c.classList.add("enter");
 }
 
 /* ISIN check digit (ISO 6166): letters -> numbers (A=10), Luhn over the digit string */
@@ -171,7 +177,7 @@ async function openIsin(isin, {fromGate = true, then = null} = {}) {
     clearInterval(timer);
     if (fromGate) { $$("#gl-steps li").forEach(li => { li.classList.remove("on"); li.classList.add("done"); }); $("#gl-bar").style.width = "100%"; await new Promise(r => setTimeout(r, reduced ? 0 : 250)); }
     const changed = S.isin !== isin;
-    S.isin = isin; S.iss = iss; if (changed) { S.sel = null; S.chat = []; S.rep.key = null; }
+    S.isin = isin; S.iss = iss; mergeUserEvents(); if (changed) { S.sel = null; S.chat = []; S.rep.key = null; }
     if (then) then();
     vt(() => { $("#gate").classList.add("hidden"); $("#g-load").classList.remove("on"); $("#ws").classList.remove("hidden"); render(); window.scrollTo(0, 0); });
   } catch (e) {
@@ -181,13 +187,14 @@ async function openIsin(isin, {fromGate = true, then = null} = {}) {
   }
 }
 function backToGate() {
+  S.dock = false; $("#dock").classList.add("hidden");
   vt(() => { $("#ws").classList.add("hidden"); $("#gate").classList.remove("hidden"); $("#g-in").value = ""; $("#g-err").textContent = ""; gateText(); history.replaceState(null, "", "#"); });
   setTimeout(() => $("#g-in").focus(), 400);
 }
 
 /* ============================== chrome ============================== */
-const PAGES = ["dashboard", "card", "compare", "ask", "report", "ideas"];
-const NAV = {dashboard: ["Dashboard", "Übersicht"], card: ["Impact card", "Impact Card"], compare: ["Compare", "Vergleich"], ask: ["Assistant", "Assistent"], report: ["Report", "Report"], ideas: ["Ideas", "Ideen"]};
+const PAGES = ["dashboard", "card", "compare", "report", "ideas"];
+const NAV = {dashboard: ["Dashboard", "Übersicht"], card: ["Impact card", "Impact Card"], compare: ["Compare", "Vergleich"], report: ["IR snapshot", "IR-Snapshot"], ideas: ["Ideas", "Ideen"]};
 const nav = p => NAV[p][de() ? 1 : 0];
 function chrome() {
   document.documentElement.lang = S.lang;
@@ -196,10 +203,10 @@ function chrome() {
   placeInd();
   $$(".lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.lang));
   const m = S.iss.meta;
-  $("#stamp").textContent = L(`Data: Xetra, ${dS(m.first_date)} – ${dL(m.last_date)} · ${m.days} trading days · ${S.uni.length} shares`, `Daten: Xetra, ${dS(m.first_date)} – ${dL(m.last_date)} · ${m.days} Handelstage · ${S.uni.length} Aktien`);
+  $("#stamp").innerHTML = L(`Xetra data as of the close on <b>${dL(m.last_date)}</b> · ${m.days} trading days since ${dS(m.first_date)} · ${S.uni.length} shares`, `Xetra-Daten bis Handelsschluss <b>${dL(m.last_date)}</b> · ${m.days} Handelstage seit ${dS(m.first_date)} · ${S.uni.length} Aktien`);
   const live = S.status && S.status.llm;
   $("#ai-dot").classList.toggle("on", !!live);
-  $("#ai-dot span").textContent = live ? L("AI connected", "KI verbunden") : L("AI: template mode", "KI: Vorlagenmodus");
+  $("#ai-dot span").textContent = live ? L(`AI: ${S.status.model}`, `KI: ${S.status.model}`) : L("AI: template mode", "KI: Vorlagenmodus");
   $("#co").innerHTML = `<button class="co-btn" data-act="co" aria-expanded="false" aria-haspopup="true"><span class="tk">${u.ticker}</span><span><b>${esc(nice(u))}</b><small>${u.isin} · ${u.index}</small></span><svg class="chev" width="14" height="14" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
     <div class="co-pop" id="co-pop"><input id="co-in" placeholder="${L("Switch company: ISIN, ticker or name", "Unternehmen wechseln: ISIN, Ticker oder Name")}" autocomplete="off" spellcheck="false"><ul class="sugg" id="co-sugg"></ul><button class="back" data-act="gate">${L("Back to ISIN entry", "Zurück zur ISIN-Eingabe")} ${ARR}</button></div>`;
   const li = (t, go) => `<li><svg width="14" height="14" viewBox="0 0 16 16"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2"/></svg>${go ? `<a href="#" data-go="${go}">${t}</a>` : `<span>${t}</span>`}</li>`;
@@ -208,7 +215,7 @@ function chrome() {
     <div><h4>${L("Data", "Daten")}</h4><ul>${li("Xetra OHLC & auctions")}${li("Xetra flow dynamics")}${li("Xetra Liquidity Measure (XLM)")}${li("Xetra on-book trades (1-min bars)")}${li(L("Index constituents · event calendar", "Indexlisten · Ereigniskalender"))}</ul></div>
     <div><h4>${L("Method", "Methode")}</h4><ul>${li(L("Numbers come from the engine", "Zahlen kommen aus der Engine"))}${li(L("Words come from the LLM", "Texte kommen vom LLM"))}${li(L("Every figure in a text is checked", "Jede Zahl im Text wird geprüft"))}${li(L("Causes are verified by people", "Ursachen prüfen Menschen"))}</ul></div>
     <div><h4>${L("Project", "Projekt")}</h4><ul>${li("Futury Build Days #4, Frankfurt")}${li(L("Deutsche Börse challenge", "Deutsche-Börse-Challenge"))}${li(L("A module for the Issuer Services Hub", "Ein Modul für den Issuer Services Hub"))}</ul></div></div>
-    <div class="fbot"><span>${L("Concept prototype for Futury Build Days 2026. Not an official Deutsche Börse product. Not investment advice.", "Konzept-Prototyp für Futury Build Days 2026. Kein offizielles Produkt der Deutschen Börse. Keine Anlageberatung.")}</span><span>${L("Keys", "Tasten")}: 1–6</span></div>`;
+    <div class="fbot"><span>${L("Concept prototype for Futury Build Days 2026. Not an official Deutsche Börse product. Not investment advice.", "Konzept-Prototyp für Futury Build Days 2026. Kein offizielles Produkt der Deutschen Börse. Keine Anlageberatung.")}</span><span>${L("Keys", "Tasten")}: 1–5 · A ${L("analyst", "Analyst")}</span></div>`;
 }
 function placeInd() { const a = $("#nav [aria-current=page]"), i = $("#navind"); if (!a || !i) return; i.style.left = a.offsetLeft + "px"; i.style.width = a.offsetWidth + "px"; }
 function segThumb() { $$(".seg").forEach(g => { const b = g.querySelector("[aria-pressed=true]"), th = g.querySelector(".th"); if (b && th) { th.style.left = b.offsetLeft + "px"; th.style.width = b.offsetWidth + "px"; } }); }
@@ -220,9 +227,8 @@ function band() {
   const u = U(S.isin), name = nice(u);
   if (S.page === "dashboard") return dashBand(u, name);
   const t = {
-    card: [L("Impact card", "Impact Card"), L("Pick an announcement or an unusual day. The card shows how the share reacted, measured against its own normal state.", "Wählen Sie eine Meldung oder einen auffälligen Tag. Die Karte zeigt die Reaktion der Aktie im Vergleich zu ihrem Normalzustand.")],
+    card: [L("Impact card", "Impact Card"), L("Pick an announcement or an unusual day, or add your own calendar. The card shows how the share reacted, measured against its own normal state.", "Wählen Sie eine Meldung oder einen auffälligen Tag, oder ergänzen Sie Ihren eigenen Kalender. Die Karte zeigt die Reaktion der Aktie im Vergleich zu ihrem Normalzustand.")],
     compare: [L("Compare events", "Ereignisse vergleichen"), L("Every event of the same type across DAX, MDAX and SDAX in 2026, measured with the card's own definitions.", "Alle Ereignisse desselben Typs in DAX, MDAX und SDAX 2026, gemessen mit den Definitionen der Karte.")],
-    ask: [L("Ask the data", "Fragen Sie die Daten"), L("Plain-language questions about your share. The assistant only sees engine output.", "Fragen in Alltagssprache zu Ihrer Aktie. Der Assistent sieht nur die Ergebnisse der Engine.")],
     report: [L("IR snapshot", "IR-Snapshot"), L("Build a one-page report for the board or investors, in English or German.", "Ein einseitiger Bericht für Vorstand oder Investoren, auf Deutsch oder Englisch.")],
     ideas: [L("What IR needs next", "Was IR als Nächstes braucht"), L("Ideas built on the same data, and the data each one still needs.", "Ideen auf derselben Datenbasis, und welche Daten jeweils noch fehlen.")]
   }[S.page];
@@ -233,13 +239,13 @@ function dashBand(u, name) {
   const prices = s.price.filter(isN), last = prices[prices.length - 1], first = prices[0];
   const to = k.median_turnover_eur, xl = k.median_xlm_25k_bps, cat = k.liquidity_check.category_estimate;
   const vw = {improved: L("improved", "verbessert"), worsened: L("worsened", "verschlechtert"), mixed: L("mixed", "gemischt"), stable: L("stable", "stabil")}[lt.verdict] || L("open", "offen");
-  const lede = L(`Over the last 60 trading days ${esc(name)} traded a median of <b>${EUR(to.stock)}</b> a day (${S.iss.meta.index} median ${EUR(to.index_median)}) at a trading cost of <b>${BPS(xl.stock)}</b> for a €25k order (index ${BPS(xl.index_median)}). Liquidity has <b>${vw === "stable" ? "stayed stable" : vw}</b> compared with the 60 days before.`,
-    `In den letzten 60 Handelstagen handelte ${esc(name)} im Median <b>${EUR(to.stock)}</b> pro Tag (${S.iss.meta.index}-Median ${EUR(to.index_median)}) bei Handelskosten von <b>${BPS(xl.stock)}</b> für eine 25-T€-Order (Index ${BPS(xl.index_median)}). Die Liquidität ist im Vergleich zu den 60 Tagen davor <b>${vw}</b>.`);
+  const lede = L(`Over the 60 trading days to ${dS(S.iss.meta.last_date)} ${esc(name)} traded a median of <b>${EUR(to.stock)}</b> a day (${S.iss.meta.index} median ${EUR(to.index_median)}) at a trading cost of <b>${BPS(xl.stock)}</b> for a €25k order (index ${BPS(xl.index_median)}). Liquidity has <b>${vw === "stable" ? "stayed stable" : vw}</b> compared with the 60 days before.`,
+    `In den 60 Handelstagen bis ${dS(S.iss.meta.last_date)} handelte ${esc(name)} im Median <b>${EUR(to.stock)}</b> pro Tag (${S.iss.meta.index}-Median ${EUR(to.index_median)}) bei Handelskosten von <b>${BPS(xl.stock)}</b> für eine 25-T€-Order (Index ${BPS(xl.index_median)}). Die Liquidität ist im Vergleich zu den 60 Tagen davor <b>${vw}</b>.`);
   return `<section class="band"><div class="wrap band-in">
     <div class="kicker">${u.index} · ISIN <b>${u.isin}</b> · Xetra${u.sector ? " · " + esc(u.sector) : ""}</div>
     <h1>${esc(name)}</h1><p class="lede">${lede}</p>
     <dl class="facts">
-      <div><dt>${L("Last close", "Letzter Schluss")} · ${dS(S.iss.meta.last_date)}</dt><dd>${PX(last)}</dd></div>
+      <div><dt>${L("Closing auction", "Schlussauktion")} · ${dL(S.iss.meta.last_date)}</dt><dd>${PX(last)}</dd></div>
       <div><dt>${L("Since 2 Jan", "Seit 2. Jan.")}</dt><dd>${P(last / first - 1)}</dd></div>
       <div><dt>${L("Liquidity trend", "Liquiditätstrend")}</dt><dd>${vw.charAt(0).toUpperCase() + vw.slice(1)}</dd></div>
       <div><dt>${L("Xetra category (est.)", "Xetra-Kategorie (Schätz.)")}</dt><dd>${cat}<small>${cat === "A" ? L("no Designated Sponsor needed", "kein Designated Sponsor nötig") : L("Designated Sponsor needed", "Designated Sponsor nötig")}</small></dd></div>
@@ -247,12 +253,12 @@ function dashBand(u, name) {
     </dl></div></section>`;
 }
 
-/* ============================== 1 dashboard (Part A) ============================== */
-const METRICS = () => [["turnover", L("Turnover", "Umsatz")], ["xlm", L("Trading cost", "Handelskosten")], ["auction", L("Auctions", "Auktionen")], ["who", L("Who trades", "Wer handelt")], ["price", L("Price", "Kurs")]];
+/* ============================== 1 dashboard: trading profile ============================== */
+const METRICS = () => [["turnover", L("Turnover", "Umsatz")], ["xlm", L("Spread & cost (XLM)", "Spread & Kosten (XLM)")], ["auction", L("Auctions", "Auktionen")], ["who", L("Who trades", "Wer handelt")], ["price", L("Price", "Kurs")]];
 function pDashboard() {
   const iss = S.iss, idx = iss.meta.index;
   const note = {turnover: L(`Daily order-book turnover. Grey line: ${idx} median. Blue bars: unusual days.`, `Täglicher Orderbuch-Umsatz. Graue Linie: ${idx}-Median. Blaue Balken: auffällige Tage.`),
-    xlm: L(`Xetra Liquidity Measure for a €25k order, in basis points (lower is cheaper). Grey: ${idx} median.`, `Xetra Liquidity Measure für eine 25-T€-Order in Basispunkten (niedriger ist günstiger). Grau: ${idx}-Median.`),
+    xlm: L(`Xetra Liquidity Measure (XLM): what it costs to buy and sell €25k at once, spread plus price impact, in basis points. Lower is cheaper. Grey: ${idx} median.`, `Xetra Liquidity Measure (XLM): Kosten für Kauf und Verkauf von 25 T€ auf einmal, Spread plus Preiseinfluss, in Basispunkten. Niedriger ist günstiger. Grau: ${idx}-Median.`),
     auction: L(`Share of turnover traded in auctions (opening, intraday, closing), 10-day median. Grey: ${idx} median.`, `Anteil des Umsatzes in Auktionen, 10-Tage-Median. Grau: ${idx}-Median.`),
     who: L("Share of one-sided turnover by participant type, 10-day median (Xetra flow dynamics).", "Anteil am einseitigen Umsatz nach Teilnehmertyp, 10-Tage-Median (Xetra Flow Dynamics)."),
     price: L(`Closing auction price. Grey: ${idx} median return, rebased to the same start.`, `Schlussauktionskurs. Grau: ${idx}-Medianrendite, auf denselben Start indexiert.`)}[S.metric];
@@ -266,6 +272,7 @@ function pDashboard() {
     <div class="rv">${peersBlock()}</div>
     <div class="rv" style="--d:.1s">${liqBlock()}</div>
   </div></section>
+  ${S.iss.cost_curve ? `<section class="sec wrap rv">${curveBlock()}</section>` : ""}
   <section class="sec wrap rv">${anomBlock()}</section>`;
 }
 function timeChart() {
@@ -311,13 +318,37 @@ function peersBlock() {
   const p = S.iss.peers, g = p.groups.filter(x => x.values && x.n > 0);
   const rows = [["turnover_eur", L("Turnover per day", "Umsatz pro Tag"), v => EUR(v)], ["xlm_25k", L("Trading cost €25k (XLM)", "Handelskosten 25 T€ (XLM)"), v => BPS(v)],
     ["auction_share", L("Auction share", "Auktionsanteil"), v => P(v, 0, false)], ["agent_share", L("Client (agent) share", "Anteil Kundenorders"), v => P(v, 0, false)], ["volatility", L("Volatility (annualised)", "Volatilität (annualisiert)"), v => P(v, 0, false)]];
-  const lab = x => x.key === "index" ? `${S.iss.meta.index}` : x.key === "size" ? L("Similar size", "Ähnliche Größe") : esc(x.label.replace(" median", ""));
-  const members = g.filter(x => x.members && x.members.length).map(x => `<b>${lab(x)}</b>: ${x.members.map(m => esc(nice({ticker: m.ticker, name: m.name}))).join(", ")}`).join(" · ");
-  return `<div class="sec-head"><div><h2 class="h2">${L("Peer benchmark", "Peer-Vergleich")}</h2><p class="sec-note">${L("Medians of the last 60 trading days. Arrows compare you with the index median.", "Mediane der letzten 60 Handelstage. Pfeile vergleichen mit dem Indexmedian.")}</p></div></div>
+  const SZ = {large: L("large", "groß"), mid: L("mid", "mittel"), small: L("small", "klein")};
+  const lab = x => x.key === "index" ? `${S.iss.meta.index}` : x.key === "size" ? `${L("Size", "Größe")}: ${SZ[x.name] || esc(x.name)}` : esc(x.name);
+  const sec = g.find(x => x.key === "sector");
+  const members = sec && sec.members.length ? `<b>${esc(sec.name)}</b>: ${sec.members.map(m => esc(nice({ticker: m.ticker, name: m.name}))).join(", ")}${sec.n > sec.members.length ? " …" : ""}. ` : "";
+  return `<div class="sec-head"><div><h2 class="h2">${L("Peer benchmark", "Peer-Vergleich")}</h2><p class="sec-note">${L("Medians of the last 60 trading days, per peer group: index, sector, and size. Arrows compare you with the index median.", "Mediane der letzten 60 Handelstage je Vergleichsgruppe: Index, Sektor und Größe. Pfeile vergleichen mit dem Indexmedian.")}</p></div></div>
   <table class="tbl"><thead><tr><th></th><th class="r">${S.iss.meta.ticker}</th>${g.map(x => `<th class="r">${lab(x)} <span style="font-weight:400">(${x.n})</span></th>`).join("")}<th class="ic"></th></tr></thead>
   <tbody>${rows.map(([k, t, f]) => `<tr><td>${t}</td><td class="r"><b>${f(p.stock[k])}</b></td>${g.map(x => `<td class="r m">${f(x.values[k])}</td>`).join("")}<td class="ic">${arrRel(p.stock[k], g[0] && g[0].values[k])}</td></tr>`).join("")}</tbody></table>
-  <p class="sec-note">${members}</p>`;
+  <p class="sec-note">${members}${L("Size = turnover tercile of all 174 shares (market capitalisation is not in the Xetra data).", "Größe = Umsatz-Terzil aller 174 Aktien (Marktkapitalisierung ist nicht in den Xetra-Daten).")}</p>`;
 }
+/* trading cost by order size (engine/xlm.py): the on-demand version of the Stock Report's XLM table */
+function curveBlock() {
+  const c = S.iss.cost_curve, rows = c.rows.filter(r => isN(r.stock_bps) && r.stock_fill >= .5 || isN(r.peer_bps)), s = c.summary;
+  const W = 760, H = 270, ml = 56, mr = 20, mt = 18, mb = 40, xs = rows.map(r => Math.log10(r.notional_eur));
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), x = v => ml + (Math.log10(v) - x0) / (x1 - x0 || 1) * (W - ml - mr);
+  const vals = rows.flatMap(r => [r.stock_fill >= .5 ? r.stock_bps : null, r.peer_bps]).filter(v => isN(v) && v > 0);
+  const l0 = Math.log10(Math.min(...vals) * .8), l1 = Math.log10(Math.max(...vals) * 1.25);   /* log scale: €10k tickets and blocks on one chart */
+  const y = v => mt + (1 - (Math.log10(v) - l0) / (l1 - l0)) * (H - mt - mb);
+  let g = "";
+  [5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000].filter(v => Math.log10(v) >= l0 && Math.log10(v) <= l1).forEach(v => { g += `<line x1="${ml}" x2="${W - mr}" y1="${f1(y(v))}" y2="${f1(y(v))}" class="gl"/><text x="${ml - 8}" y="${f1(y(v) + 4)}" class="ax" text-anchor="end">${N0(v)}</text>`; });
+  rows.forEach(r => g += `<text x="${f1(x(r.notional_eur))}" y="${H - mb + 18}" class="ax" text-anchor="middle">${esc(r.label)}</text>`);
+  const ln = (k, col, w, dash) => { const pts = rows.filter(r => isN(r[k + "_bps"]) && (k === "peer" || r.stock_fill >= .5)); return `<path d="${pts.map((r, i) => `${i ? "L" : "M"}${f1(x(r.notional_eur))},${f1(y(r[k + "_bps"]))}`).join("")}" fill="none" stroke="${col}" stroke-width="${w}" ${dash ? 'stroke-dasharray="4 4"' : ""} class="draw" pathLength="1"/>` + pts.map(r => `<circle cx="${f1(x(r.notional_eur))}" cy="${f1(y(r[k + "_bps"]))}" r="${k === "stock" ? 4 : 3}" fill="${k === "stock" ? "#fff" : col}" stroke="${col}" stroke-width="2" data-tip="${enc(`<span class="t">${esc(r.label)} ${L("order", "Order")}</span><br>${k === "stock" ? S.iss.meta.ticker : L("Peers", "Peers")} ${BPS(r[k + "_bps"], 0)}${k === "stock" ? `<br>${L("book absorbed it on", "Buch nahm sie auf an")} ${P(r.stock_fill, 0, false)} ${L("of days", "der Tage")}` : ""}`)}"/>`).join(""); };
+  const big = s.largest_absorbed_label;
+  return `<div class="cols-21"><div><div class="sec-head"><div><h2 class="h2">${L("Trading cost by order size", "Handelskosten nach Ordergröße")}</h2><p class="sec-note">${L(`Median XLM over the last 60 trading days, from a €10k ticket to a block. Dashed: ${S.iss.meta.index} peers. Sizes the order book could not absorb on most days are left out.`, `Median-XLM der letzten 60 Handelstage, von 10 T€ bis zum Block. Gestrichelt: ${S.iss.meta.index}-Peers. Größen, die das Orderbuch an den meisten Tagen nicht aufnehmen konnte, fehlen.`)}</p></div></div>
+    <div class="chart"><svg viewBox="0 0 ${W} ${H}">${g}<text x="${ml}" y="${mt - 6}" class="ax">bps (${L("log scale", "log. Skala")})</text>${ln("peer", "var(--graphite)", 1.6, true)}${ln("stock", "var(--navy)", 2.4)}</svg></div></div>
+    <div><dl class="facts facts--stack">
+      <div><dt>${L("€100k order costs", "100-T€-Order kostet")}</dt><dd>${BPS(s.cost_100k_bps, 0)}<small>${L("peers", "Peers")} ${BPS(s.peer_cost_100k_bps, 0)}</small></dd></div>
+      <div><dt>${L("€1m order costs", "1-Mio.-€-Order kostet")}</dt><dd>${BPS(s.cost_1m_bps, 0)}<small>${L("peers", "Peers")} ${BPS(s.peer_cost_1m_bps, 0)}</small></dd></div>
+      <div><dt>${L("Largest order the book absorbs on most days", "Größte Order, die das Buch meist aufnimmt")}</dt><dd>${big ? esc(big) : NA}</dd></div></dl>
+      <p class="sec-note">${L("Why IR cares: an institutional investor building a position needs to know what a block costs. This is the number behind a Designated Sponsor conversation.", "Warum IR das braucht: Ein institutioneller Investor, der eine Position aufbaut, will wissen, was ein Block kostet. Das ist die Zahl hinter dem Gespräch mit dem Designated Sponsor.")}</p></div></div>`;
+}
+const CTX = c => !c ? "" : String(c).split(/,\s*/).map(k => ({index_event: L("index change", "Indexänderung"), index_change: L("index membership change", "Indexwechsel"), quarterly_expiry: L("quarterly expiry", "großer Verfall"), monthly_expiry: L("monthly expiry", "Monatsverfall"), month_end_review: L("index review date", "Index-Review-Tag"), market_wide_volume: L("market-wide volume", "marktweiter Umsatz")}[k] || k)).join(", ");
 function liqBlock() {
   const lt = S.iss.liquidity, k = S.iss.kpis.liquidity_check, idx = S.iss.meta.index;
   const vw = {improved: L("Liquidity improved.", "Die Liquidität hat sich verbessert."), worsened: L("Liquidity worsened.", "Die Liquidität hat sich verschlechtert."), mixed: L("Liquidity is mixed.", "Die Liquidität ist gemischt."), stable: L("Liquidity is stable.", "Die Liquidität ist stabil.")}[lt.verdict] || L("Not enough history yet.", "Noch zu wenig Historie.");
@@ -341,14 +372,14 @@ function liqBlock() {
 function anomBlock() {
   const a = S.iss.anomalies;
   if (!a.length) return `<h2 class="h2">${L("Unusual days", "Auffällige Tage")}</h2><p class="empty">${L("No unusual days in 2026.", "Keine auffälligen Tage in 2026.")}</p>`;
-  return `<div class="sec-head"><div><h2 class="h2">${L("Unusual days", "Auffällige Tage")}</h2><p class="sec-note">${L("Turnover z ≥ 3, stock-specific move z ≥ 3 or spread ≥ 2× normal. Consecutive days are merged. The data shows that something happened, not why.", "Umsatz-z ≥ 3, titelspezifische Bewegung z ≥ 3 oder Spread ≥ 2× normal. Aufeinanderfolgende Tage werden zusammengefasst. Die Daten zeigen, dass etwas passiert ist, nicht warum.")}</p></div></div>
-  <table class="tbl"><thead><tr><th>${L("Date", "Datum")}</th><th>${L("What was unusual", "Was auffiel")}</th><th class="r">${L("Abnormal", "Abnormal")}</th><th class="ic"></th><th class="r">${L("Turnover", "Umsatz")}</th><th>${L("Calendar", "Kalender")}</th><th></th></tr></thead><tbody>
+  return `<div class="sec-head"><div><h2 class="h2">${L("Unusual days", "Auffällige Tage")}</h2><p class="sec-note">${L("Turnover z ≥ 3, stock-specific move z ≥ 3 or spread ≥ 2× normal. Consecutive days are merged. The data shows that something happened, not why: causes come from the calendar; market mechanics (index changes, expiries, market-wide days) are flagged so they are not mistaken for company news.", "Umsatz-z ≥ 3, titelspezifische Bewegung z ≥ 3 oder Spread ≥ 2× normal. Aufeinanderfolgende Tage werden zusammengefasst. Die Daten zeigen, dass etwas passiert ist, nicht warum: Ursachen kommen aus dem Kalender; Marktmechanik (Indexänderungen, Verfallstage, marktweite Tage) wird markiert, damit sie nicht als Unternehmensnachricht gilt.")}</p></div></div>
+  <table class="tbl"><thead><tr><th>${L("Date", "Datum")}</th><th>${L("What was unusual", "Was auffiel")}</th><th class="r">${L("Abnormal", "Abnormal")}</th><th class="ic"></th><th class="r">${L("Turnover", "Umsatz")}</th><th>${L("Calendar · market context", "Kalender · Marktkontext")}</th><th></th></tr></thead><tbody>
   ${a.map(x => `<tr class="go" data-card="${x.peak_date}" ${x.event ? `data-ev="${esc(x.event.event_id)}"` : ""}><td><b>${dS(x.start)}${x.days > 1 ? " – " + dS(x.end) : ""}</b></td><td class="m">${esc(reasonL(x.reason))}</td><td class="r"><b>${P(x.peak_abn_ret)}</b></td><td class="ic">${arrRet(x.peak_abn_ret)}</td><td class="r">${X(x.max_vol_ratio)}</td>
-    <td>${x.event ? `<span class="tag">${esc(x.event.type)}</span> <span class="m" style="font-size:13px">${esc(x.event.title.slice(0, 60))}${x.event.title.length > 60 ? "…" : ""}</span>` : `<span class="m" style="font-size:13px">${L("no entry, cause open", "kein Eintrag, Ursache offen")}</span>`}</td>
+    <td>${x.event ? `<span class="tag">${esc(x.event.type)}</span> <span class="m" style="font-size:13px">${esc(x.event.title.slice(0, 60))}${x.event.title.length > 60 ? "…" : ""}</span>` : x.context ? `<span class="tag g">${L("MARKET", "MARKT")}</span> <span class="m" style="font-size:13px">${esc(CTX(x.context))}</span>` : `<span class="m" style="font-size:13px">${L("no entry, cause open", "kein Eintrag, Ursache offen")}</span>`}${x.event && x.context ? `<div class="m" style="font-size:12px;margin-top:2px">${L("also", "auch")}: ${esc(CTX(x.context))}</div>` : ""}</td>
     <td class="r"><span class="link" style="white-space:nowrap">${L("Impact card", "Impact Card")} ${ARR}</span></td></tr>`).join("")}</tbody></table>`;
 }
 
-/* ============================== 2 impact card (Part B) ============================== */
+/* ============================== 2 impact card: event impact ============================== */
 const keyOf = (sel, isin = S.isin) => `${isin}|${sel.day}|${sel.event_id || ""}`;
 function defaultSel() {
   const a = [...S.iss.anomalies].sort((p, q) => q.severity - p.severity)[0];
@@ -367,7 +398,9 @@ function pCard() {
   const cur = (day, id) => sel.day === day && (sel.event_id || null) === (id || null);
   const list = `<aside class="evlist rv" aria-label="${L("Events", "Ereignisse")}">
     <h4>${L("Announcements (calendar)", "Meldungen (Kalender)")}</h4>
-    ${evs.length ? evs.map(e => { const d = String(e.reaction_day).slice(0, 10); return `<button data-card="${d}" data-ev="${esc(e.event_id)}" aria-current="${cur(d, e.event_id)}"><span class="d"><span>${dS(d)} ${e.time_local ? `<span class="m" style="font-weight:400">· ${esc(e.time_local)}</span>` : ""}</span><span class="tag">${esc(e.type)}</span></span><span class="t">${String(e.verified) === "1" ? "✓ " : ""}${esc(e.title)}</span></button>`; }).join("") : `<p class="m" style="font-size:14px">${L("No calendar entries for this share yet.", "Noch keine Kalendereinträge für diese Aktie.")}</p>`}
+    <div class="ev-tools"><button class="link" data-act="addev">+ ${L("Add event", "Ereignis hinzufügen")}</button><label class="link">${L("Import calendar", "Kalender importieren")}<input type="file" id="evfile" accept=".csv,.ics,.txt" hidden></label></div>
+    ${S.addEv ? evForm() : ""}
+    ${evs.length ? evs.map(e => { const d = String(e.reaction_day).slice(0, 10); return `<button data-card="${d}" data-ev="${esc(e.event_id)}" aria-current="${cur(d, e.event_id)}"><span class="d"><span>${dS(d)} ${e.time_local ? `<span class="m" style="font-weight:400">· ${esc(e.time_local)}</span>` : ""}</span><span class="tag ${e.user ? "s" : ""}">${e.user ? L("OWN", "EIGEN") + " · " : ""}${esc(e.type)}</span></span><span class="t">${String(e.verified) === "1" ? "✓ " : ""}${esc(e.title)}</span></button>`; }).join("") : `<p class="m" style="font-size:14px">${L("No calendar entries for this share yet.", "Noch keine Kalendereinträge für diese Aktie.")}</p>`}
     <h4>${L("Unusual days without an entry", "Auffällige Tage ohne Eintrag")}</h4>
     ${un.length ? un.map(a => `<button data-card="${a.peak_date}" aria-current="${cur(a.peak_date, null)}"><span class="d"><span>${dS(a.peak_date)}</span><span class="tag s">${P(a.peak_abn_ret)}</span></span><span class="t">${esc(reasonL(a.reason))}</span></button>`).join("") : `<p class="m" style="font-size:14px">${L("None.", "Keine.")}</p>`}
   </aside>`;
@@ -377,7 +410,7 @@ function pCard() {
 async function loadCard() {
   const sel = S.sel, k = keyOf(sel);
   if (!S.cards[k]) {
-    try { S.cards[k] = await api(`/api/card?isin=${S.isin}&day=${sel.day}${sel.event_id ? `&event_id=${enc(sel.event_id)}` : ""}`); }
+    try { S.cards[k] = await api(cardURL(S.isin, sel.day, sel.event_id)); }
     catch (e) { $("#cardslot") && ($("#cardslot").innerHTML = `<p class="empty">${L("Could not build the card: ", "Karte konnte nicht berechnet werden: ")}${esc(e.message)}</p>`); return; }
     if (S.page !== "card" || keyOf(S.sel) !== k) return;
     const slot = $("#cardslot"); slot.innerHTML = cardHTML(S.cards[k]); after(slot);
@@ -393,6 +426,7 @@ function cardHTML(d) {
   const timing = notable ? L(`Detected from trading on <b>${dL(e.reaction_day)}</b>`, `Aus dem Handel erkannt am <b>${dL(e.reaction_day)}</b>`)
     : `${L("Published", "Veröffentlicht")} <b>${dS(dt)}${tm ? " " + tm : ""}</b> · ${TIMING(e.timing)}${e.timing_source === "inferred_from_trading" ? L(" (inferred from trading)", " (aus dem Handel abgeleitet)") : ""} → ${L("reaction", "Reaktion")} <b>${dS(e.reaction_day)}</b>`;
   const ver = notable ? L("No calendar entry. The cause is not in the data and has not been verified.", "Kein Kalendereintrag. Die Ursache steht nicht in den Daten und ist nicht verifiziert.")
+    : String(e.event_id || "").startsWith("USR_") ? L("From your own calendar (not checked against a source)", "Aus Ihrem eigenen Kalender (nicht mit einer Quelle geprüft)")
     : (String(row.verified) === "1" ? L("✓ Date and time verified against the source", "✓ Datum und Uhrzeit mit der Quelle geprüft") : L("Source not yet verified", "Quelle noch nicht geprüft"));
   const pct = (t, x, med) => `<div class="pct-row"><span>${t}</span><span class="trk"><i class="barx" style="width:${(x || 0) * 100}%"></i>${isN(med) ? "" : ""}</span><b class="nt">${isN(x) ? Math.floor(x * 100) + "%" : NA}</b></div>`;
   const cmpBlock = cm ? `<div><div class="big-cap">${L("How it ranks", "Einordnung")}</div>
@@ -413,7 +447,8 @@ function cardHTML(d) {
     <div class="row"><span>${L("Proprietary share", "Anteil Eigenhandel")}</span><div class="trk" style="height:12px"><div class="b barx" style="left:0;top:0;width:${(pa.prop_share || 0) * 100}%;background:var(--sky)"></div></div><b class="r">${P(pa.prop_share, 0, false)}</b></div>
     <div class="row"><span>${L("Market maker share", "Anteil Market Maker")}</span><div class="trk" style="height:12px"><div class="b barx" style="left:0;top:0;width:${(pa.mm_share || 0) * 100}%;background:var(--graphite)"></div></div><b class="r">${P(pa.mm_share, 0, false)}</b></div></div>
     <p class="sec-note">${L(`Client orders were net ${imb < 0 ? "sellers" : "buyers"}: ${EUR(Math.abs(pa.agent_aggr_net_eur))} more ${imb < 0 ? "sold" : "bought"} aggressively. Grey tick: normal.`, `Kundenorders waren per Saldo ${imb < 0 ? "Verkäufer" : "Käufer"}: ${EUR(Math.abs(pa.agent_aggr_net_eur))} mehr aggressiv ${imb < 0 ? "verkauft" : "gekauft"}. Grauer Strich: normal.`)}</p>`;
-  const flags = (c.flags || []).length ? `<span>${L("Flags", "Hinweise")}: ${c.flags.map(esc).join(", ")}</span>` : "";
+  const FL = {flow_censored: L("participant flows held back by Xetra (fewer than 7 trades)", "Teilnehmerflüsse von Xetra zurückgehalten (unter 7 Trades)"), flow_multi_day: L("participant flows cover several days", "Teilnehmerflüsse über mehrere Tage"), possible_corp_action: L("possible corporate action (split, rights issue): check before comparing", "mögliche Kapitalmaßnahme: vor Vergleich prüfen"), short_baseline: L("fewer than 20 days of history before the event", "weniger als 20 Tage Historie vor dem Ereignis"), comparison_failed: L("no comparison group", "keine Vergleichsgruppe")};
+  const flags = (c.flags || []).length ? `<span>${L("Note", "Hinweis")}: ${c.flags.map(f => esc(FL[f] || f)).join("; ")}</span>` : "";
   return `<article class="card rv in" id="thecard">
     <div class="card-head"><div><div class="ttl">${L("Impact card", "Impact Card")}</div><div class="id">${esc(id)}</div></div><div class="timing">${timing}</div></div>
     <div class="card-title"><div><span class="tag">${esc(e.type)}</span><h2 style="margin-top:8px">${esc(notable ? L("Unusual trading day", "Auffälliger Handelstag") : e.title)}</h2>
@@ -421,14 +456,14 @@ function cardHTML(d) {
     <div class="card-sec card-top">
       <div><div class="big-cap">${L("Stock-specific move (abnormal return)", "Titelspezifische Bewegung (abnormale Rendite)")}</div>
         <div class="big" style="color:${col}"><span class="count" data-to="${p.abn_ret}">${P(p.abn_ret)}</span></div>
-        <p class="big-sub">${esc(nice(U(c.isin)))} <b>${P(p.ret)}</b> · ${c.index} ${L("peers", "Peers")} <b>${P(p.peer_ret)}</b> · ${isN(p.abn_ret_z) ? nf(Math.abs(p.abn_ret_z), 1) + "σ" : ""} · ${L("next 5 days", "nächste 5 Tage")} <b>${P(p.car_0_5)}</b></p></div>
+        <p class="big-sub">${esc(nice(U(c.isin)))} <b>${P(p.ret)}</b> · ${c.index} ${L("peers", "Peers")} <b>${P(p.peer_ret)}</b> · ${isN(p.abn_ret_z) ? `<span data-tip="${enc(L("How many times the share's normal daily stock-specific move", "Vielfaches der normalen täglichen titelspezifischen Bewegung"))}">${nf(Math.abs(p.abn_ret_z), 1)}× ${L("its normal daily move", "die normale Tagesbewegung")}</span>` : ""} · ${L("day 0 to +5", "Tag 0 bis +5")} <b>${P(p.car_0_5)}</b></p></div>
       ${cmpBlock}</div>
     <div class="card-sec" style="padding-top:0;padding-bottom:0">${inst}</div>
     <div class="card-sec"><div class="sec-head" style="margin-bottom:10px"><h3 class="h3">${L("The day, minute by minute", "Der Tag, Minute für Minute")}</h3>
       <div class="legend"><span><i></i>${L("price vs prev. close", "Kurs vs. Vortag")}</span><span><i class="b" style="background:var(--bar)"></i>${L("turnover (5 min)", "Umsatz (5 Min.)")}</span><span><i class="b" style="background:var(--navy)"></i>${L("auctions", "Auktionen")}</span><span><i class="b" style="background:var(--sky-soft)"></i>${L("first 15 min", "erste 15 Min.")}</span></div></div>
       <div class="chart" id="ichart">${d.bars ? intraChart(d) : `<p class="empty">${L("No 1-minute bars for this share yet. The daily figures above are complete.", "Für diese Aktie gibt es noch keine 1-Minuten-Balken. Die Tageswerte oben sind vollständig.")}</p>`}</div></div>
     <div class="card-sec cols" style="gap:48px"><div><h3 class="h3">${L("Who traded", "Wer gehandelt hat")}</h3>${flows}</div><div><h3 class="h3">${L("Aftershocks", "Nachwirkung")}</h3>${afterChart(d)}</div></div>
-    <div class="card-sec" style="font-size:12.5px;color:var(--mute);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between"><span>${L("Baseline", "Basis")} ${esc(c.baseline.window)} (${c.baseline.days_used} ${L("days", "Tage")}) · ${L("peers = equal-weighted", "Peers = gleichgewichtete")} ${c.index} · impact_card v${esc(c.schema_version)}</span>${flags}</div>
+    <div class="card-sec" style="font-size:12.5px;color:var(--mute);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between"><span>${L(`Normal = median of ${c.baseline.days_used} trading days ending a week before the event (${esc(c.baseline.window)}). Abnormal return = return minus the median return of the other ${c.index} members. Prices = closing auction.`, `Normal = Median aus ${c.baseline.days_used} Handelstagen bis eine Woche vor dem Ereignis (${esc(c.baseline.window)}). Abnormale Rendite = Rendite minus Medianrendite der übrigen ${c.index}-Werte. Kurse = Schlussauktion.`)}</span>${flags}</div>
   </article>
   <section class="ai-box rv in" id="aibox">${aiBoxHTML(keyOf(S.sel))}</section>`;
 }
@@ -485,10 +520,10 @@ function afterChart(d) {
 
 /* ---------- AI summary (on the card) ---------- */
 function aiBoxHTML(k) {
-  const lang = S.aiLang || S.lang, r = S.ai[k + "|" + lang], live = S.status && S.status.llm;
+  const lang = S.aiLang || S.lang, r = S.ai[k + "|" + lang], live = r ? r.source === "llm" : S.status && S.status.llm;
   const chk = r ? numbersCheck(r.text, S.cards[k] && S.cards[k].card) : null;
   return `<div class="head"><h2 class="h2">${L("AI summary", "KI-Zusammenfassung")}</h2>
-    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><span class="badge ${live ? "on" : ""}"><i></i>${live ? L("Language model connected", "Sprachmodell verbunden") : L("Template mode (no API key in .env)", "Vorlagenmodus (kein API-Schlüssel in .env)")}</span>${seg("ailang", [["en", "EN"], ["de", "DE"]], lang)}</div></div>
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><span class="badge ${live ? "on" : ""}"><i></i>${live ? L(`Written by ${esc((r && r.model) || S.status.model || "the language model")}`, `Geschrieben von ${esc((r && r.model) || S.status.model || "dem Sprachmodell")}`) : r && r.rejected && r.rejected.length ? L("Template text (the model's draft had figures not in the card)", "Vorlagentext (Entwurf des Modells hatte Zahlen, die nicht in der Karte stehen)") : L("Template text (no language model connected)", "Vorlagentext (kein Sprachmodell verbunden)")}</span>${seg("ailang", [["en", "EN"], ["de", "DE"]], lang)}</div></div>
     <p class="ai-text ${r ? "" : "wait"}" id="aitext">${r ? esc(r.text) : L("Writing the summary from the card…", "Die Zusammenfassung wird aus der Karte geschrieben…") + '<span class="caret"></span>'}</p>
     <div class="ai-foot"><span class="check ${chk && chk.bad ? "warn" : ""}" id="aichk">${chk ? checkHTML(chk) : ""}</span>
       <span style="display:flex;gap:18px;flex-wrap:wrap"><button class="link" data-act="regen">${L("Regenerate", "Neu schreiben")}</button><button class="link" data-act="copy">${L("Copy", "Kopieren")}</button><button class="link" data-act="toreport">${L("Put in report", "In den Report")} ${ARR}</button></span></div>`;
@@ -585,34 +620,7 @@ function scatter(rows, me) {
   return `<svg viewBox="0 0 ${W} ${H}">${g}<g class="ann" style="--i:-4">${dots}</g></svg>`;
 }
 
-/* ============================== 4 assistant ============================== */
-function pAsk() {
-  const top = [...S.iss.anomalies].sort((a, b) => b.severity - a.severity)[0];
-  const qs = [L("Has our liquidity improved?", "Hat sich unsere Liquidität verbessert?"), L(`How do our spreads compare with the ${S.iss.meta.index}?`, `Wie sind unsere Spreads im ${S.iss.meta.index}-Vergleich?`),
-    L("Did trading change after results?", "Hat sich der Handel nach den Ergebnissen verändert?")].concat(top ? [L(`What happened on ${top.peak_date}?`, `Was ist am ${top.peak_date} passiert?`)] : []);
-  const live = S.status && S.status.llm;
-  const hist = S.chat.map(m => `<div class="msg q"><div class="who">${L("You", "Sie")}</div><div class="txt">${esc(m.q)}</div></div><div class="msg a"><div class="who">${L("Assistant", "Assistent")} · ${m.source === "llm" ? "LLM" : L("template", "Vorlage")}</div><div class="txt">${esc(m.a)}</div></div>`).join("");
-  return `<section class="sec wrap"><div class="cols-21">
-    <div class="rv"><div class="chips">${qs.map(q => `<button class="pill pill--line pill--sm" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>
-      <div class="chat" id="chat">${hist || `<div class="msg"><div class="txt m" style="font-size:18px">${L(`Ask anything about ${esc(nice(U(S.isin)))}: liquidity, spreads, a specific day, results. Answers use engine numbers only.`, `Fragen Sie alles zu ${esc(nice(U(S.isin)))}: Liquidität, Spreads, ein bestimmter Tag, Ergebnisse. Antworten nutzen nur Engine-Zahlen.`)}</div></div>`}</div>
-      <form class="ask-in" id="askf"><input id="askq" placeholder="${L("Type a question…", "Frage eingeben…")}" autocomplete="off"><button class="pill pill--sm" type="submit">${L("Ask", "Fragen")} ${ARR}</button></form>
-      <p class="sec-note">${live ? L("Answers come from the language model, grounded in engine output.", "Antworten kommen vom Sprachmodell, gestützt auf Engine-Ergebnisse.") : L("No API key configured: answers come from deterministic templates. Add LLM_PROVIDER and LLM_API_KEY to .env to switch on the language model.", "Kein API-Schlüssel: Antworten kommen aus festen Vorlagen. LLM_PROVIDER und LLM_API_KEY in .env eintragen, um das Sprachmodell zu aktivieren.")}</p></div>
-    <div class="rv" style="--d:.1s"><h2 class="h2" style="margin-bottom:12px">${L("What it can see", "Was er sieht")}</h2><ul class="side-list">
-      <li><code>baseline.kpis</code><span>${L("normal state vs index", "Normalzustand vs. Index")}</span></li><li><code>liquidity_trend</code><span>${L("last 60 vs previous 60 days", "letzte 60 vs. vorherige 60 Tage")}</span></li>
-      <li><code>anomalies</code><span>${L("unusual days with reasons", "auffällige Tage mit Grund")}</span></li><li><code>impact_card</code><span>${L("all figures for one day", "alle Zahlen zu einem Tag")}</span></li><li><code>events.csv</code><span>${L("verified announcements", "geprüfte Meldungen")}</span></li></ul>
-      <p class="sec-note">${L("It never states causes and gives no investment advice.", "Er nennt keine Ursachen und gibt keine Anlageberatung.")}</p></div></div></section>`;
-}
-async function ask(q) {
-  const chat = $("#chat"); if (!chat) return; if (!S.chat.length) chat.innerHTML = "";
-  chat.insertAdjacentHTML("beforeend", `<div class="msg q"><div class="who">${L("You", "Sie")}</div><div class="txt">${esc(q)}</div></div><div class="msg a"><div class="who">${L("Assistant", "Assistent")}</div><div class="txt"><span class="caret"></span></div></div>`);
-  const box = chat.lastElementChild.querySelector(".txt"); chat.lastElementChild.scrollIntoView({behavior: "smooth", block: "nearest"});
-  try { const r = await post("/api/ask", {isin: S.isin, question: q, lang: S.lang}); S.chat.push({q, a: r.text, source: r.source});
-    chat.lastElementChild.querySelector(".who").textContent = `${L("Assistant", "Assistent")} · ${r.source === "llm" ? "LLM" : L("template", "Vorlage")}`;
-    const w = r.text.split(" "); let i = 0; (function st() { box.textContent = w.slice(0, ++i).join(" "); if (i < w.length) setTimeout(st, reduced ? 0 : 16); })(); }
-  catch (e) { box.textContent = e.message; }
-}
-
-/* ============================== 5 report (IV, VIII) ============================== */
+/* ============================== 4 report: IR snapshot (IV, VIII) ============================== */
 function repOptions() {
   const o = [];
   S.iss.events.forEach(e => o.push([`${String(e.reaction_day).slice(0, 10)}|${e.event_id}`, `${dS(e.reaction_day)} · ${e.type} · ${String(e.title).slice(0, 40)}`]));
@@ -625,7 +633,7 @@ function pReport() {
   const box = (k, t) => `<label><input type="checkbox" data-rep="${k}" ${r[k] ? "checked" : ""}> ${t}</label>`;
   return `<section class="wrap print-me"><div class="rep">
     <div class="rep-side rv"><div><div class="lbl">${L("Sections", "Abschnitte")}</div>
-      ${box("a", L("Part A: normal state", "Teil A: Normalzustand"))}${box("peers", L("Peer benchmark", "Peer-Vergleich"))}${box("liq", L("Liquidity verdict", "Liquiditätsbewertung"))}${box("anom", L("Unusual days", "Auffällige Tage"))}${box("card", L("Part B: impact card", "Teil B: Impact Card"))}${box("ai", L("AI summary of the card", "KI-Zusammenfassung der Karte"))}</div>
+      ${box("a", L("Trading profile (60 days)", "Handelsprofil (60 Tage)"))}${box("peers", L("Peer benchmark", "Peer-Vergleich"))}${box("liq", L("Liquidity verdict", "Liquiditätsbewertung"))}${box("anom", L("Unusual days", "Auffällige Tage"))}${box("card", L("Impact card", "Impact Card"))}${box("ai", L("AI summary of the card", "KI-Zusammenfassung der Karte"))}</div>
       <div><div class="lbl">${L("Event for the impact card", "Ereignis für die Impact Card")}</div><select data-rep="key">${repOptions().map(([v, t]) => `<option value="${esc(v)}" ${v === r.key ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
       <div><div class="lbl">${L("Language", "Sprache")}</div>${seg("replang", [["en", "EN"], ["de", "DE"]], S.lang)}</div>
       <div><button class="pill" data-act="print">${L("Download PDF", "PDF herunterladen")} ${ARR}</button><p class="sec-note">${L("A4 layout. Choose “Save as PDF” in the print dialog.", "A4-Layout. Im Druckdialog „Als PDF sichern“ wählen.")}</p></div></div>
@@ -635,7 +643,7 @@ function sheetHTML() {
   const r = S.rep, u = U(S.isin), iss = S.iss, k = iss.kpis, lt = iss.liquidity, [day, ev] = (r.key || "|").split("|");
   const ck = `${S.isin}|${day}|${ev || ""}`, d = S.cards[ck], ai = S.ai[ck + "|" + S.lang];
   const prices = iss.series.price.filter(isN);
-  let h = `<div class="sh-top"><div><div class="k">${L("IR snapshot", "IR-Snapshot")} · ${u.ticker} · ${u.isin} · ${u.index}</div><h3>${esc(nice(u))}</h3></div><div class="k" style="text-align:right">Issuer Intelligence Hub<br>${L("Data", "Daten")}: Xetra · ${dL(iss.meta.last_date)}</div></div>`;
+  let h = `<div class="sh-top"><div><div class="k">${L("IR snapshot", "IR-Snapshot")} · ${u.ticker} · ${u.isin} · ${u.index}</div><h3>${esc(nice(u))}</h3></div><div class="k" style="text-align:right">Issuer Intelligence Hub<br>${L("Xetra data as of the close on", "Xetra-Daten bis Handelsschluss")} ${dL(iss.meta.last_date)}</div></div>`;
   if (r.a) h += `<section><h4>${L("Normal state, last 60 trading days", "Normalzustand, letzte 60 Handelstage")}</h4><table><tr><th></th><th class="r">${u.ticker}</th><th class="r">${u.index} ${L("median", "Median")}</th></tr>
     <tr><td>${L("Turnover per day", "Umsatz pro Tag")}</td><td class="r"><b>${EUR(k.median_turnover_eur.stock)}</b></td><td class="r">${EUR(k.median_turnover_eur.index_median)}</td></tr>
     <tr><td>${L("Trading cost €25k (XLM)", "Handelskosten 25 T€ (XLM)")}</td><td class="r"><b>${BPS(k.median_xlm_25k_bps.stock)}</b></td><td class="r">${BPS(k.median_xlm_25k_bps.index_median)}</td></tr>
@@ -665,12 +673,12 @@ function sparkIntra(d) {
 async function loadReport() {
   const [day, ev] = (S.rep.key || "|").split("|"); if (!day) return;
   const ck = `${S.isin}|${day}|${ev || ""}`;
-  if (!S.cards[ck]) { try { S.cards[ck] = await api(`/api/card?isin=${S.isin}&day=${day}${ev ? "&event_id=" + enc(ev) : ""}`); } catch (e) { return; } }
+  if (!S.cards[ck]) { try { S.cards[ck] = await api(cardURL(S.isin, day, ev)); } catch (e) { return; } }
   if (!S.ai[ck + "|" + S.lang]) { try { S.ai[ck + "|" + S.lang] = await post("/api/narrate", {isin: S.isin, day, event_id: ev || null, lang: S.lang}); } catch (e) { /* keep placeholder */ } }
   if (S.page === "report") $("#sheet") && ($("#sheet").innerHTML = sheetHTML());
 }
 
-/* ============================== 6 ideas ============================== */
+/* ============================== 5 ideas ============================== */
 const ILL = [
   `<svg viewBox="0 0 210 116"><g stroke="#bdbdbd">${[20, 38, 56, 74, 92].map(y => `<line x1="20" x2="190" y1="${y}" y2="${y}"/>`).join("")}</g><line x1="20" x2="190" y1="65" y2="65" stroke="#000099" stroke-dasharray="4 3"/><text x="190" y="60" font-size="9" fill="#000099" text-anchor="end">SDAX cut-off</text><path class="hl" pathLength="1" d="M20 40 C60 42 80 50 110 58 S160 80 190 88" fill="none" stroke="#0099ff" stroke-width="2.5"/><circle cx="190" cy="88" r="4" fill="#0099ff"/></svg>`,
   `<svg viewBox="0 0 210 116"><line x1="20" x2="190" y1="58" y2="58" stroke="#bdbdbd" stroke-width="4"/><line x1="130" x2="130" y1="42" y2="74" stroke="#181813" stroke-width="1.5"/><text x="130" y="36" font-size="9" fill="#404040" text-anchor="middle">100 bps</text><path class="hl" pathLength="1" d="M20 58 H112" stroke="#000099" stroke-width="4"/><circle cx="112" cy="58" r="7" fill="#fff" stroke="#000099" stroke-width="2.5"/></svg>`,
@@ -690,13 +698,128 @@ function pIdeas() {
   <div class="tiles">${I.map((t, i) => `<article class="tile rv" style="--d:${(i % 3) * .08}s"><div class="ill">${ILL[i]}</div><div class="body"><h3>${t[0]}</h3><p>${t[1]}</p><div class="data"><div><b>${L("Have", "Hat")}</b><span>${t[2]}</span></div><div class="need"><b>${L("Need", "Fehlt")}</b><span>${t[3]}</span></div></div></div></article>`).join("")}</div></section>`;
 }
 
+/* ============================== own event calendar (VI: ingest a corporate event calendar) ============================== */
+const UEV_KEY = "iih.userEvents";
+function userEvents(isin) { try { return (JSON.parse(localStorage.getItem(UEV_KEY) || "{}")[isin]) || []; } catch (e) { return S._uev && S._uev[isin] || []; } }
+function saveUserEvents(isin, list) { S._uev = S._uev || {}; S._uev[isin] = list; try { const all = JSON.parse(localStorage.getItem(UEV_KEY) || "{}"); all[isin] = list; localStorage.setItem(UEV_KEY, JSON.stringify(all)); } catch (e) { /* private mode: keep in memory */ } }
+function mergeUserEvents() { const own = userEvents(S.isin), ids = new Set(S.iss.events.map(e => e.event_id)); S.iss.events = S.iss.events.filter(e => !e.user).concat(own.filter(e => !ids.has(e.event_id))); }
+function cardURL(isin, day, ev) {
+  let u = `/api/card?isin=${isin}&day=${day}${ev ? `&event_id=${enc(ev)}` : ""}`;
+  const own = ev && String(ev).startsWith("USR_") && userEvents(isin).find(e => e.event_id === ev);
+  if (own) u += `&date=${own.date}&time=${enc(own.time_local || "")}&type=${enc(own.type)}&title=${enc(own.title)}`;
+  return u;
+}
+const EVTYPES = ["FY", "Q1", "H1", "Q3", "ADHOC", "GUIDANCE", "DIVIDEND_EX", "AGM", "CMD", "MA", "OTHER"];
+function evForm() {
+  return `<form class="ev-form" id="evform"><div class="r2"><input id="ev-d" type="date" min="${S.iss.meta.first_date}" max="${S.iss.meta.last_date}" required aria-label="${L("Date", "Datum")}"><input id="ev-t" type="time" aria-label="${L("Time (CET)", "Uhrzeit (MEZ)")}"></div>
+    <select id="ev-y" aria-label="${L("Type", "Typ")}">${EVTYPES.map(t => `<option value="${t}">${TYPE(t)}</option>`).join("")}</select>
+    <input id="ev-n" placeholder="${L("Title, e.g. Q3 trading statement", "Titel, z. B. Q3-Mitteilung")}" maxlength="160">
+    <button class="pill pill--sm" type="submit">${L("Build impact card", "Impact Card erstellen")} ${ARR}</button>
+    <p class="m">${L("Time decides the reaction day: after the 17:35 closing auction it is the next trading day. CSV import: date,time,type,title. ICS from Outlook or Google also works.", "Die Uhrzeit bestimmt den Reaktionstag: nach der Schlussauktion um 17:35 ist es der nächste Handelstag. CSV-Import: date,time,type,title. ICS aus Outlook oder Google geht auch.")}</p></form>`;
+}
+const guessType = t => { t = String(t).toLowerCase(); return /hauptversammlung|agm|annual general/.test(t) ? "AGM" : /dividend|ex-tag/.test(t) ? "DIVIDEND_EX" : /\bq1\b|first quarter|1\. quartal/.test(t) ? "Q1" : /\bh1\b|half|halbjahr/.test(t) ? "H1" : /\bq3\b|third quarter|9m|nine months|9 monate/.test(t) ? "Q3" : /annual|full.year|geschäftsjahr|fy\b|jahresergebnis/.test(t) ? "FY" : /ad.hoc/.test(t) ? "ADHOC" : /guidance|prognose|outlook/.test(t) ? "GUIDANCE" : /capital markets day|kapitalmarkttag|cmd\b/.test(t) ? "CMD" : "OTHER"; };
+function parseCalendar(text) {
+  const out = [];
+  if (/BEGIN:VEVENT/.test(text)) {
+    text.replace(/\r?\n[ \t]/g, "").split("BEGIN:VEVENT").slice(1).forEach(b => {
+      const st = (b.match(/DTSTART[^:]*:(\d{8})(?:T(\d{2})(\d{2})\d{0,2}(Z)?)?/) || []), sum = ((b.match(/SUMMARY[^:]*:(.*)/) || [])[1] || "").trim();
+      if (!st[1]) return; let date = `${st[1].slice(0, 4)}-${st[1].slice(4, 6)}-${st[1].slice(6, 8)}`, time = st[2] ? `${st[2]}:${st[3]}` : "";
+      if (st[4] && time) { const d = new Date(`${date}T${time}:00Z`), f = new Intl.DateTimeFormat("sv-SE", {timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"}).format(d).split(" "); date = f[0]; time = f[1]; }
+      out.push({date, time, type: guessType(sum), title: sum.replace(/\\,/g, ",")});
+    });
+    return out;
+  }
+  const lines = text.split(/\r?\n/).filter(l => l.trim()), sep = (lines[0] || "").includes(";") ? ";" : ",";
+  const head = lines[0].toLowerCase().split(sep).map(h => h.trim().replace(/"/g, "")), has = head.includes("date") || head.includes("datum");
+  const ix = k => head.findIndex(h => k.includes(h));
+  const iD = has ? ix(["date", "datum"]) : 0, iT = has ? ix(["time", "zeit", "uhrzeit"]) : 1, iY = has ? ix(["type", "typ"]) : 2, iN = has ? ix(["title", "titel", "event", "name"]) : 3;
+  lines.slice(has ? 1 : 0).forEach(l => { const c = l.split(sep).map(x => x.trim().replace(/^"|"$/g, "")); let d = c[iD] || ""; const m = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/); if (m) d = `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`; if (!/^\d{4}-\d{2}-\d{2}/.test(d)) return;
+    const title = iN >= 0 ? c[iN] || "" : ""; out.push({date: d.slice(0, 10), time: iT >= 0 ? c[iT] || "" : "", type: (iY >= 0 && EVTYPES.includes((c[iY] || "").toUpperCase())) ? c[iY].toUpperCase() : guessType(title), title}); });
+  return out;
+}
+async function importCalendar(file) {
+  const evs = parseCalendar(await file.text());
+  if (!evs.length) { toast(L("No events found in this file", "Keine Ereignisse in der Datei gefunden")); return; }
+  addEvents(evs, true);
+}
+async function addEvents(evs, bulk = false) {
+  try {
+    const r = await post("/api/calendar", {isin: S.isin, events: evs});
+    const ok = r.events.filter(e => e.reaction_day), old = userEvents(S.isin).filter(e => !ok.some(n => n.event_id === e.event_id));
+    saveUserEvents(S.isin, old.concat(ok)); mergeUserEvents(); S.addEv = false;
+    const inRange = ok.length, skipped = r.events.length - ok.length;
+    toast(bulk ? L(`${inRange} events matched to trading days${skipped ? `, ${skipped} after the data` : ""}`, `${inRange} Ereignisse Handelstagen zugeordnet${skipped ? `, ${skipped} nach Datenende` : ""}`) : L("Event added", "Ereignis hinzugefügt"));
+    if (ok.length) openCard(ok[ok.length - 1].reaction_day, ok[ok.length - 1].event_id); else render();
+  } catch (e) { toast(e.message); }
+}
+
+/* ============================== IR analyst (agent dock, on every page) ============================== */
+const TOOLL = {find_company: ["Company search", "Unternehmenssuche"], company_overview: ["Trading profile", "Handelsprofil"], peer_benchmark: ["Peer benchmark", "Peer-Vergleich"], trading_cost_curve: ["Cost by order size", "Kosten nach Ordergröße"], unusual_days: ["Unusual days", "Auffällige Tage"], event_calendar: ["Event calendar", "Ereigniskalender"], impact_card: ["Impact card", "Impact Card"], compare_events: ["Event comparison", "Ereignisvergleich"], show: ["View", "Ansicht"]};
+const stepL = st => { const t = TOOLL[st.tool] ? TOOLL[st.tool][de() ? 1 : 0] : st.tool, a = st.args || {}; return t + (a.day ? " " + dS(a.day) : "") + (a.by ? " · " + a.by : "") + (a.event_type ? " · " + TYPE(a.event_type) : "") + (a.query ? ` “${a.query}”` : ""); };
+const actL = a => a.view === "card" ? `${L("Open impact card", "Impact Card öffnen")}${a.day ? " · " + dS(a.day) : ""}` : a.view === "compare" ? `${L("Compare", "Vergleichen")}${a.event_type ? ": " + TYPE(a.event_type) : ""}` : a.view === "report" ? L("Open IR snapshot", "IR-Snapshot öffnen") : L("Open dashboard", "Dashboard öffnen");
+function doAction(a) {
+  if (window.innerWidth < 1200) dockToggle(false);
+  if (a.isin && a.isin !== S.isin && a.view !== "card") { openIsin(a.isin, {fromGate: false, then: () => { S.page = a.view; }}); return; }
+  if (a.view === "card" && a.day) { openCard(a.day, a.event_id || null, a.isin || S.isin); return; }
+  if (a.view === "compare") { if (a.event_type) S.cmp.type = a.event_type; S.cmp.index = a.index || "ALL"; S.cmp.data = null; if (S.page === "compare") vt(() => render()); else go("compare"); return; }
+  if (a.view === "report") { if (a.day) { S.rep.key = `${a.day}|${a.event_id || ""}`; S.rep.card = S.rep.ai = true; } go("report"); return; }
+  go("dashboard");
+}
+function dockCtx() { const c = {page: S.page}; if (S.page === "card" && S.sel) { c.day = S.sel.day; c.event_id = S.sel.event_id; } if (S.page === "report" && S.rep.key) { const [d, e] = S.rep.key.split("|"); c.day = d; c.event_id = e || null; } if (S.page === "compare") { c.event_type = S.cmp.type; c.index = S.cmp.index; } return c; }
+function dockSugg() {
+  const q = {
+    card: [L("Explain this card in two sentences", "Erklären Sie diese Karte in zwei Sätzen"), L("How does this rank against similar events?", "Wie ordnet sich das gegenüber ähnlichen Ereignissen ein?"), L("Put this card in a report", "Diese Karte in einen Report")],
+    compare: [L("Where do we rank among these events?", "Auf welchem Rang liegen wir bei diesen Ereignissen?"), L("How did the market react to our results?", "Wie hat der Markt auf unsere Ergebnisse reagiert?")],
+    report: [L("Summarise our liquidity for the board", "Fassen Sie unsere Liquidität für den Vorstand zusammen"), L("What were our biggest moves this year?", "Was waren unsere größten Bewegungen dieses Jahr?")]
+  }[S.page] || [L("Has our liquidity improved?", "Hat sich unsere Liquidität verbessert?"), L("How do our spreads compare with our sector?", "Wie sind unsere Spreads im Sektorvergleich?"), L("What were our biggest moves this year?", "Was waren unsere größten Bewegungen dieses Jahr?"), L("How large an order can the book absorb?", "Wie große Orders nimmt das Orderbuch auf?")];
+  return q;
+}
+function dockMsg(m) {
+  if (m.role === "user") return `<div class="dm q"><span class="who">${L("You", "Sie")}</span><p>${esc(m.content)}</p></div>`;
+  const chk = m.check, bad = chk && chk.unsupported && chk.unsupported.length;
+  const src = m.source === "llm" ? esc(m.model || "LLM") : L("template", "Vorlage");
+  return `<div class="dm a"><span class="who">${L("Analyst", "Analyst")} · ${src}</span>
+    ${m.steps && m.steps.length ? `<ol class="steps">${m.steps.filter(s => s.tool !== "show").map(s => `<li>${esc(stepL(s))}</li>`).join("")}</ol>` : ""}
+    <p>${esc(m.content)}</p>
+    ${m.actions && m.actions.length ? `<div class="acts">${m.actions.map(a => `<button class="pill pill--sm" data-do="${enc(JSON.stringify(a))}">${esc(actL(a))} ${ARR}</button>`).join("")}</div>` : ""}
+    ${chk && chk.total ? `<div class="chk ${bad ? "warn" : ""}">${bad ? L(`${chk.unsupported.length} figure(s) not found in the engine output: ${chk.unsupported.slice(0, 3).join(", ")}`, `${chk.unsupported.length} Zahl(en) nicht in den Engine-Ergebnissen: ${chk.unsupported.slice(0, 3).join(", ")}`) : L(`✓ Every figure traced to engine output`, `✓ Jede Zahl aus den Engine-Ergebnissen`)}</div>` : ""}</div>`;
+}
+function dockRender() {
+  const d = $("#dock"); if (!d || !S.iss) return;
+  d.classList.toggle("on", S.dock); d.classList.remove("hidden");
+  const u = U(S.isin), c = dockCtx(), live = S.status && S.status.llm;
+  const where = c.day ? `${NAV[S.page] ? nav(S.page) : ""} · ${dS(c.day)}` : (NAV[S.page] ? nav(S.page) : "");
+  $("#dock-fab").innerHTML = `<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><polyline points="2,12 6,12 8,5 11,15 13,9 18,9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>${L("Ask the IR analyst", "IR-Analyst fragen")}</span><kbd>A</kbd>`;
+  $("#dock-head").innerHTML = `<div><b>${L("IR analyst", "IR-Analyst")}</b><small><i class="${live ? "on" : ""}"></i>${live ? esc(S.status.model) + L(" · tools over the engine", " · Werkzeuge über die Engine") : L("template mode · add the JAIF key to .env", "Vorlagenmodus · JAIF-Schlüssel in .env")}</small></div>
+    <div class="dh-r">${S.chat.length ? `<button data-act="dockclear" class="x" title="${L("New conversation", "Neues Gespräch")}">${L("New", "Neu")}</button>` : ""}<button data-act="dock" class="x" aria-label="${L("Close", "Schließen")}">✕</button></div>`;
+  $("#dock-ctx").innerHTML = `<span>${L("Looking at", "Kontext")}</span> <b>${esc(nice(u))}</b> · ${esc(where)}`;
+  const log = $("#dock-log");
+  log.innerHTML = S.chat.length ? S.chat.map(dockMsg).join("") + (S.busy ? `<div class="dm a busy"><span class="who">${L("Analyst", "Analyst")}</span><p><span class="caret"></span> ${L("reading the engine output…", "liest die Engine-Ergebnisse…")}</p></div>` : "")
+    : `<div class="intro"><p>${L(`I answer questions about ${esc(nice(u))} with figures from the Xetra engine, and I can open any card, comparison or report for you.`, `Ich beantworte Fragen zu ${esc(nice(u))} mit Zahlen aus der Xetra-Engine und öffne jede Karte, jeden Vergleich oder Report für Sie.`)}</p><p class="m">${L("I say what the data shows, not why. Causes come only from the verified event calendar. No investment advice.", "Ich sage, was die Daten zeigen, nicht warum. Ursachen nur aus dem geprüften Ereigniskalender. Keine Anlageberatung.")}</p></div>`;
+  $("#dock-sugg").innerHTML = dockSugg().map(q => `<button data-q="${esc(q)}">${esc(q)}</button>`).join("");
+  $("#dockq").placeholder = L("Ask about liquidity, a day, peers, results…", "Fragen zu Liquidität, einem Tag, Peers, Ergebnissen…");
+  $("#dockf button").disabled = S.busy;
+  log.scrollTop = log.scrollHeight;
+}
+function dockToggle(on) { S.dock = on === undefined ? !S.dock : on; dockRender(); if (S.dock) setTimeout(() => $("#dockq") && $("#dockq").focus(), 220); }
+async function dockAsk(q) {
+  if (S.busy) return; if (!S.dock) S.dock = true;
+  const history = S.chat.map(m => ({role: m.role, content: m.content}));
+  S.chat.push({role: "user", content: q}); S.busy = true; dockRender();
+  try {
+    const r = await post("/api/agent", {isin: S.isin, question: q, history, context: dockCtx(), lang: S.lang});
+    S.chat.push({role: "assistant", content: r.text, source: r.source, model: r.model, steps: r.steps, actions: r.actions, check: r.check});
+  } catch (e) { S.chat.push({role: "assistant", content: L("The analyst could not answer: ", "Der Analyst konnte nicht antworten: ") + e.message, source: "error"}); }
+  S.busy = false; dockRender();
+}
+
 /* ============================== render + interactions ============================== */
-const PAGE = {dashboard: pDashboard, card: pCard, compare: pCompare, ask: pAsk, report: pReport, ideas: pIdeas};
+const PAGE = {dashboard: pDashboard, card: pCard, compare: pCompare, report: pReport, ideas: pIdeas};
 let io;
 function render() {
   chrome();
   $("#app").innerHTML = band() + `<div class="content">${PAGE[S.page]()}</div>`;
-  after($("#app")); setHash(); requestAnimationFrame(placeInd); document.fonts && document.fonts.ready.then(() => { placeInd(); segThumb(); });
+  after($("#app")); setHash(); dockRender(); requestAnimationFrame(placeInd); document.fonts && document.fonts.ready.then(() => { placeInd(); segThumb(); });
   if (S.page === "card") loadCard();
   if (S.page === "compare") loadCompare();
   if (S.page === "report") loadReport();
@@ -751,7 +874,7 @@ function coSugg() { const q = $("#co-in").value; CO.list = search(q, 8); CO.sel 
 function coToggle(on) { const pop = $("#co-pop"), b = $("[data-act=co]"); if (!pop) return; pop.classList.toggle("on", on); b.setAttribute("aria-expanded", on); if (on) { $("#co-in").value = ""; coSugg(); setTimeout(() => $("#co-in").focus(), 50); } }
 
 document.addEventListener("click", ev => {
-  const t = ev.target.closest("[data-go],[data-card],[data-act],[data-q],[data-open],[data-isin],[data-pick]");
+  const t = ev.target.closest("[data-go],[data-card],[data-act],[data-q],[data-open],[data-isin],[data-pick],[data-do]");
   if (!ev.target.closest(".co")) coToggle(false);
   if (!ev.target.closest(".g-form")) $("#g-sugg").classList.remove("on");
   if (!t) return;
@@ -761,7 +884,8 @@ document.addEventListener("click", ev => {
   if (t.dataset.go) { go(t.dataset.go); return; }
   if (t.dataset.card) { openCard(t.dataset.card, t.dataset.ev || null); return; }
   if (t.dataset.open) { const [isin, day, ev2] = t.dataset.open.split("|"); openCard(day, ev2 || null, isin); return; }
-  if (t.dataset.q) { ask(t.dataset.q); return; }
+  if (t.dataset.q) { dockAsk(t.dataset.q); return; }
+  if (t.dataset.do) { doAction(JSON.parse(decodeURIComponent(t.dataset.do))); return; }
   const a = t.dataset.act;
   if (a === "lang") { S.lang = t.dataset.v; S.aiLang = null; if ($("#ws").classList.contains("hidden")) gateText(); else vt(() => render()); }
   else if (a === "co") { ev.stopPropagation(); coToggle(!$("#co-pop").classList.contains("on")); }
@@ -774,15 +898,20 @@ document.addEventListener("click", ev => {
   else if (a === "cmpthis") { S.cmp.type = t.dataset.type; S.cmp.index = ["DAX", "MDAX", "SDAX"].includes(t.dataset.index) ? t.dataset.index : "ALL"; S.cmp.data = null; go("compare"); }
   else if (a === "replang") { S.lang = t.dataset.v; vt(() => render()); }
   else if (a === "print") { window.print(); }
+  else if (a === "dock") { dockToggle(); }
+  else if (a === "dockclear") { S.chat = []; dockRender(); }
+  else if (a === "addev") { S.addEv = !S.addEv; render(); }
 });
 document.addEventListener("change", ev => {
+  if (ev.target.id === "evfile" && ev.target.files[0]) { importCalendar(ev.target.files[0]); ev.target.value = ""; return; }
   const c = ev.target.dataset.cmp, r = ev.target.dataset.rep;
   if (c) { S.cmp[c] = ev.target.value; S.cmp.data = null; $("#cmpbody").innerHTML = `<div class="skel" style="min-height:420px"></div>`; loadCompare(); }
   if (r) { if (r === "key") { S.rep.key = ev.target.value; $("#sheet").innerHTML = sheetHTML(); loadReport(); } else { S.rep[r] = ev.target.checked; $("#sheet").innerHTML = sheetHTML(); } }
 });
 document.addEventListener("submit", ev => {
   ev.preventDefault();
-  if (ev.target.id === "askf") { const q = $("#askq").value.trim(); if (q) { $("#askq").value = ""; ask(q); } }
+  if (ev.target.id === "dockf") { const q = $("#dockq").value.trim(); if (q && !S.busy) { $("#dockq").value = ""; dockAsk(q); } }
+  if (ev.target.id === "evform") { addEvents([{date: $("#ev-d").value, time: $("#ev-t").value, type: $("#ev-y").value, title: $("#ev-n").value}]); }
   if (ev.target.id === "g-form") { const u = resolveGate(); if (u) { $("#g-in").value = u.isin; anatomy(u.isin); $("#g-sugg").classList.remove("on"); openIsin(u.isin); } else $("#g-err").textContent = L("No DAX, MDAX or SDAX share found for this input.", "Keine DAX-, MDAX- oder SDAX-Aktie für diese Eingabe gefunden."); }
 });
 document.addEventListener("input", ev => {
@@ -794,7 +923,10 @@ document.addEventListener("keydown", ev => {
   if (ev.target.id === "g-in") { nav(G, G.list, $("#g-sugg"), () => anatomy($("#g-in").value)); if (ev.key === "Escape") $("#g-sugg").classList.remove("on"); return; }
   if (ev.target.id === "co-in") { if (!nav(CO, CO.list, $("#co-sugg")) && ev.key === "Enter") { ev.preventDefault(); const u = CO.list[CO.sel]; if (u) { coToggle(false); if (u.isin !== S.isin) openIsin(u.isin, {fromGate: false}); } } if (ev.key === "Escape") coToggle(false); return; }
   if (ev.target.closest && ev.target.closest("input,select,textarea")) return;
-  if (!$("#ws").classList.contains("hidden") && ev.key >= "1" && ev.key <= "6" && !ev.metaKey && !ev.ctrlKey) go(PAGES[+ev.key - 1]);
+  if ($("#ws").classList.contains("hidden") || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if (ev.key >= "1" && ev.key <= "5") go(PAGES[+ev.key - 1]);
+  if (ev.key === "a" || ev.key === "A") { ev.preventDefault(); dockToggle(true); }
+  if (ev.key === "Escape" && S.dock) dockToggle(false);
 });
 $("#g-in").addEventListener("focus", () => { if ($("#g-in").value.trim()) $("#g-sugg").classList.add("on"); });
 addEventListener("scroll", () => document.body.classList.toggle("scrolled", scrollY > 30), {passive: true});
@@ -804,6 +936,7 @@ setInterval(() => { const c = $("#clock"); if (c) c.textContent = new Intl.DateT
 addEventListener("hashchange", () => {
   const m = location.hash.match(/^#\/([A-Z]{2}[A-Z0-9]{10})\/(\w+)(?:\/(\d{4}-\d{2}-\d{2}))?(?:\/(.+))?/);
   if (!m || !U(m[1]) || !S.iss) return;
+  if (m[2] === "ask") { dockToggle(true); return; }
   if (m[1] !== S.isin) { openIsin(m[1], {fromGate: false, then: () => { S.page = PAGES.includes(m[2]) ? m[2] : "dashboard"; }}); return; }
   if (m[3] && m[2] === "card") { const sel = {day: m[3], event_id: m[4] ? decodeURIComponent(m[4]) : null}; if (!S.sel || keyOf(sel) !== keyOf(S.sel) || S.page !== "card") openCard(sel.day, sel.event_id); return; }
   if (PAGES.includes(m[2]) && m[2] !== S.page) go(m[2]);
@@ -817,6 +950,6 @@ addEventListener("hashchange", () => {
     S.uni = uni; S.status = st; gateText(); gateTape();
   } catch (e) { $("#g-err").textContent = L("The data server is not running. Start it with: python web/server.py", "Der Datenserver läuft nicht. Start: python web/server.py"); return; }
   const m = location.hash.match(/^#\/([A-Z]{2}[A-Z0-9]{10})\/(\w+)(?:\/(\d{4}-\d{2}-\d{2}))?(?:\/(.+))?/);
-  if (m && U(m[1])) { if (PAGES.includes(m[2])) S.page = m[2]; if (m[3]) S.sel = {day: m[3], event_id: m[4] ? decodeURIComponent(m[4]) : null}; const sel = S.sel; await openIsin(m[1], {fromGate: false, then: () => { S.sel = sel; }}); }
+  if (m && U(m[1])) { if (PAGES.includes(m[2])) S.page = m[2]; if (m[2] === "ask") S.dock = true; if (m[3]) S.sel = {day: m[3], event_id: m[4] ? decodeURIComponent(m[4]) : null}; const sel = S.sel; await openIsin(m[1], {fromGate: false, then: () => { S.sel = sel; }}); }
   else setTimeout(() => $("#g-in").focus(), 900);
 })();
