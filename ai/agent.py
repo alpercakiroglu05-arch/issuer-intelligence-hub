@@ -242,7 +242,7 @@ TOOLS = [
     _fn("find_company", "Find a DAX/MDAX/SDAX share by name, ticker or ISIN.", {"query": {"type": "string"}}, ["query"]),
     _fn("company_overview", "Normal state of the share over the last 60 trading days vs index/sector/size medians, "
         "liquidity trend (last 60 vs previous 60 days) and the Xetra liquidity category estimate.", {"isin": _ISIN}, ["isin"]),
-    _fn("peer_benchmark", "Compare the share with a peer group: index, sector or size (turnover cohort).",
+    _fn("peer_benchmark", "Compare the share with a peer group: index, sector or size (the 10 stocks closest in turnover).",
         {"isin": _ISIN, "by": {"type": "string", "enum": ["index", "sector", "size"]}}, ["isin"]),
     _fn("trading_cost_curve", "Trading cost (XLM) by order size from EUR 10k to 10m vs peers, and the largest order "
         "the order book absorbs on most days.", {"isin": _ISIN}, ["isin"]),
