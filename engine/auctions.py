@@ -24,8 +24,7 @@ CLOSING_CALL = "17:30"
 def auction_profile(isin: str) -> pd.DataFrame:
     s = stock(isin)[["date", "open_auct_px", "open_auct_ts", "close_auct_px", "close_auct_ts", "turnover_eur"]]
     out = s[["date"]].copy()
-    bars = intraday()
-    mine = None if bars is None else bars[bars["isin"] == isin]
+    mine = intraday(isin)
     if mine is None or mine.empty:
         for c in ("open_auction_eur", "close_auction_eur", "close_auction_share", "last_cont_px",
                   "close_auction_move"):

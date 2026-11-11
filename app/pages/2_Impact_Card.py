@@ -54,9 +54,9 @@ summary = text(json.dumps(card, default=str), lang)
 st.info(summary)
 
 # Intraday chart (appears once C1 has built data/intraday_bars.parquet)
-bars = data.intraday()
+bars = data.intraday(isin)
 if bars is not None:
-    b = bars[(bars["isin"] == isin) & (bars["ts_local"].dt.date == pd.Timestamp(day).date())]
+    b = bars[bars["ts_local"].dt.date == pd.Timestamp(day).date()]
     if len(b):
         f = go.Figure()
         f.add_scatter(x=b["ts_local"], y=b["close"], mode="lines", name="Price")

@@ -16,9 +16,13 @@ Onset     first minute where both break, in the direction of the day's move, and
           Before 09:00 or in the opening auction  -> inferred timing "pre_open" (news before the open).
           Later                                   -> "intraday".
 
-Sessions: pre_market (< 09:00), opening_auction, at_open (continuous trading up to 09:05), continuous.
+Sessions: pre_market (< 09:00), opening_auction, at_open (first ONSET_OPEN_WINDOW_MIN = 15 min), continuous.
 Limitation: the price move is raw (no intraday peer data), so a market-wide move can also trigger it.
-Validation (4 stocks x 205 days): onset found on 17 of 19 days with |abnormal return z| >= 3.
+Validation:
+  - 4 hero stocks x 205 days: onset found on 17 of 19 days with |abnormal return z| >= 3.
+  - 39 sourced events with a known release time (events.csv, 44 stocks): inferred timing matches the release
+    time in 33 of 39 (85 %; 72 % with a 5-minute open window); for all 7 releases during trading hours the
+    onset comes after the release (HDD 29 Oct: ad hoc 12:00:53, onset 12:02).
 
 Also reports the price at onset, how much of the day's move was priced in 15 minutes after the onset,
 and the volatility interruptions (unscheduled auctions) of the day.
@@ -26,8 +30,8 @@ and the volatility interruptions (unscheduled auctions) of the day.
 import numpy as np
 import pandas as pd
 
-from config import (BASELINE_DAYS, BASELINE_GAP, ONSET_MIN_TURNOVER_SHARE, ONSET_PERSIST_MIN, ONSET_PRICE_K,
-                    ONSET_VOLUME_K)
+from config import (BASELINE_DAYS, BASELINE_GAP, ONSET_MIN_TURNOVER_SHARE, ONSET_OPEN_WINDOW_MIN, ONSET_PERSIST_MIN,
+                    ONSET_PRICE_K, ONSET_VOLUME_K)
 from engine.data import intraday, stock
 
 GRID_START, GRID_END = "08:00", "17:29"
@@ -70,8 +74,8 @@ def _volatility_interruptions(day_bars: pd.DataFrame) -> list[str]:
 
 def onset(isin: str, day, event_time: str | None = None) -> dict | None:
     """When did the market start pricing the news? None if there are no bars or no break."""
-    bars = intraday()
-    if bars is None:
+    mine = intraday(isin)
+    if mine is None or mine.empty:
         return None
     day = pd.Timestamp(day)
     s = stock(isin)
@@ -86,7 +90,6 @@ def onset(isin: str, day, event_time: str | None = None) -> dict | None:
     if not (prev_close > 0) or not (sigma > 0) or pd.isna(day_ret):
         return None
 
-    mine = bars[bars["isin"] == isin]
     dates = mine["ts_local"].dt.tz_localize(None).dt.normalize()
     today = mine[dates == day]
     if today.empty:
@@ -124,7 +127,7 @@ def onset(isin: str, day, event_time: str | None = None) -> dict | None:
         session = "pre_market"
     elif m <= 545 and g.loc[m, "is_auction"]:  # opening auction, possibly extended to ~09:05
         session = "opening_auction"
-    elif m <= 545:                             # first minutes of continuous trading: news was out at the open
+    elif m < 540 + ONSET_OPEN_WINDOW_MIN:      # first minutes of continuous trading: news was out at the open
         session = "at_open"
     else:
         session = "continuous"

@@ -72,13 +72,15 @@ HAS_BARS = (DATA_DIR / "intraday_bars.parquet").exists()
 @pytest.mark.skipif(not (HAS_DATA and HAS_BARS), reason="intraday_bars.parquet missing")
 def test_intraday_bars_match_daily_turnover():
     """Sum of 1-min bars per day must equal Xetra on-book turnover."""
-    import pandas as pd
-    from engine.data import daily, intraday
-    b = intraday().copy()
-    b["date"] = b["ts_local"].dt.tz_localize(None).dt.normalize()
-    s = b.groupby(["isin", "date"])["volume_eur"].sum().rename("bars").reset_index()
-    m = s.merge(daily()[["isin", "date", "turnover_eur"]], on=["isin", "date"])
-    assert (m["bars"] / m["turnover_eur"]).median() == pytest.approx(1.0, abs=0.001)
+    from engine.data import daily, intraday, intraday_isins
+    d = daily()[["isin", "date", "turnover_eur"]]
+    for isin in intraday_isins():   # one stock at a time (the full file has millions of rows)
+        b = intraday(isin)
+        s = b.groupby(b["ts_local"].dt.tz_localize(None).dt.normalize())["volume_eur"].sum()
+        m = d[d["isin"] == isin].set_index("date")["turnover_eur"]
+        r = (s / m).dropna()
+        # len > 0, not 213: a stock that changed ISIN (FRE, QIA) has its days split over two ISINs
+        assert len(r) > 0 and r.median() == pytest.approx(1.0, abs=0.001), (isin, r.median())
 
 
 @pytest.mark.skipif(not (HAS_DATA and HAS_BARS), reason="intraday_bars.parquet missing")
@@ -122,8 +124,8 @@ def test_auction_block_evd():
 def test_auction_volumes_match_flows():
     """Opening + closing auction (trade bars) ~ all auction turnover in the flow data (rest: midday/volatility)."""
     from engine.auctions import auction_profile
-    from engine.data import intraday, stock
-    for isin in intraday()["isin"].unique():
+    from engine.data import intraday_isins, stock
+    for isin in intraday_isins():
         s, p = stock(isin), auction_profile(isin)
         flow = s[[f"{x}_auct_buy" for x in ("mm", "agent", "prop")]].sum(axis=1)
         r = ((p["open_auction_eur"] + p["close_auction_eur"]) / flow.where(flow > 0)).median()

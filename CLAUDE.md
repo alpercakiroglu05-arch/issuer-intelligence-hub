@@ -74,8 +74,8 @@ Each folder has a `NOTES.md` and a PDF data dictionary.
 | ❌ | Eurex settlement prices (5.2 GB), other Eurex, ETP flows, Xetra TES | not needed |
 
 Processed files in `data/`: `daily_features.parquet` (174 stocks × 213 days, 76 cols), `universe.csv`,
-`events.parquet`, `intraday_bars.parquet` (EVD, EVT, HDD, GXI; 163k 1-min bars), `hero_candidates.csv`.
-Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `ingest/build_intraday.py <tickers>` (~130 s).
+`events.parquet`, `intraday_bars.parquet` (all 44 stocks in `events.csv`: heroes + DAX 40; 3.8M 1-min bars, ~170 MB; read one stock with `engine.data.intraday(isin)`, never the whole file in app code), `hero_candidates.csv`.
+Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `ingest/build_intraday.py <tickers>` (~160 s for 44 stocks; add `--rebuild` when the ticker list is unchanged but the code changed).
 
 ### Pitfalls (all handled in ingest; keep them in mind for new code)
 - **Flows:**
@@ -96,9 +96,9 @@ Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `
 
 ### Validations already done (good for jury Q&A)
 - Flow one-sided total / OHLC turnover = **1.000** (median over all stock-days).
-- Sum of 1-min bars / daily turnover = **1.000** on all 852 stock-days.
+- Sum of 1-min bars / daily turnover = **1.000** for every one of the 44 stocks (46 ISINs).
 - Opening + closing auction volume from the trade file = 97.6–99.7 % of flow auction turnover (median per hero stock); the rest is midday auction and volatility interruptions.
-- Onset vs announcement time: for all 6 hero events announced during trading hours, the detected onset comes after the announcement (lag 2–117 min, median ~18 min). Events announced after the close or before the open show the onset in pre-market / at the open in 13 of 19 cases.
+- Onset vs announcement time: for all 7 events announced during trading hours (6 hero + Beiersdorf), the detected onset comes after the announcement (lag 2–117 min). Over all 39 sourced events with a release time (44 stocks), the timing inferred from the onset matches the release time in 33 (85 %).
 - Auction share is real: EVD on 27 Oct had **83 %** of turnover in the closing auction (raw trades and flows agree).
   60-day medians: DAX 51 %, MDAX 52 %, SDAX 34 %.
 

@@ -69,3 +69,4 @@ ONSET_PRICE_K = 2.0               # |move vs previous close| >= 2 x daily return
 ONSET_VOLUME_K = 3.0              # cumulative turnover >= 3 x normal for the time of day
 ONSET_MIN_TURNOVER_SHARE = 0.01   # ... and >= 1% of a normal day's turnover (ignores single odd prints)
 ONSET_PERSIST_MIN = 5             # price still beyond the threshold 5 minutes later
+ONSET_OPEN_WINDOW_MIN = 15        # break within the first 15 min of trading -> news was out before the open
