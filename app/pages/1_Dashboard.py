@@ -114,8 +114,12 @@ with right:
     st.plotly_chart(f3, width="stretch")
 
 st.markdown("### Unusual days")
-st.caption("Consecutive unusual days are merged into one episode. The announcement column links each episode to "
-           "a sourced event from events/events.csv (empty = no company news found).")
+st.caption("Consecutive unusual days are merged into one episode. **Announcement** links each episode to a sourced "
+           "event from events/events.csv (empty = no company news found). **Market context** flags index and calendar "
+           "days (expiries, index reviews, market-wide volume), so you can tell \"our news\" from \"the market\".")
+CONTEXT_WORDS = {"index_event": "index event", "index_change": "index change", "quarterly_expiry": "quarterly expiry",
+                 "monthly_expiry": "monthly expiry", "month_end_review": "month-end (possible MSCI review)",
+                 "market_wide_volume": "market-wide volume"}
 ev = data.events()
 ev = ev[ev["isin"] == isin]
 ev_day = pd.to_datetime(ev["reaction_day"])
@@ -128,12 +132,18 @@ def linked_event(start, end) -> str:
 
 show = episodes.copy()
 show["event"] = [linked_event(a, b) for a, b in zip(show["start"], show["end"], strict=False)]
+show["market"] = [", ".join(CONTEXT_WORDS.get(f.strip(), f.strip()) for f in str(c).split(",") if f.strip())
+                  for c in show.get("context", pd.Series("", index=show.index)).fillna("")]
 for col in ("start", "end", "peak_date"):
     show[col] = pd.to_datetime(show[col]).dt.date
-st.dataframe(show[["start", "end", "days", "event", "reason", "peak_abn_ret", "total_abn_ret", "max_vol_ratio"]].style.format(
+st.dataframe(show[["start", "end", "days", "event", "market", "reason", "peak_abn_ret", "total_abn_ret",
+                   "max_vol_ratio"]].style.format(
     {"peak_abn_ret": "{:+.1%}", "total_abn_ret": "{:+.1%}", "max_vol_ratio": "{:.1f}x"}, na_rep="–"),
     width="stretch", hide_index=True,
-    column_config={"event": "announcement", "peak_abn_ret": "stock-specific move (peak day)",
+    column_config={"event": "announcement",
+                   "market": st.column_config.TextColumn(
+                       "market context", help=" · ".join(f"{CONTEXT_WORDS.get(k, k)}: {v}" for k, v in baseline.CONTEXT_HELP.items())),
+                   "peak_abn_ret": "stock-specific move (peak day)",
                    "total_abn_ret": "stock-specific move (episode)", "max_vol_ratio": "turnover vs normal (max)"})
 if len(show):
     opts = list(show.itertuples())
