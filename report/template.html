@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<title>IR Snapshot - {{ card.name }}</title>
+<style>
+  @page { size: A4; margin: 18mm; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #1a1a1a; font-size: 10.5pt; }
+  h1 { font-size: 17pt; margin: 0 0 2pt 0; }
+  .sub { color: #666; margin-bottom: 12pt; }
+  table.kpi { width: 100%; border-collapse: collapse; margin: 10pt 0; }
+  table.kpi td { border: 0.5pt solid #ccc; padding: 7pt; width: 25%; vertical-align: top; }
+  .label { color: #666; font-size: 8.5pt; }
+  .value { font-size: 15pt; font-weight: bold; }
+  .base { color: #666; font-size: 8.5pt; }
+  .text { background: #f4f6f8; padding: 9pt; margin: 10pt 0; line-height: 1.45; }
+  .foot { color: #888; font-size: 7.5pt; margin-top: 16pt; }
+</style>
+</head>
+<body>
+  <h1>{{ card.name }} ({{ card.ticker }}, {{ card.index }})</h1>
+  <div class="sub">{{ L.title }}: {{ card.event.title }} &middot; {{ L.day }} {{ card.event.reaction_day }}</div>
+
+  <table class="kpi"><tr>
+    <td><div class="label">{{ L.abn }}</div><div class="value">{{ pct(card.price.abn_ret) }}</div>
+        <div class="base">{{ L.stock }} {{ pct(card.price.ret) }} &middot; {{ L.peers }} {{ pct(card.price.peer_ret) }}</div></td>
+    <td><div class="label">{{ L.vol }}</div><div class="value">{{ x(card.volume.ratio) }}</div>
+        <div class="base">{{ eur(card.volume.turnover_eur) }} vs {{ eur(card.volume.baseline_eur) }}</div></td>
+    <td><div class="label">{{ L.xlm }}</div><div class="value">{{ bps(card.liquidity.xlm_25k_bps) }}</div>
+        <div class="base">{{ L.normal }} {{ bps(card.liquidity.xlm_25k_baseline_bps) }}</div></td>
+    <td><div class="label">{{ L.agent }}</div><div class="value">{{ pct(card.participants.agent_aggr_imbalance) }}</div>
+        <div class="base">{{ L.auction }} {{ pct0(card.auctions.auction_share) }} ({{ L.normal }} {{ pct0(card.auctions.auction_share_baseline) }})</div></td>
+  </tr></table>
+
+  <div class="text">{{ narrative }}</div>
+
+  <div class="foot">{{ L.foot }}</div>
+</body>
+</html>

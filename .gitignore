@@ -3,6 +3,12 @@
 .env.*
 !.env.example
 
+# Data never goes into git (shared via OneDrive/SharePoint)
+data/
+*.parquet
+*.csv.gz
+*.tgz
+
 # Python
 .venv/
 venv/
@@ -10,15 +16,12 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Local runtime data (LLM cache, audit log)
+# Local runtime data (LLM cache)
 .cache/
-
-# Node (if a Next.js frontend is added)
-node_modules/
-.next/
 
 # OS / editors
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+.streamlit/secrets.toml

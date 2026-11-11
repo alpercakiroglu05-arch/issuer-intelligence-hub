@@ -1,0 +1,41 @@
+"""Central configuration. Import from here instead of hard-coding paths or constants."""
+import os
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent
+
+# Processed, small files (parquet/csv). Shared via OneDrive/SharePoint, never committed.
+DATA_DIR = Path(os.getenv("IIH_DATA_DIR", REPO_ROOT / "data"))
+
+# Raw Deutsche Boerse excerpt (8.9 GB). Only needed to (re)run the ingest scripts.
+RAW_DIR = Path(os.getenv("IIH_RAW_DIR", REPO_ROOT.parent))
+
+EVENTS_CSV = REPO_ROOT / "events" / "events.csv"
+SECTORS_CSV = REPO_ROOT / "events" / "sectors.csv"
+
+# Stocks we showcase (max 3 per the challenge). Proposed - team decides.
+#   EVD  CTS Eventim (MDAX): 27 Mar -23%, sell-off all day, 23% of turnover in the closing auction
+#   EVT  Evotec (SDAX):      14 Jul -24%, -22% gap at the open (news before the open)
+#   HDD  Heidelberger Druck (SDAX): small cap, ~EUR 1.3m/day, XLM ~90 bps -> liquidity story
+#   (GXI Gerresheimer: -31% on 11 Feb, left the SDAX on 9 Apr -> no XLM data afterwards; pitch story only)
+HERO_TICKERS = ["EVD", "EVT", "HDD"]
+DEFAULT_TICKER = "EVD"
+
+# Event study windows (trading days, relative to the reaction day t=0)
+BASELINE_DAYS = 60      # length of the "normal" window
+BASELINE_GAP = 5        # skip t-5..t-1 so pre-event run-up does not pollute the baseline
+CAR_DAYS = 5            # cumulative abnormal return over t0..t+5
+SPREAD_NORMAL_TOL = 1.2 # spread counts as "back to normal" at <= 1.2 x baseline
+
+# Xetra session (local Frankfurt time)
+XETRA_OPEN = "09:00"
+XETRA_CLOSE_AUCTION = "17:35"
+TZ = "Europe/Berlin"
+
+# Xetra Designated Sponsor thresholds (Being Public Guide, p. 32)
+DS_XLM_MAX_BPS = 100       # XLM (EUR 25k order) <= 100 bps ...
+DS_TURNOVER_MIN_EUR = 2.5e6  # ... and avg daily order book turnover >= EUR 2.5m -> category A
+DS_LOOKBACK_DAYS = 84      # ~4 months
+
+# Anomaly thresholds
+ANOMALY_Z = 3.0
