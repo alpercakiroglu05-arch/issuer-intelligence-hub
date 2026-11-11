@@ -4,7 +4,8 @@
 !.env.example
 
 # Data never goes into git (shared via OneDrive/SharePoint)
-
+data/
+Data/
 *.parquet
 *.csv.gz
 *.tgz
