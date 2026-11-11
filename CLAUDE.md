@@ -44,7 +44,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 pip install -r requirements.txt
 python web/server.py                      # demo UI (web front end, C3): http://127.0.0.1:8600
 streamlit run app/Home.py                 # backup UI and analyst view: http://localhost:8501
-pytest                                    # 79 tests (incl. web API); data tests skip if data/ is empty
+pytest                                    # 108 tests (incl. web API); data tests skip if data/ is empty
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
 - Before a PR, run `pytest` **and** a headless page check:
@@ -114,7 +114,7 @@ Hero stocks (max 3 per challenge, set in `config.HERO_TICKERS`; the team may sti
 
 Xetra liquidity rule (Being Public Guide p. 32): XLM (EUR 25k) ≤ 100 bps **and** ≥ EUR 2.5m/day (4-month average) means category A; otherwise a Designated Sponsor is needed. `engine.baseline.kpis()` gives an estimate.
 
-## Status (Wed 21:45, all PRs up to #25 merged, 69 tests green incl. the XLM curve PR)
+## Status (Wed ~22:30, all PRs up to #31 merged, 108 tests green)
 
 Done on `main`:
 - **Ingest:** daily (174 stocks x 213 days), events (80 sourced events), intraday (44 event stocks, 3.8M bars).
@@ -136,15 +136,11 @@ Done on `main`:
 - **Docs:** `docs/SUBMISSION.md` is the submission text (13:30, "what data, model, logic"); keep its numbers in sync if the engine changes. `docs/C2_ENGINE.md` documents the C2 functions.
 
 Open (see README checklists):
-1. ~~Peer benchmarking by sector and size~~ ✅ (brief point II): engine by Kaan (PR #20, `compare.peer_group`), dashboard selector "Compare with: Index / Sector / Size" (PR #21). Example: HDD XLM 72 bps vs Industrials 32 but small-turnover cohort 77, so the size cohort is the fair benchmark for a small cap.
-2. **Part A export** (brief: the dashboard result "can be exported as a short report"). Owner C4, no commits yet.
-3. **LLM:**
-   - The JAIF gateway is set in `.env.example` (`https://hip-gw.hessian.ai/v1`, OpenAI-compatible; models such as Kolibri-1 for DE/EN and GLM-5.3-Flash). The workshop key comes from the pinned message in our Discord team channel.
-   - The numbers check (`ai/checks.py`) and the answer cache (`LLM_CACHE`, `data/llm_cache.json`) are in.
-   - Tests always run without an LLM (`tests/conftest.py`).
-4. **Dashboard (C3):** liquidity trend, episodes and the peer selector are in (PRs #19, #21). Still open: auction share over time (brief point I) and the visual design. C3 has no commits yet.
-5. **Team setup:** everyone runs `git pull` + `python ingest/build_intraday.py` once (~3 min, raw data is on every laptop).
-6. **Human check:** spot-check the hero rows in `events.csv` (source link, time) before the pitch.
+1. **JAIF key** → `.env` (from the pinned message in our Discord team channel). Then pick the model (Kolibri-1 for DE/EN), check the texts and run the demo path once to fill the answer cache.
+2. **German formatting** in the DE texts and snapshots (Kaan, tonight).
+3. **Web:** market context in *Unusual days*; optional the cost-by-order-size block (Kaan with Alper).
+4. **Thu morning:** demo dry run on the web UI; backup video at 12:00 on the web UI; Streamlit open as the live fallback.
+5. **Human check:** spot-check the hero rows in `events.csv` (source link, time) before the pitch.
 
 Decided: Eurex open interest is skipped (participant split censored for >90 % of small-cap series), and Xetra TES is a "what's next" idea.
 

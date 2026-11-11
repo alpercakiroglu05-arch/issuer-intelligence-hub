@@ -7,12 +7,13 @@ Mid- and small-cap IR teams cannot easily see how their own share trades or how 
 to their announcements. They have no terminal and no analyst, so they wait days for broker reports.
 This tool answers two questions with one click:
 
-- **Part A, Dashboard: "How does our share normally trade?"** Turnover, trading cost (XLM spread), auctions, who trades, comparison with index peers, unusual days.
+- **Part A, Dashboard: "How does our share normally trade?"** Turnover, trading cost (XLM spread, also by order size), auctions, who trades, peers by index / sector / size, liquidity trend ("has our liquidity improved?"), unusual days with the linked announcement and market context, exportable as a short IR report (DE/EN).
 - **Part B, Impact card: "What happened when we announced X?"** Move vs. peers, volume vs. normal, spread, opening/closing auction vs normal, participant flows, the minute the market started pricing the news, and a rank among events of the same type, exported as an IR snapshot (DE/EN).
 
 > **Design rule: numbers come from code, words come from the LLM.**
 > The engine computes every figure deterministically. The LLM only sees the resulting JSON and writes text.
-> Without an API key the app still runs on template texts.
+> A numbers check rejects any model text with a figure that is not in the JSON, and the screen says which text you read.
+> Without an API key the app still runs on template texts. LLM: open models via the JAIF gateway (OpenAI-compatible).
 
 ---
 
@@ -31,7 +32,7 @@ cp .env.example .env                                   # optional: add LLM key
 ```bash
 python web/server.py           # demo UI (web front end) -> http://127.0.0.1:8600
 streamlit run app/Home.py      # backup UI / analyst view -> http://localhost:8501
-pytest                         # smoke tests (data tests skip if data/ is empty)
+pytest                         # 108 tests incl. the web API (data tests skip if data/ is empty)
 ```
 
 Build the processed data from the 8.9 GB raw excerpt (once, and after `git pull` when `events.csv` changed):
@@ -57,25 +58,28 @@ python ingest/build_intraday.py                  # ~3 min, every stock in events
   (174 stocks × 213 days)       (1-min bars, 44 event stocks) (80 events + timing, reaction_day)
           └───────────────┬───────────────────┘
                           ▼
-  engine/   baseline.py (Part A) · impact.py · onset.py · auctions.py (Part B) · compare.py  ← deterministic
+  engine/   baseline.py (Part A) · impact.py · onset.py · auctions.py (Part B) · compare.py · xlm.py  ← deterministic
                           ▼  JSON
-  ai/       narrate.py (DE/EN text) · agent.py (Q&A)                    ← LLM sees JSON only
+  ai/       narrate.py (DE/EN text) · checks.py (numbers check) · agent.py (Q&A)  ← LLM sees JSON only
                           ▼
-  app/      Streamlit: Dashboard · Impact card · Compare · Assistant
-  report/   IR snapshot HTML/PDF
+  web/      demo UI: server.py (JSON API) + app.js (Issuer Services look): ISIN entry · Dashboard ·
+            Impact card · Compare · Assistant · Report (Part A + B) · Ideas
+  app/      backup UI / analyst view (Streamlit): Dashboard · Impact card · Compare · Assistant
+  report/   IR snapshot HTML/PDF (impact card + Part A report)
 ```
 
 ```
 futury-build-days-2026/
 ├── config.py              paths, windows, thresholds (single source of truth)
 ├── ingest/                build_daily.py ✅ · build_events.py ✅ · build_intraday.py ✅
-├── engine/                data.py ✅ · baseline.py ✅ · impact.py ✅ · onset.py ✅ · auctions.py ✅ · compare.py ✅
-├── ai/                    llm.py ✅ · narrate.py ✅ · agent.py ✅ (v1)
+├── engine/                data.py ✅ · baseline.py ✅ · impact.py ✅ · onset.py ✅ · auctions.py ✅ · compare.py ✅ · xlm.py ✅
+├── ai/                    llm.py ✅ (JAIF, answer cache) · narrate.py ✅ · checks.py ✅ (numbers check) · agent.py ✅ (v1)
 ├── report/                template.html ✅ · export.py ✅
-├── app/                   Home.py · pages/1_Dashboard · 2_Impact_Card · 3_Compare · 4_Assistant
+├── web/                   demo UI: server.py · index.html · app.js · app.css (C3)
+├── app/                   backup UI (Streamlit): Home.py · pages/1_Dashboard · 2_Impact_Card · 3_Compare · 4_Assistant
 ├── events/                events.csv (80 sourced events) · sectors.csv (174 stocks, Deutsche Börse sectors)
-├── docs/                  API_CONTRACT · SUBMISSION (data, model, logic) · C2_ENGINE · SCOPE · PITCH
-├── tests/                 smoke tests (pytest)
+├── docs/                  API_CONTRACT · SUBMISSION (data, model, logic) · REQUIREMENTS (brief → web page) · C2_ENGINE · SCOPE · PITCH · design/
+├── tests/                 108 tests: engine, data, Streamlit pages, web API over HTTP, numbers check
 └── data/                  processed files (gitignored)
 ```
 
@@ -107,24 +111,18 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] Index-day context in `anomalies()` (expiry Fridays, index reviews, market-wide days; use the `INDEX` rows of `events.csv`)
 
 ### C3 · Frontend. Owner: Alper
-- [ ] Impact card design (the demo moment): follow the designer's sketch
-- [ ] Intraday chart: event-time marker ✅ (onset line, PR #5), highlighted auctions still open
-- [x] Compare page: scatter of abnormal return vs volume ratio, selected stock highlighted (PR #7)
-- [ ] Polish: colors, empty states, loading, one clean end-to-end flow for the pitch
-- [ ] Part A: auction share over time chart on the dashboard (brief point I)
-- [x] Dashboard: "has our liquidity improved?" (`liquidity_trend()`) and episodes linked to events (PR #19); "Compare with: Index / Sector / Size" (PR #21)
+- [x] **Web front end** (`web/`, PR #27; Windows/NaN fixes in #30): the **demo UI**. Issuer Services look, ISIN entry, dashboard (volume, spread, auctions over time; peers; liquidity verdict; unusual days), impact card (minute chart with onset, auctions, who traded, aftershocks, AI summary with numbers check), compare, assistant, report (Part A + B, DE/EN, PDF) and ideas. Every brief item has one page (`docs/REQUIREMENTS.md`)
+- [x] Streamlit (`app/`, backup UI): liquidity trend, episodes with events and market context, Compare with Index / Sector / Size, cost by order size, Part A report button (PRs #19–#29)
+- [ ] Web: show Kaan's market context (index days, expiries, MSCI) in *Unusual days*; optional: the cost-by-order-size block (`engine.xlm`). Agree with Kaan before building
 
-### C4 · AI + report. Owner: AskingAtlas
-Priorities from the demo dry run (Wed evening), in this order:
-- [x] **Part A report** (brief: the dashboard result "can be exported as a short report"): a button on the dashboard, HTML/PDF, DE/EN, reusing `report/export.py` (`part_a_html()`, done by C2). Content: KPIs vs index/sector/size (`baseline.kpis()`), liquidity trend (`liquidity_trend()["summary"]`), episodes with linked events.
-- [ ] **Assistant without LLM:** today `ask()` answers with a raw JSON dump when no key is set. Add a deterministic fallback for the typical questions:
-  - liquidity → `liquidity_trend()` summary
-  - spreads and peers → `kpis()` vs index/sector/size
-  - most unusual day → top episode + linked event + card summary
-- [x] **Numbers check** (`ai/checks.py`): every number in an LLM text must be in the card JSON, else the template is shown; the card says which (by C1)
-- [ ] **German formatting** in the DE texts and snapshot: `−23,2 %` and `27.03.2026` instead of `-23.2%` and `2026-03-27`; the comparison group label is still English.
-- [ ] JAIF / LLM: `.env.example` points at the JAIF gateway (`https://hip-gw.hessian.ai/v1`); the workshop key is in our Discord team channel (pinned). Answer cache `LLM_CACHE` (by C1)
-- [ ] `agent.py` v2: tool calling with `TOOLS` (kpis, anomalies, impact_card)
+### C4 · AI + report. Owner: AskingAtlas (no commits so far; C1 and C2 took the items over)
+- [x] **Part A report** (brief: the dashboard result "can be exported as a short report"): web Report tab (C3) and Streamlit button (C2, PR #29)
+- [x] **Numbers check** (`ai/checks.py`, PR #28): every number in a model text must be in the card JSON, else the template is shown; both UIs say which text it is
+- [x] **Assistant without a model**: short answer + liquidity summary instead of a JSON dump (Streamlit, PR #28); the web has its own fallback answers
+- [x] **Answer cache** (`LLM_CACHE`, PR #28) so the live demo survives Wi-Fi/API outages
+- [ ] **German formatting** in the DE texts and snapshots (`−23,2 %`, `27.03.2026`, German group label): Kaan, tonight
+- [ ] **JAIF key**: `.env` already points at `https://hip-gw.hessian.ai/v1`; the workshop key is in the pinned message of our Discord team channel. Then pick the model (Kolibri-1 for DE/EN) and run the demo path once to fill the cache
+- [ ] Optional: `agent.py` v2 with tool calling
 
 ### Non-code (research and pitch team)
 - **Please spot-check the hero rows of `events/events.csv`** (source link, time) before the pitch.
@@ -155,8 +153,8 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)**. In short:
 | When | Milestone |
 |---|---|
 | Wed 18:00 | End-to-end on real daily data (✅ skeleton) + events v1 |
-| Wed 22:00 | Intraday bars ✅ + comparison ✅ + LLM text live (open, C4) |
-| Thu 08:30 | Review, cut scope |
+| Wed 22:00 | Intraday bars ✅ + comparison ✅ + web front end ✅ + numbers check ✅ · LLM key still open |
+| Thu 08:30 | JAIF key in `.env`, demo dry run on the **web** UI, cut scope |
 | Thu 11:00 | **Feature freeze** |
 | Thu 12:00 | Backup demo video recorded |
 | Thu 13:30 | Demo submission · 14:30 deck · 15:00 pitch |
