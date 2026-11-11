@@ -10,11 +10,15 @@ Standard library only (no new dependencies). The LLM key stays here, in .env; th
 
 API (all GET unless noted, JSON):
     /api/universe                         all 174 shares for the ISIN entry
-    /api/issuer?isin=                     Part A: profile, index medians, kpis, liquidity trend, peers, anomalies, events
-    /api/card?isin=&day=&event_id=        Part B: impact_card() + 1-minute bars + aftershocks
+    /api/issuer?isin=                     trading profile: series, index medians, kpis, liquidity trend, peers,
+                                          trading cost by order size, unusual days, event calendar
+    /api/card?isin=&day=&event_id=        impact_card() + 1-minute bars + aftershocks
+         [&date=&time=&type=&title=]      ... for an event the user added or imported (not in events.csv)
     /api/compare?type=&index=             same-type events (engine.compare)
+    POST /api/calendar {isin,events:[{date,time,type,title}]}  match the company's own calendar to trading days
     POST /api/narrate {isin,day,event_id,lang}   AI summary (LLM or template fallback)
-    POST /api/ask {isin,question}                AI assistant
+    POST /api/agent {isin,question,history,context,lang}  IR analyst agent (ai/agent.py: tool calling over the engine)
+    POST /api/ask {isin,question,lang}           same agent, short answer (v1 contract)
     /api/status                           data + LLM status
 """
 import argparse
@@ -34,7 +38,7 @@ sys.path.insert(0, str(ROOT))
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from config import DATA_DIR, HERO_TICKERS, SECTORS_CSV  # noqa: E402
+from config import DATA_DIR, HERO_TICKERS, SECTORS_CSV, XETRA_CLOSE_AUCTION, XETRA_OPEN  # noqa: E402
 from engine import baseline, compare, data, impact  # noqa: E402
 
 WEB = Path(__file__).resolve().parent
@@ -110,30 +114,33 @@ PEER_COLS = ["turnover_eur", "xlm_25k", "auction_share", "agent_share", "volatil
 
 
 def peers(isin: str) -> dict:
+    """Index, sector and size peers as defined by the engine (engine.compare.peer_group), medians from stock_medians."""
     m = stock_medians()
     me = m.loc[isin]
-    idx_peers = m[(m["idx_latest"] == me["idx_latest"]) & (m.index != isin)]
-    # size cohort: the 10 shares with the closest average turnover (any index)
-    others = m[m.index != isin].copy()
-    others["dist"] = (np.log(others["avg_turnover_eur"]) - math.log(me["avg_turnover_eur"])).abs()
-    cohort = others.nsmallest(10, "dist")
-    sec = sectors().get(me["ticker"])
-    sec_peers = m[[sectors().get(t) == sec and i != isin for i, t in zip(m.index, m["ticker"])]] if sec else m.iloc[0:0]
 
     def med(frame):
         return {c: r(frame[c].median()) for c in PEER_COLS} if len(frame) else None
 
-    return {
-        "stock": {c: r(me[c]) for c in PEER_COLS},
-        "groups": [
-            {"key": "index", "label": f"{me['idx_latest']} median", "n": len(idx_peers), "values": med(idx_peers)},
-            {"key": "size", "label": "Size cohort median", "n": len(cohort), "values": med(cohort),
-             "members": [{"ticker": t, "name": n} for t, n in zip(cohort["ticker"], cohort["name"])]},
-            {"key": "sector", "label": f"{sec} median" if sec else "Sector median", "n": len(sec_peers),
-             "values": med(sec_peers), "members": [{"ticker": t, "name": n} for t, n in zip(sec_peers["ticker"], sec_peers["name"])]},
-        ],
-        "period": "median of the last 60 trading days; volatility = annualised std of daily returns",
-    }
+    groups = []
+    for by in ("index", "sector", "size"):
+        g = compare.peer_group(isin, by)
+        if by == "sector" and g["by"] != "sector":  # unknown sector: the engine falls back to the index
+            continue
+        frame = m.loc[[i for i in g["isins"] if i in m.index]]
+        groups.append({"key": by, "label": g["label"], "name": g["name"], "n": len(frame), "values": med(frame),
+                       "members": [{"ticker": t, "name": n} for t, n in zip(frame["ticker"], frame["name"])][:12]})
+    return {"stock": {c: r(me[c]) for c in PEER_COLS}, "groups": groups,
+            "period": "median of the last 60 trading days; volatility = annualised std of daily returns; "
+                      "size = turnover cohort (market cap is not in the data)"}
+
+
+def cost_curve(isin: str) -> dict | None:
+    from engine import xlm
+    try:
+        c = xlm.cost_curve(isin)
+    except Exception:  # noqa: BLE001  no XLM (e.g. left the index): the dashboard simply hides the curve
+        return None
+    return clean({"rows": records(c), "summary": xlm.curve_summary(c)})
 
 
 def events_for(isin: str) -> list[dict]:
@@ -175,7 +182,8 @@ def issuer(isin: str) -> dict:
     for row in ep.to_dict("records"):
         day = str(pd.Timestamp(row["peak_date"]).date())
         m = by_day.get(day)
-        eps.append({**clean(row), "peak_date": day, "event": clean({k: m[k] for k in ("event_id", "type", "title", "verified")}) if m else None})
+        eps.append({**clean(row), "peak_date": day, "context": row.get("context") or "",
+                    "event": clean({k: m[k] for k in ("event_id", "type", "title", "verified")}) if m else None})
     u = next(x for x in universe() if x["isin"] == isin)
     return clean({
         "meta": {**u, "first_date": series["date"][0], "last_date": series["date"][-1], "days": len(dates)},
@@ -183,13 +191,53 @@ def issuer(isin: str) -> dict:
         "kpis": baseline.kpis(isin),
         "liquidity": baseline.liquidity_trend(isin),
         "peers": peers(isin),
+        "cost_curve": cost_curve(isin),
         "anomalies": eps,
         "events": events_for(isin),
     })
 
 
-def card(isin: str, day: str, event_id: str | None) -> dict:
+def _timing(t: str | None) -> str:
+    if not t:
+        return "unknown"
+    t = t.strip()[:5]
+    return "pre_open" if t < XETRA_OPEN else "intraday" if t < XETRA_CLOSE_AUCTION else "post_close"
+
+
+def calendar(body: dict) -> dict:
+    """The company's own event calendar (typed in or imported as CSV/ICS in the browser) -> reaction days.
+    Same rule as ingest/build_events.py: after the close or on a non-trading day -> next trading day."""
+    isin = body["isin"]
+    days = pd.DatetimeIndex(sorted(data.stock(isin)["date"].unique()))
+    out = []
+    for e in body.get("events", [])[:200]:
+        try:
+            d = pd.Timestamp(str(e["date"])[:10])
+        except (KeyError, ValueError):
+            continue
+        t = (e.get("time") or "").strip()[:5] or None
+        timing = _timing(t)
+        pos = int(days.searchsorted(d))
+        if pos < len(days) and days[pos] == d and timing == "post_close":
+            pos += 1
+        if pos >= len(days):
+            out.append({**e, "reaction_day": None, "note": "after the end of the data"})
+            continue
+        etype = str(e.get("type") or "OTHER").upper()[:12]
+        out.append({"event_id": f"USR_{etype}_{d.strftime('%Y%m%d')}{'_' + t.replace(':', '') if t else ''}",
+                    "type": etype, "date": str(d.date()), "time_local": t or "", "timing": timing,
+                    "title": str(e.get("title") or etype)[:160], "reaction_day": str(days[pos].date()),
+                    "verified": "0", "source_url": "", "user": True})
+    return {"events": out}
+
+
+def card(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
     ev = find_event(isin, event_id)
+    if ev is None and user and user.get("date"):
+        t = (user.get("time") or "").strip()[:5]
+        ev = {"event_id": event_id, "type": (user.get("type") or "OTHER").upper(), "date": user["date"],
+              "time_local": t, "timing": _timing(t), "title": user.get("title") or "Own calendar entry",
+              "source_url": ""}
     c = impact.impact_card(isin, day, ev)
     s = data.stock(isin)
     i = int(s.index[s["date"] == pd.Timestamp(day)][0])
@@ -225,6 +273,14 @@ def llm_available() -> bool:
         return False
 
 
+def llm_model() -> str | None:
+    try:
+        from ai import llm
+        return llm.model_name() if llm.available() else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def narrate(body: dict) -> dict:
     from ai import narrate as nar
     c = impact.impact_card(body["isin"], body["day"], find_event(body["isin"], body.get("event_id")))
@@ -235,53 +291,17 @@ def narrate(body: dict) -> dict:
     return {"text": m["text"], "source": m["source"], "model": m["model"], "rejected": m["rejected"], "lang": lang}
 
 
-def _fallback_answer(q: str, isin: str, lang: str) -> str:
-    """Deterministic answer from engine numbers when no LLM is configured (the demo never breaks)."""
-    from ai import narrate as nar
-    ql = q.lower()
-    de = lang == "de"
-    k = baseline.kpis(isin)
-    name = k["name"]
-    if any(w in ql for w in ("result", "ergebnis", "quarter", "quartal", "earnings", "zahlen")):
-        e = data.events()
-        e = e[(e["isin"] == isin) & (e["type"].isin(["FY", "Q1", "H1", "Q3"]))]
-        m = compare.metrics_all().set_index(["isin", "date"])
-        lines = []
-        for row in e.itertuples():
-            key = (isin, pd.Timestamp(row.reaction_day))
-            if key in m.index:
-                x = m.loc[key]
-                lines.append(f"{row.type} ({pd.Timestamp(row.reaction_day).date()}): "
-                             f"{x['abn_ret'] * 100:+.1f}% {'abnormal' if not de else 'abnormal'}, "
-                             f"{x['vol_ratio']:.1f}x {'turnover vs normal' if not de else 'Umsatz vs. normal'}")
-        head = "Reaktion auf Ergebnisveröffentlichungen:" if de else "Reaction to results releases:"
-        return head + "\n" + "\n".join(lines) if lines else ("Keine Ergebnistermine im Kalender." if de else "No results dates in the calendar yet.")
-    dates = [w for w in q.replace("?", " ").split() if len(w) == 10 and w[4] == "-" and w[7] == "-"]
-    if dates:
-        try:
-            return nar.template_narrative(impact.impact_card(isin, dates[0]), lang)
-        except ValueError:
-            pass
-    if any(w in ql for w in ("spread", "xlm", "cost", "kosten", "peer", "vergleich", "compare")):
-        s, i = k["median_xlm_25k_bps"]["stock"], k["median_xlm_25k_bps"]["index_median"]
-        if de:
-            return (f"{name}: Handelskosten (XLM 25k) im Median {s:.1f} bps über die letzten 60 Handelstage, "
-                    f"{k['index']}-Median {i:.1f} bps, also {'günstiger' if s < i else 'teurer'} als der Index.")
-        return (f"{name}: median trading cost (XLM 25k) {s:.1f} bps over the last 60 trading days vs. "
-                f"{i:.1f} bps for the {k['index']} median, so {'cheaper' if s < i else 'more expensive'} than the index.")
-    lt = baseline.liquidity_trend(isin)
-    if de:
-        v = {"improved": "verbessert", "worsened": "verschlechtert", "mixed": "gemischt", "stable": "stabil"}.get(lt["verdict"], "offen")
-        return (f"Liquidität {v}: Handelskosten {lt['xlm_25k_change_pct'] * 100:+.0f}%, Umsatz {lt['turnover_change_pct'] * 100:+.0f}% "
-                f"(letzte 60 vs. vorherige 60 Handelstage). Xetra-Kategorie (Schätzung): {lt['ds_category']['now']}.")
-    return lt["summary"] + f" Xetra liquidity category (estimate): {lt['ds_category']['now']}."
+def agent(body: dict) -> dict:
+    from ai import agent as ag
+    out = ag.run(body["question"], body["isin"], history=body.get("history") or [],
+                 context=body.get("context") or {}, lang=body.get("lang", "en"))
+    return clean(out)
 
 
 def ask(body: dict) -> dict:
-    if llm_available():
-        from ai import agent
-        return {"text": agent.ask(body["question"], body["isin"]), "source": "llm"}
-    return {"text": _fallback_answer(body["question"], body["isin"], body.get("lang", "en")), "source": "template"}
+    """v1 contract: {text, source}. Same agent."""
+    out = agent(body)
+    return {"text": out["text"], "source": out["source"], "actions": out.get("actions", [])}
 
 
 # ---------- HTTP ----------
@@ -318,10 +338,12 @@ class Handler(SimpleHTTPRequestHandler):
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         routes = {
             "/api/status": lambda: {"data_dir": str(DATA_DIR), "stocks": len(universe()),
-                                    "intraday_stocks": len(data.intraday_isins()), "llm": llm_available()},
+                                    "intraday_stocks": len(data.intraday_isins()), "llm": llm_available(),
+                                    "model": llm_model(), "last_date": str(data.daily()["date"].max().date())},
             "/api/universe": universe,
             "/api/issuer": lambda: issuer(q["isin"]),
-            "/api/card": lambda: card(q["isin"], q["day"], q.get("event_id")),
+            "/api/card": lambda: card(q["isin"], q["day"], q.get("event_id"),
+                                      {k: q[k] for k in ("date", "time", "type", "title") if k in q} or None),
             "/api/compare": lambda: compare_table(q.get("type", "NOTABLE_DAY"), q.get("index")),
         }
         if u.path in routes:
@@ -333,7 +355,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         u = urlparse(self.path)
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0)) or 0) or b"{}")
-        routes = {"/api/narrate": narrate, "/api/ask": ask}
+        routes = {"/api/narrate": narrate, "/api/ask": ask, "/api/agent": agent, "/api/calendar": calendar}
         if u.path in routes:
             return self._guard(routes[u.path], body)
         self._json({"error": "not found"}, 404)
