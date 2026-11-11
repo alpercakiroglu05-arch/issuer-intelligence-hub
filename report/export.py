@@ -19,6 +19,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from config import LIQUIDITY_TREND_TOL, MARKET_WIDE_SHARE, MARKET_WIDE_VOL_RATIO
 from engine.baseline import CONTEXT_HELP
+from report.fmt import MINUS, formatters, group_label
 
 ENV = Environment(loader=FileSystemLoader(Path(__file__).parent), autoescape=True)
 
@@ -43,21 +44,16 @@ LABELS = {
 }
 
 
-def _fmt():
-    def na(v): return v is None or v != v
-    def pct(x): return "n/a" if na(x) else f"{x * 100:+.1f}%"
-    def pct0(x): return "n/a" if na(x) else f"{x * 100:.0f}%"
-    def pctile(x): return "n/a" if na(x) else f"{int(x * 100)}%"   # never rounds up, as on screen
-    def pct1(x): return "n/a" if na(x) else f"{x * 100:.1f}%"
-    def x(v): return "n/a" if na(v) else f"{v:.1f}x"
-    def bps(v): return "n/a" if na(v) else f"{v:.0f} bps"
-    def eur(v): return "n/a" if na(v) else (f"EUR {v / 1e6:.1f}m" if v >= 1e6 else f"EUR {v / 1e3:.0f}k")
-    return dict(pct=pct, pct0=pct0, pctile=pctile, pct1=pct1, x=x, bps=bps, eur=eur)
+def _fmt(lang: str = "en") -> dict:
+    """Formatters for the templates (report.fmt; EN '-23.2%', DE '−23,2 %')."""
+    return formatters(lang)
 
 
 def to_html(card: dict, narrative: str, lang: str = "en") -> str:
-    return ENV.get_template("template.html").render(card=card, narrative=narrative, lang=lang,
-                                                    L=LABELS.get(lang, LABELS["en"]), **_fmt())
+    lang = lang if lang in LABELS else "en"
+    cmp_group = group_label(card["comparison"], lang) if card.get("comparison") else ""
+    return ENV.get_template("template.html").render(card=card, narrative=narrative, lang=lang, cmp_group=cmp_group,
+                                                    L=LABELS[lang], **_fmt(lang))
 
 
 def to_pdf(html: str) -> bytes | None:
@@ -65,6 +61,8 @@ def to_pdf(html: str) -> bytes | None:
         from xhtml2pdf import pisa
     except ImportError:
         return None
+    # the PDF base font has no U+2212 minus; keep the real characters in the HTML, ASCII only in the PDF
+    html = html.replace(MINUS, "-")
     buf = BytesIO()
     pisa.CreatePDF(html, dest=buf, encoding="utf-8")
     return buf.getvalue()
@@ -101,17 +99,17 @@ LABELS_A = {
         size_note="Umsatzkohorte als Größen-Proxy; Marktkapitalisierung ist nicht in den Daten",
         sector_unknown="Sektor unbekannt, stattdessen wird der Index verwendet",
         kpi_h="Kennzahlen", kpi_period="Median der letzten 60 Handelstage", stock="Aktie",
-        turnover="Tagesumsatz", xlm="Handelskosten XLM EUR 25k", auction="Auktionsanteil",
+        turnover="Tagesumsatz", xlm="Handelskosten XLM (25 Tsd. EUR)", auction="Auktionsanteil",
         agent="Anteil Agenten (Kunden)", ds_h="Liquiditätskategorie (Schätzung)",
-        ds_text="4-Monats-Durchschnittsumsatz {to}/Tag, XLM EUR 25k {xlm}. Kategorie A erfordert XLM <= 100 bps "
-                "und >= EUR 2.5m/Tag; sonst ist ein Designated Sponsor nötig.",
+        ds_text="4-Monats-Durchschnittsumsatz {to}/Tag, XLM (25 Tsd. EUR) {xlm}. Kategorie A erfordert XLM (25 Tsd. EUR) <= 100 bps "
+                "und >= 2,5 Mio. EUR/Tag; sonst ist ein Designated Sponsor nötig.",
         small_peer="Kleine Vergleichsgruppe: einige Mediane beruhen auf weniger als 3 anderen Aktien.",
         trend_h="Hat sich unsere Liquidität verbessert?", verdict="Ergebnis", now="letzte 60 Tage",
         before="vorherige 60 Tage", change="Veränderung", ds_cat="DS-Kategorie (Schätzung)",
         vs_index="vs. Index", vs_sector="vs. Sektor",
         curve_h="Handelskosten nach Ordergröße", curve_period="Median der letzten 60 Handelstage, verglichen mit",
         largest="Größte Order, die das Orderbuch an den meisten Tagen aufnahm",
-        cost_100k="Kosten einer Order über EUR 100k", cost_1m="Kosten einer Order über EUR 1m",
+        cost_100k="Kosten einer Order über 100 Tsd. EUR", cost_1m="Kosten einer Order über 1 Mio. EUR",
         thin="Orderbuch zu dünn", peers="Vergleichsgruppe",
         no_xlm="Kein XLM für diese Aktie in den letzten 60 Tagen. Die Deutsche Börse veröffentlicht XLM nur für "
                "Indexmitglieder.",
@@ -134,12 +132,12 @@ VS_WORD = {"en": {"stock-specific": "stock-specific", "market-wide": "market-wid
            "de": {"stock-specific": "aktienspezifisch", "market-wide": "marktweit", "sector-wide": "sektorweit"}}
 TREND_HELP_DE = {
     "improved": "Der Handel wurde günstiger und/oder es wurde mehr gehandelt, und nichts verschlechterte sich um "
-                "mehr als 10%. Eine gute Nachricht für den Vorstand; prüfen, ob sich der ganze Index ebenso bewegte.",
+                "mehr als 10 %. Eine gute Nachricht für den Vorstand; prüfen, ob sich der ganze Index ebenso bewegte.",
     "worsened": "Der Handel wurde teurer und/oder es wurde weniger gehandelt, und nichts verbesserte sich um mehr "
-                "als 10%. Anlass für ein Gespräch mit dem Designated Sponsor oder für mehr Investor-Outreach.",
+                "als 10 %. Anlass für ein Gespräch mit dem Designated Sponsor oder für mehr Investor-Outreach.",
     "mixed": "Der Handel wurde günstiger, aber es wurde weniger gehandelt (oder umgekehrt). "
              "Beides prüfen, bevor man dem Vorstand eine bessere Liquidität meldet.",
-    "stable": "Handelskosten und Umsatz blieben beide innerhalb von 10% der Vorperiode.",
+    "stable": "Handelskosten und Umsatz blieben beide innerhalb von 10 % der Vorperiode.",
     None: "Noch nicht genug Handelshistorie für einen Vergleich.",
 }
 CONTEXT_WORDS = {
@@ -160,7 +158,7 @@ CONTEXT_HELP_DE = {
     "monthly_expiry": "Dritter Freitag des Monats: monatlicher Optionsverfall. Der Umsatz kann höher als normal sein.",
     "month_end_review": "Letzter Handelstag im Feb./Mai/Aug./Nov.: mögliches MSCI-Überprüfungsdatum. "
                         "Indexfonds können in der Schlussauktion umschichten.",
-    "market_wide_volume": f"Mindestens {MARKET_WIDE_SHARE:.0%} aller Aktien handelten mehr als das "
+    "market_wide_volume": f"Mindestens {MARKET_WIDE_SHARE * 100:.0f} % aller Aktien handelten mehr als das "
                           f"{MARKET_WIDE_VOL_RATIO:.0f}-Fache ihres normalen Umsatzes: ein marktweiter Tag, "
                           "keine Unternehmensmeldung.",
 }
@@ -179,14 +177,15 @@ def _summary_de(t: dict) -> str:
             return "etwa gleich"
         return "besser" if (c < 0) == lower_is_better else "schlechter"
 
+    sp = formatters("de")["spct0"]
     parts = []
     if t["xlm_25k_change_pct"] is not None:
-        parts.append(f"Handelskosten {t['xlm_25k_change_pct'] * 100:+.0f}% ({word(t['xlm_25k_change_pct'], True)})")
+        parts.append(f"Handelskosten {sp(t['xlm_25k_change_pct'])} ({word(t['xlm_25k_change_pct'], True)})")
     if t["turnover_change_pct"] is not None:
-        parts.append(f"Umsatz {t['turnover_change_pct'] * 100:+.0f}% ({word(t['turnover_change_pct'], False)})")
+        parts.append(f"Umsatz {sp(t['turnover_change_pct'])} ({word(t['turnover_change_pct'], False)})")
     w = t["window"]
     out = f"{VERDICT['de'][t['verdict']]}: " + ", ".join(parts) + f", letzte {w} vs. vorherige {w} Handelstage."
-    ip = [f"{lbl} {t[key] * 100:+.0f}%" for key, lbl in (("index_xlm_25k_change_pct", "Handelskosten"),
+    ip = [f"{lbl} {sp(t[key])}" for key, lbl in (("index_xlm_25k_change_pct", "Handelskosten"),
                                                          ("index_turnover_change_pct", "Umsatz")) if t[key] is not None]
     if ip:
         out += f" {t['index']}-Median: " + ", ".join(ip) + "."
@@ -194,6 +193,17 @@ def _summary_de(t: dict) -> str:
     if ds.get("now") and ds.get("before") and ds["now"] != ds["before"]:
         out += f" Designated-Sponsor-Kategorie (Schätzung): {ds['before']} -> {ds['now']}."
     return out
+
+
+def _size_label(label: str | None, lang: str) -> str:
+    """Order-size label from engine.xlm ('€2.5m', '€100k') in the report style: EN 'EUR 2.5m', DE '2,5 Mio. EUR'."""
+    if not label:
+        return "n/a"
+    if lang != "de":
+        return label.replace("€", "EUR ")
+    v = label.lstrip("€")
+    unit = " Mio. EUR" if v.endswith("m") else " Tsd. EUR"
+    return v[:-1].replace(".", ",") + unit
 
 
 def part_a_data(isin: str, peer_by: str = "index") -> dict:
@@ -248,4 +258,4 @@ def part_a_html(isin: str, lang: str = "en", peer_by: str = "index") -> str:
         ctx_words=CONTEXT_WORDS[lang], ctx_help=[(CONTEXT_WORDS[lang].get(f, f), ctx_help.get(f, "")) for f in used_ctx],
         reason_word=(lambda r: REASON_DE.get(r, r)) if lang == "de" else (lambda r: r),
         size_word=(lambda n: SIZE_DE.get(n, n)) if lang == "de" else (lambda n: n),
-        label_eur=lambda s: "n/a" if not s else s.replace("€", "EUR "), **_fmt())
+        label_eur=lambda s: _size_label(s, lang), **_fmt(lang))

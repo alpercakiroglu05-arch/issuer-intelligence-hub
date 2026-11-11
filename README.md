@@ -122,7 +122,7 @@ Priorities from the demo dry run (Wed evening), in this order:
   - spreads and peers → `kpis()` vs index/sector/size
   - most unusual day → top episode + linked event + card summary
 - [x] **Numbers check** (`ai/checks.py`): every number in an LLM text must be in the card JSON, else the template is shown; the card says which (by C1)
-- [ ] **German formatting** in the DE texts and snapshot: `−23,2 %` and `27.03.2026` instead of `-23.2%` and `2026-03-27`; the comparison group label is still English.
+- [x] **German formatting** in the DE texts, snapshot and Part A report: `−23,2 %`, `27.03.2026`, `8,6-fach`, `2,5 Mio. EUR` (one place: `report/fmt.py`); the comparison group label is German too (`report.fmt.group_label`). EN output unchanged.
 - [ ] JAIF / LLM: `.env.example` points at the JAIF gateway (`https://hip-gw.hessian.ai/v1`); the workshop key is in our Discord team channel (pinned). Answer cache `LLM_CACHE` (by C1)
 - [ ] `agent.py` v2: tool calling with `TOOLS` (kpis, anomalies, impact_card)
 

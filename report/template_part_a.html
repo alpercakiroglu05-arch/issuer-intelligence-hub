@@ -30,7 +30,7 @@
     {{ L.title }} &middot; ISIN {{ d.isin }}<br>
     {{ L.sector }}: {% if k.peer_groups.sector.fallback %}n/a ({{ L.sector_unknown }}){% else %}{{ k.peer_groups.sector.name }}{% endif %}
     &middot; {{ L.size }}: {{ size_word(k.peer_groups.size.name) }} <span class="base">({{ L.size_note }})</span><br>
-    {{ L.data }}: {{ d.period.start }} &ndash; {{ d.period.end }} ({{ d.period.days }} {{ L.days }})
+    {{ L.data }}: {{ date(d.period.start) }} &ndash; {{ date(d.period.end) }} ({{ d.period.days }} {{ L.days }})
   </div>
 
   {# 2. KPIs vs index / sector / size #}
@@ -91,7 +91,7 @@
         <th class="num" width="11%">{{ L.peak }}</th><th class="num" width="11%">{{ L.total }}</th>
         <th class="num" width="8%">{{ L.volx }}</th></tr>
     {% for e in d.episodes %}
-    <tr><td>{{ e.start }}</td><td>{{ e.end }}</td><td class="num">{{ e.days }}</td><td>{{ e.event }}</td>
+    <tr><td>{{ date(e.start) }}</td><td>{{ date(e.end) }}</td><td class="num">{{ e.days }}</td><td>{{ e.event }}</td>
         <td>{% for f in e.context %}{{ ctx_words.get(f, f) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
         <td>{% for r in e.reason %}{{ reason_word(r) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
         <td class="num">{{ pct(e.peak_abn_ret) }}</td><td class="num">{{ pct(e.total_abn_ret) }}</td>
