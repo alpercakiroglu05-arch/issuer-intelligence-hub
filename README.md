@@ -72,7 +72,7 @@ futury-build-days-2026/
 ├── ai/                    llm.py ✅ · narrate.py ✅ · agent.py ✅ (v1)
 ├── report/                template.html ✅ · export.py ✅
 ├── app/                   Home.py · pages/1_Dashboard · 2_Impact_Card · 3_Compare · 4_Assistant
-├── events/                events.csv (80 sourced events) · sectors.csv (4 rows, to be filled)
+├── events/                events.csv (80 sourced events) · sectors.csv (174 stocks, Deutsche Börse sectors)
 ├── docs/                  API_CONTRACT · SUBMISSION (data, model, logic) · C2_ENGINE · SCOPE · PITCH
 ├── tests/                 smoke tests (pytest)
 └── data/                  processed files (gitignored)
@@ -101,7 +101,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] `baseline.py`: liquidity trend ("has liquidity improved?"), merge consecutive anomaly days
 - [x] Unit tests: GXI 2026-02-11 should give ret ≈ −31.4 %, abnormal ≈ −30.5 %, volume ≈ 20× normal (`test_impact_card_known_values`)
 - [x] `compare.py` extras: summary sentence, percentiles never round up to 100 % (PR #11); `anomalies()` crash fix (PR #10)
-- [ ] **Peer benchmarking by sector and size** (brief point II): `sectors.csv` for all stocks + a turnover cohort (market cap is not in the data)
+- [x] **Peer benchmarking by sector and size** (brief point II, PR #20): `sectors.csv` from Deutsche Börse's listed-companies file + a turnover cohort as size proxy (market cap is not in the data)
 - [ ] Index-day context in `anomalies()` (expiry Fridays, index reviews, market-wide days; use the `INDEX` rows of `events.csv`)
 
 ### C3 · Frontend. Owner: Alper
@@ -110,7 +110,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] Compare page: scatter of abnormal return vs volume ratio, selected stock highlighted (PR #7)
 - [ ] Polish: colors, empty states, loading, one clean end-to-end flow for the pitch
 - [ ] Part A: auction share over time chart on the dashboard (brief point I)
-- [ ] Dashboard: show `liquidity_trend()` ("has our liquidity improved?") and `anomaly_episodes()`. The code is ready; see `docs/C2_ENGINE.md` → "For C3"
+- [x] Dashboard: "has our liquidity improved?" (`liquidity_trend()`) and episodes linked to events (PR #19); "Compare with: Index / Sector / Size" (PR #21)
 
 ### C4 · AI + report. Owner: ________
 - [ ] Get the JAIF / LLM endpoint working in `.env`
@@ -120,7 +120,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 
 ### Non-code (research and pitch team)
 - **Please spot-check the hero rows of `events/events.csv`** (source link, time) before the pitch.
-- `events/sectors.csv`: sector of every DAX/MDAX/SDAX stock (needed for brief point II, see C2)
+- [x] `events/sectors.csv`: sector of every DAX/MDAX/SDAX stock (done by C2, PR #20)
 - Pitch deck (3–5 slides), demo script, backup video (2–3 min), and the list "what else IR needs + which data"
 
 ---

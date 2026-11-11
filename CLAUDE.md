@@ -128,10 +128,10 @@ Done on `main`:
 - **Docs:** `docs/SUBMISSION.md` is the submission text (13:30, "what data, model, logic"); keep its numbers in sync if the engine changes. `docs/C2_ENGINE.md` documents the C2 functions.
 
 Open (see README checklists):
-1. **Peer benchmarking by sector and size** (brief point II): needs `events/sectors.csv` for all stocks plus a size cohort (market cap is not in the data, so use a turnover cohort). Proposed owner: C2 (Kaan).
+1. ~~Peer benchmarking by sector and size~~ ✅ (brief point II): engine by Kaan (PR #20, `compare.peer_group`), dashboard selector "Compare with: Index / Sector / Size" (PR #21). Example: HDD XLM 72 bps vs Industrials 32 but small-turnover cohort 77, so the size cohort is the fair benchmark for a small cap.
 2. **Part A export** (brief: the dashboard result "can be exported as a short report"). Owner C4, no commits yet.
 3. **LLM:** JAIF key -> `.env`, numbers check, answer cache (C4). Until then texts are templates. Do not claim a numbers check in the pitch.
-4. **Dashboard (C3):** show `liquidity_trend()` and `anomaly_episodes()` (code ready, see `docs/C2_ENGINE.md` -> "For C3"), plus the auction share over time (brief point I). C3 has no commits yet.
+4. **Dashboard (C3):** liquidity trend, episodes and the peer selector are in (PRs #19, #21). Still open: auction share over time (brief point I) and the visual design. C3 has no commits yet.
 5. **Team setup:** everyone runs `git pull` + `python ingest/build_intraday.py` once (~3 min, raw data is on every laptop).
 6. **Human check:** spot-check the hero rows in `events.csv` (source link, time) before the pitch.
 
