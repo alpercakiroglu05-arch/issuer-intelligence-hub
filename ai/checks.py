@@ -14,6 +14,7 @@ Limitation: a small integer (e.g. "12") can match some unrelated value by chance
 decimals or large values are caught.
 """
 import json
+import math
 import re
 
 _DATE_ISO = re.compile(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b")
@@ -48,6 +49,7 @@ def allowed_values(payload) -> list[float]:
     for v in raw:
         for s in (v, v * 100, v / 1e3, v / 1e6, v / 1e9):
             vals.add(abs(s))
+        vals.add(float(math.floor(abs(v) * 100)))  # percentiles are shown rounded down ("bigger than 93 %" for 0.939)
     return sorted(vals)
 
 
