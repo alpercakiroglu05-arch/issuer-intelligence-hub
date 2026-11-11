@@ -45,7 +45,7 @@ Types: `FY Q1 H1 Q3 DIVIDEND_EX AGM ADHOC GUIDANCE MA CMD INDEX`.
                    "close_auction_move", "close_auction_move_baseline_abs"},
   "participants": {"agent_share", "agent_share_baseline", "agent_aggr_imbalance", "agent_aggr_imbalance_baseline", "agent_aggr_net_eur", "prop_share", "mm_share"},
   "intraday":     {"volume_share_first_15min", "volume_share_first_60min", "open_auction_eur", "close_auction_eur", "intraday_low", "intraday_high", "time_of_low", "onset"} | null,
-  "comparison":   {"group_type", "group_index", "group", "n", "abs_abn_ret_pctile", "abs_abn_ret_median", "vol_ratio_pctile", "vol_ratio_median", "xlm_ratio_pctile", "xlm_ratio_median", "rank_abs_abn_ret", "period_start", "period_end", "summary"} | null,
+  "comparison":   {"group_type", "group_index", "group", "n", "abs_abn_ret_pctile", "abs_abn_ret_median", "vol_ratio_pctile", "vol_ratio_median", "xlm_ratio_pctile", "xlm_ratio_median", "rank_abs_abn_ret", "rank_of", "period_start", "period_end", "summary"} | null,
   "flags":        ["flow_censored", "short_baseline", …] }
 ```
 `auctions` (engine/auctions.py): volumes in EUR from the trade bars at the exact uncross minute (OHLC auction timestamps),
@@ -58,7 +58,7 @@ Check: open + close auction (bars) = 97.6–99.7 % of flow auction turnover (med
 `comparison` (engine/compare.py): where this event sits among comparable events. Group = same `event.type` in the same
 index (from events.csv) if that has >= `config.COMPARE_MIN_GROUP` other events, else all indices, else `NOTABLE_DAY`
 (every unusual stock-day, same rules as the dashboard). `*_pctile` = share of the other events with a smaller value (0..1),
-`*_median` = group median, `rank_abs_abn_ret` = 1 for the biggest stock-specific move. The metrics are computed vectorised
+`*_median` = group median, `rank_abs_abn_ret` = 1 for the biggest stock-specific move, `rank_of` = `n` + 1 (the group plus this day; shown everywhere as "rank 3 of 215 (incl. this day)" / "Rang 3 von 215 (inkl. dieses Tages)", `report.fmt.formatters(lang)["rank"]`). The metrics are computed vectorised
 with the card's own definitions (baseline t-65..t-6), so the card and the comparison table agree.
 `summary` = one English sentence built from these fields and the card (percentiles rounded down, never "100%").
 `period_start` / `period_end` = first / last day of the data the group is drawn from (ISO dates); `group` is an English

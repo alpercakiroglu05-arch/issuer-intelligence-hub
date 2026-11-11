@@ -45,7 +45,8 @@
 
   {% if card.comparison %}
   <div class="base">{{ L.cmp_pre }} {{ card.comparison.n }} {{ cmp_group }}:
-    {{ L.cmp_abn }} {{ pctile(card.comparison.abs_abn_ret_pctile) }},
+    {{ L.cmp_abn }} {{ pctile(card.comparison.abs_abn_ret_pctile) }}{% if card.comparison.rank_abs_abn_ret %}
+    ({{ rank(card.comparison.rank_abs_abn_ret, card.comparison.rank_of or card.comparison.n + 1) }}){% endif %},
     {{ L.cmp_vol }} {{ pctile(card.comparison.vol_ratio_pctile) }}.</div>
   {% endif %}
 
