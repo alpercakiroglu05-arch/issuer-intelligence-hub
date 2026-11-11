@@ -138,7 +138,10 @@ Done on `main`:
 Open (see README checklists):
 1. ~~Peer benchmarking by sector and size~~ ✅ (brief point II): engine by Kaan (PR #20, `compare.peer_group`), dashboard selector "Compare with: Index / Sector / Size" (PR #21). Example: HDD XLM 72 bps vs Industrials 32 but small-turnover cohort 77, so the size cohort is the fair benchmark for a small cap.
 2. **Part A export** (brief: the dashboard result "can be exported as a short report"). Owner C4, no commits yet.
-3. **LLM:** JAIF key -> `.env`, numbers check, answer cache (C4). Until then texts are templates. Do not claim a numbers check in the pitch.
+3. **LLM:**
+   - The JAIF gateway is set in `.env.example` (`https://hip-gw.hessian.ai/v1`, OpenAI-compatible; models such as Kolibri-1 for DE/EN and GLM-5.3-Flash). The workshop key comes from the pinned message in our Discord team channel.
+   - The numbers check (`ai/checks.py`) and the answer cache (`LLM_CACHE`, `data/llm_cache.json`) are in.
+   - Tests always run without an LLM (`tests/conftest.py`).
 4. **Dashboard (C3):** liquidity trend, episodes and the peer selector are in (PRs #19, #21). Still open: auction share over time (brief point I) and the visual design. C3 has no commits yet.
 5. **Team setup:** everyone runs `git pull` + `python ingest/build_intraday.py` once (~3 min, raw data is on every laptop).
 6. **Human check:** spot-check the hero rows in `events.csv` (source link, time) before the pitch.

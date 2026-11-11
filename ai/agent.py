@@ -39,5 +39,6 @@ def ask(question: str, isin: str) -> str:
         ])
         return msg.content.strip()
     except llm.LLMUnavailable:
-        return ("The language model is not configured yet (.env). Here is the raw context instead:\n\n"
-                + json.dumps(context["kpis"], indent=2, default=str))
+        trend = baseline.liquidity_trend(isin)
+        return ("The assistant needs a language model (JAIF key in `.env`). Until then, the dashboard and the "
+                f"impact cards answer most questions. In short: {trend['summary']}")

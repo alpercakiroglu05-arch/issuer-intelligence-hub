@@ -229,9 +229,10 @@ def narrate(body: dict) -> dict:
     from ai import narrate as nar
     c = impact.impact_card(body["isin"], body["day"], find_event(body["isin"], body.get("event_id")))
     lang = body.get("lang", "en")
-    live = llm_available()
-    text = nar.narrate(c, lang) if live else nar.template_narrative(c, lang)
-    return {"text": text, "source": "llm" if live else "template", "lang": lang}
+    # narrate_with_meta: the model's text is used only if every number in it is in the card (ai/checks.py);
+    # "source" says which one the user sees, so the label is honest even when the check rejects a draft
+    m = nar.narrate_with_meta(c, lang)
+    return {"text": m["text"], "source": m["source"], "model": m["model"], "rejected": m["rejected"], "lang": lang}
 
 
 def _fallback_answer(q: str, isin: str, lang: str) -> str:

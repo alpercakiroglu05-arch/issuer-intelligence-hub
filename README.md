@@ -121,9 +121,9 @@ Priorities from the demo dry run (Wed evening), in this order:
   - liquidity → `liquidity_trend()` summary
   - spreads and peers → `kpis()` vs index/sector/size
   - most unusual day → top episode + linked event + card summary
-- [ ] **Numbers check** in `narrate.py`: every number in an LLM text must exist in the card JSON, else use the template. Do not claim it in the pitch before it is merged.
+- [x] **Numbers check** (`ai/checks.py`): every number in an LLM text must be in the card JSON, else the template is shown; the card says which (by C1)
 - [ ] **German formatting** in the DE texts and snapshot: `−23,2 %` and `27.03.2026` instead of `-23.2%` and `2026-03-27`; the comparison group label is still English.
-- [ ] JAIF / LLM endpoint in `.env` (only if the organisers give us a key; without it the templates run)
+- [ ] JAIF / LLM: `.env.example` points at the JAIF gateway (`https://hip-gw.hessian.ai/v1`); the workshop key is in our Discord team channel (pinned). Answer cache `LLM_CACHE` (by C1)
 - [ ] `agent.py` v2: tool calling with `TOOLS` (kpis, anomalies, impact_card)
 
 ### Non-code (research and pitch team)

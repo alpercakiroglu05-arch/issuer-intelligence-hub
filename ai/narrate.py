@@ -3,14 +3,16 @@ Impact card -> short IR text in German or English.  OWNER: C4 (AI).  STATUS: v1 
 
 Rule: the LLM only sees the impact_card JSON. Every number in the text must come from it.
 
-TODO C4:
-  - tune the prompt with the IR expert (tone: factual, no advice, no speculation)
-  - add a numbers check: every number in the output must appear in the JSON (else fall back)
+Numbers check (ai/checks.py): an LLM text with a number that is not in the card JSON is rejected and the
+template text is used instead. narrate_with_meta() says which one the user sees.
+
+TODO C4: tune the prompt with the IR expert (tone: factual, no advice, no speculation)
 """
 import json
 import math
 
 from ai import llm
+from ai.checks import unsupported_numbers
 
 SYSTEM = """You are an investor-relations analyst writing for the IR team of a listed company.
 You receive ONE JSON object with pre-computed trading statistics for one event day.
@@ -27,15 +29,27 @@ no investment advice; no predictions; plain factual tone. Ratios: 'x times norma
 LANG = {"en": "English", "de": "German"}
 
 
-def narrate(card: dict, lang: str = "en") -> str:
+def narrate_with_meta(card: dict, lang: str = "en") -> dict:
+    """{"text", "source": "llm" | "template", "model", "rejected": [numbers not in the JSON]}.
+    The LLM text is used only if every number in it can be found in the card JSON (ai/checks.py)."""
+    meta = {"source": "template", "model": None, "rejected": []}
     try:
         msg = llm.chat([
             {"role": "system", "content": SYSTEM.format(language=LANG.get(lang, "English"))},
             {"role": "user", "content": json.dumps(card, default=str)},
         ])
-        return msg.content.strip()
-    except Exception:  # LLMUnavailable, network, quota ... -> deterministic text
-        return template_narrative(card, lang)
+        text = (msg.content or "").strip()
+        bad = unsupported_numbers(text, card)
+        if text and not bad:
+            return {"text": text, "source": "llm", "model": llm.model_name(), "rejected": []}
+        meta["rejected"] = bad
+    except Exception:  # noqa: BLE001  LLMUnavailable, network, quota ... -> deterministic text
+        pass
+    return {"text": template_narrative(card, lang), **meta}
+
+
+def narrate(card: dict, lang: str = "en") -> str:
+    return narrate_with_meta(card, lang)["text"]
 
 
 def _p(x):
