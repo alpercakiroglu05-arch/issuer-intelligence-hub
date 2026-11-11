@@ -80,13 +80,14 @@ in the direction of the day's move, still holding 5 minutes later. Thresholds in
 | `engine.data.daily()` / `stock(isin)` / `events()` / `intraday(isin)` / `intraday_isins()` | DataFrames / set | C1/C2 |
 | `engine.baseline.profile(isin, start, end)` | daily time series for the dashboard | C2 |
 | `engine.baseline.kpis(isin, days=60)` | dict: medians vs index + liquidity category estimate. Each median pair also has `sector_median` and `size_median`; plus `peer_groups` {index, sector, size: name, label, n, fallback} and `flags` (`small_peer_group`, `no_sector`) | C2 |
-| `engine.baseline.anomalies(isin)` | DataFrame: unusual days with `reason`, `severity` | C2 |
+| `engine.baseline.anomalies(isin)` | DataFrame: unusual days with `reason`, `severity`, `context` (comma-separated flags, empty for none) | C2 |
+| `engine.baseline.market_context(isin, day)` / `CONTEXT_HELP` / `CONTEXT_FLAGS` | list[str] of `index_event, index_change, quarterly_expiry, monthly_expiry, month_end_review, market_wide_volume` / dict flag→tooltip text / tuple (order) | C2 |
 | `engine.baseline.liquidity_trend(isin, window=60)` | dict: last vs previous `window` days, XLM 25k + turnover change vs index median, `verdict` (improved/worsened/mixed/stable/null), `vs_index`, `help`, DS category now vs before, `monthly` series, `summary`; also `vs_sector`, `sector`, `sector_median`, `sector_*_change_pct` (see `docs/C2_ENGINE.md`) | C2 |
-| `engine.baseline.anomaly_episodes(isin)` | DataFrame: consecutive unusual days merged: `start, end, days, peak_date, peak_abn_ret, total_abn_ret, max_vol_ratio, reason, severity` | C2 |
+| `engine.baseline.anomaly_episodes(isin)` | DataFrame: consecutive unusual days merged: `start, end, days, peak_date, peak_abn_ret, total_abn_ret, max_vol_ratio, reason, severity, context` | C2 |
 | `engine.impact.impact_card(isin, day, event=None)` | dict (schema above) | C2 |
 | `engine.onset.onset(isin, day, event_time=None)` | dict: news onset minute (see `intraday.onset`) | C1 |
 | `engine.auctions.auction_profile(isin)` | DataFrame per day: open/close auction EUR, close auction share and price move | C1 |
-| `engine.compare.event_types()` / `same_type_events(type, index=None)` / `percentile(card, table)` / `comparison_for(card)` | list / DataFrame / dict / dict | C2 (v1 by C1) |
+| `engine.compare.event_types()` / `same_type_events(type, index=None)` / `percentile(card, table)` / `comparison_for(card)` | list / DataFrame (last column `context`, same flags as `anomalies()`) / dict / dict | C2 (v1 by C1) |
 | `engine.compare.metrics_all()` | DataFrame: every stock-day with the card metrics + `notable`, `reason` | C2 (v1 by C1) |
 | `engine.compare.peer_group(isin, by="index"\|"sector"\|"size")` | dict: `by, name, label, isins, n, fallback` (sector unknown → `fallback: "index"`). Stock and other ISINs of the same ticker excluded | C2 |
 | `engine.compare.sector_peers(isin)` / `size_peers(isin)` / `size_cohort(isin)` / `size_cohorts()` | list[str] / list[str] / str / Series isin→cohort. Sector from `events/sectors.csv`; size = **turnover cohort (size proxy)**, not market cap | C2 |

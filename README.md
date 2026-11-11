@@ -102,7 +102,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] Unit tests: GXI 2026-02-11 should give ret ≈ −31.4 %, abnormal ≈ −30.5 %, volume ≈ 20× normal (`test_impact_card_known_values`)
 - [x] `compare.py` extras: summary sentence, percentiles never round up to 100 % (PR #11); `anomalies()` crash fix (PR #10)
 - [x] **Peer benchmarking by sector and size** (brief point II, PR #20): `sectors.csv` from Deutsche Börse's listed-companies file + a turnover cohort as size proxy (market cap is not in the data)
-- [ ] Index-day context in `anomalies()` (expiry Fridays, index reviews, market-wide days; use the `INDEX` rows of `events.csv`)
+- [x] Index-day context in `anomalies()` (expiry Fridays, index reviews, market-wide days; use the `INDEX` rows of `events.csv`)
 
 ### C3 · Frontend. Owner: Alper
 - [ ] Impact card design (the demo moment): follow the designer's sketch

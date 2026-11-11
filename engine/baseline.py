@@ -3,20 +3,23 @@ Part A - the "normal state" of a stock.  OWNER: C2 (engine).  STATUS: v1 works.
 
     profile(isin)              daily time series for the dashboard
     index_benchmark(idx, col)  median of a column across the stock's index, per day
-    anomalies(isin)            unusual days ("notable days") with a reason
+    anomalies(isin)            unusual days ("notable days") with a reason and a market context
     kpis(isin)                 headline numbers vs. index, sector and size-proxy medians + Xetra liquidity check
     liquidity_trend(isin)      "has our liquidity improved?" last 60 vs previous 60 trading days
     anomaly_episodes(isin)     consecutive unusual days merged into one episode
+    market_context(isin, day)  index / calendar / market-wide flags of a day (CONTEXT_HELP explains them)
 
 Peer groups (index / sector / turnover cohort as size proxy) come from engine.compare.peer_group.
 """
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
 
 from config import (ANOMALY_Z, DS_LOOKBACK_DAYS, DS_TURNOVER_MIN_EUR, DS_XLM_MAX_BPS, LIQUIDITY_TREND_TOL,
-                    MIN_PEER_GROUP)
+                    MARKET_WIDE_SHARE, MARKET_WIDE_VOL_RATIO, MIN_PEER_GROUP)
 from engine.compare import peer_group
-from engine.data import daily, stock
+from engine.data import daily, events, stock
 
 PROFILE_COLS = [
     "date", "price", "ret", "abn_ret", "peer_ret", "turnover_eur", "turnover_med60", "vol_ratio",
@@ -50,10 +53,84 @@ def anomalies(isin: str, z: float = ANOMALY_Z) -> pd.DataFrame:
     hit = reasons.any(axis=1) & ~s["possible_corp_action"]
     out = s.loc[hit, ["date", "ret", "abn_ret", "vol_ratio", "vol_z", "abn_ret_z", "xlm_25k_ratio"]].copy()
     if out.empty:  # apply() on an empty frame returns a DataFrame, not a Series
-        return out.assign(reason=pd.Series(dtype=str), severity=pd.Series(dtype=float))
+        return out.assign(reason=pd.Series(dtype=str), severity=pd.Series(dtype=float),
+                          context=pd.Series(dtype=str))
     out["reason"] = reasons[hit].apply(lambda r: ", ".join(r.index[r]), axis=1)
     out["severity"] = out["abn_ret_z"].abs().fillna(0) + out["vol_z"].clip(lower=0).fillna(0)
+    out["context"] = context_frame(out.assign(isin=isin))
     return out.sort_values("date", ascending=False).reset_index(drop=True)
+
+
+# ---------- market context: is an unusual day company news or an index / calendar day? ----------
+CONTEXT_FLAGS = ("index_event", "index_change", "quarterly_expiry", "monthly_expiry", "month_end_review",
+                 "market_wide_volume")
+CONTEXT_HELP = {
+    "index_event": "Index inclusion or deletion listed in events.csv (type INDEX). Index funds trade at the close, "
+                   "so volume jumps without company news.",
+    "index_change": "The stock's DAX/MDAX/SDAX membership changed on this day (from the daily index lists).",
+    "quarterly_expiry": "Third Friday of Mar/Jun/Sep/Dec: options and futures expiry and the DAX index family "
+                        "rebalancing. Volume is high for many stocks.",
+    "monthly_expiry": "Third Friday of the month: monthly options expiry. Volume can be higher than normal.",
+    "month_end_review": "Last trading day of Feb/May/Aug/Nov: possible MSCI index review date. "
+                        "Index funds may rebalance at the close.",
+    "market_wide_volume": f"At least {MARKET_WIDE_SHARE:.0%} of all stocks traded more than "
+                          f"{MARKET_WIDE_VOL_RATIO:.0f}x their normal turnover: a market-wide day, not company news.",
+}
+
+
+@lru_cache(maxsize=1)
+def _calendar_context() -> dict:
+    """trading day -> calendar / market-wide flags, for every trading day in the data."""
+    d = daily()
+    days = pd.DatetimeIndex(sorted(d["date"].unique()))
+    flags = {day: [] for day in days}
+    for month in days.to_period("M").unique():
+        first = month.start_time
+        third_friday = first + pd.Timedelta(days=(4 - first.weekday()) % 7 + 14)
+        expiry = days[(days <= third_friday) & (days >= first)]   # holiday -> previous trading day
+        if len(expiry):
+            flags[expiry[-1]].append("quarterly_expiry" if month.month in (3, 6, 9, 12) else "monthly_expiry")
+    for month in days.to_period("M").unique():
+        in_month = days[days.to_period("M") == month]
+        if month.month in (2, 5, 8, 11) and days[-1] > in_month[-1]:  # only complete months
+            flags[in_month[-1]].append("month_end_review")
+    share = (d["vol_ratio"] > MARKET_WIDE_VOL_RATIO).groupby(d["date"]).mean()
+    for day in share.index[share >= MARKET_WIDE_SHARE]:
+        flags[day].append("market_wide_volume")
+    return flags
+
+
+@lru_cache(maxsize=1)
+def _index_events() -> frozenset:
+    """(isin, reaction_day) of every INDEX event in events.csv."""
+    e = events()
+    e = e[(e["type"] == "INDEX") & e["isin"].notna() & e["reaction_day"].notna()]
+    return frozenset(zip(e["isin"], pd.to_datetime(e["reaction_day"])))
+
+
+@lru_cache(maxsize=1)
+def _index_changes() -> frozenset:
+    """(isin, date) where the stock's index differs from its previous trading day (entry and exit included)."""
+    d = daily().sort_values(["isin", "date"])
+    idx = d["idx"].fillna("none")
+    changed = (idx != idx.groupby(d["isin"]).shift()) & d["isin"].duplicated()
+    return frozenset(zip(d.loc[changed, "isin"], d.loc[changed, "date"]))
+
+
+def context_frame(df: pd.DataFrame) -> pd.Series:
+    """Context flags for each row of `df` (columns isin, date) as one string, e.g. "index_event, month_end_review"."""
+    cal, ev, ch = _calendar_context(), _index_events(), _index_changes()
+    out = []
+    for isin, day in zip(df["isin"], pd.to_datetime(df["date"])):
+        f = (["index_event"] if (isin, day) in ev else []) + (["index_change"] if (isin, day) in ch else [])
+        out.append(", ".join(f + cal.get(day, [])))
+    return pd.Series(out, index=df.index, dtype=object)
+
+
+def market_context(isin: str, day) -> list[str]:
+    """Why a day may be unusual without company news. Flags in CONTEXT_FLAGS order; see CONTEXT_HELP."""
+    s = context_frame(pd.DataFrame({"isin": [isin], "date": [pd.Timestamp(day)]})).iloc[0]
+    return s.split(", ") if s else []
 
 
 def kpis(isin: str, days: int = 60) -> dict:
@@ -240,7 +317,7 @@ def liquidity_trend(isin: str, window: int = 60) -> dict:
 
 # ---------- anomaly episodes ----------
 EPISODE_COLS = ["start", "end", "days", "peak_date", "peak_abn_ret", "total_abn_ret", "max_vol_ratio",
-                "reason", "severity"]
+                "reason", "severity", "context"]
 
 
 def anomaly_episodes(isin: str, z: float = ANOMALY_Z) -> pd.DataFrame:
@@ -256,8 +333,10 @@ def anomaly_episodes(isin: str, z: float = ANOMALY_Z) -> pd.DataFrame:
     for _, g in a.groupby("episode", sort=False):
         peak = g.loc[g["severity"].idxmax()]
         reasons = dict.fromkeys(r for rs in g["reason"] for r in rs.split(", "))
+        ctx = {f for cs in g["context"] for f in cs.split(", ") if f}
         rows.append({"start": g["date"].min(), "end": g["date"].max(), "days": len(g),
                      "peak_date": peak["date"], "peak_abn_ret": peak["abn_ret"],
                      "total_abn_ret": g["abn_ret"].sum(min_count=1), "max_vol_ratio": g["vol_ratio"].max(),
-                     "reason": ", ".join(reasons), "severity": g["severity"].max()})
+                     "reason": ", ".join(reasons), "severity": g["severity"].max(),
+                     "context": ", ".join(f for f in CONTEXT_FLAGS if f in ctx)})
     return pd.DataFrame(rows, columns=EPISODE_COLS).sort_values("start", ascending=False).reset_index(drop=True)

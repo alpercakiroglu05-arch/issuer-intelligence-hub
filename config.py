@@ -74,6 +74,11 @@ SIZE_COHORT_DAYS = 60
 SIZE_COHORT_LABELS = ("large", "mid", "small")   # top / middle / bottom third by turnover
 MIN_PEER_GROUP = 3                               # fewer peers -> flag "small_peer_group"
 
+# Market context of unusual days (engine/baseline.py context_frame): a day is "market-wide" when at least
+# MARKET_WIDE_SHARE of all stocks trade more than MARKET_WIDE_VOL_RATIO x their normal turnover
+MARKET_WIDE_VOL_RATIO = 2.0
+MARKET_WIDE_SHARE = 0.25
+
 # News onset detection (engine/onset.py): first minute where price AND volume break from normal
 ONSET_PRICE_K = 2.0               # |move vs previous close| >= 2 x daily return std (baseline)
 ONSET_VOLUME_K = 3.0              # cumulative turnover >= 3 x normal for the time of day

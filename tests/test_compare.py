@@ -216,3 +216,17 @@ def test_peer_group_rejects_unknown_by():
     from engine.data import isin_of
     with pytest.raises(ValueError):
         peer_group(isin_of("EVD"), "market_cap")
+
+
+
+@needs_data
+def test_compare_tables_have_context_column():
+    """Every same-type table gets "context"; the rows themselves do not change."""
+    from engine.compare import TABLE_COLS, same_type_events
+    assert TABLE_COLS[-1] == "context"
+    notable = same_type_events("NOTABLE_DAY", "MDAX")
+    evd_aug = notable[(notable["ticker"] == "EVD") & (notable["reaction_day"] == pd.Timestamp("2026-08-31"))]
+    assert evd_aug["context"].iloc[0].startswith("index_event")
+    idx = same_type_events("INDEX")
+    assert list(idx.columns) == TABLE_COLS and (idx["context"].str.contains("index_event")).all()
+    assert same_type_events("H1")["context"].notna().all()

@@ -81,6 +81,57 @@ start       end         days  peak_date   peak_abn_ret  total_abn_ret  max_vol_r
 ```
 EVD 27 Mar (Fri) + 30 Mar (Mon) become one 2-day episode with the peak on 27 Mar.
 
+## Market context: `baseline.market_context(isin, day) -> list[str]` and the `context` column
+
+**The problem:** `anomalies()` flags index days as a "volume spike", but there is no company news behind them.
+Real example: EVD on 31 Aug 2026 traded 19x its normal turnover with a price move of only -1.8%. That day
+MSCI Germany deleted the stock at the close (`events.csv`, type `INDEX`).
+
+**What was added:** every unusual day now carries a `context`, one string of comma-separated flags in this order:
+
+| Flag | Rule | Source |
+|---|---|---|
+| `index_event` | `events.csv` has a `type == INDEX` row for this ISIN with this `reaction_day` | research team, sourced (most reliable) |
+| `index_change` | the stock's `idx` differs from its previous trading day (entry or exit) | daily index lists (`daily_features.idx`) |
+| `quarterly_expiry` | third Friday of Mar/Jun/Sep/Dec (options/futures expiry and DAX family rebalancing) | calendar |
+| `monthly_expiry` | third Friday of the other months | calendar |
+| `month_end_review` | last trading day of Feb/May/Aug/Nov, a **possible** MSCI review date | calendar |
+| `market_wide_volume` | at least `config.MARKET_WIDE_SHARE` (25 %) of all stocks traded > `MARKET_WIDE_VOL_RATIO` (2x) normal turnover | data, all 174 stocks |
+
+- If the third Friday is not a trading day, the expiry flag goes to the previous trading day.
+- `month_end_review` is only set for complete months in the data.
+- `CONTEXT_HELP` has a short English explanation per flag, meant as a tooltip. `CONTEXT_FLAGS` gives the order.
+- **Columns:** `anomalies()` and `anomaly_episodes()` have a new last column, `context`; for an episode it is the union of
+  its days' flags. Every `compare.same_type_events()` table (NOTABLE_DAY and typed events) also has `context` as its
+  last column. No other column changed, `reason` included.
+- **Context is an alternative explanation, not a verdict.**
+  - It says there is a known non-news reason for heavy trading on that day. EVD on 29 May has `month_end_review`
+    *and* a +10 % stock-specific move, so read `context` together with `reason` and the abnormal return.
+  - The typical index day is `volume spike` only, with a small price move and a context flag.
+
+**In the data (2026):**
+- 196 of the 871 unusual days (22.5 %) have a context:
+  - `market_wide_volume` 175
+  - `quarterly_expiry` 112
+  - `month_end_review` 49
+  - `monthly_expiry` 18
+  - `index_change` 3
+  - `index_event` 1
+- 8 trading days are market-wide: 20 Mar, 19 Jun, 18 Sep (quarterly expiries); 27 Feb, 29 May, 31 Aug (Feb/May/Aug
+  month ends); 3 Mar; 23 Mar.
+- The share of stocks above 2x normal turnover has a median of 7 % and a 95th percentile of 18 %, so 25 % is well
+  above a normal day.
+- EVD on 27 Mar (the real news day, -23 %) has no context; its market-wide share was 14.7 %.
+
+Examples, EVD:
+```
+date        reason                             context
+2026-08-31  volume spike                       index_event, month_end_review, market_wide_volume
+2026-05-29  volume spike, stock-specific move  month_end_review, market_wide_volume
+2026-03-27  volume spike, stock-specific move  (empty)
+2026-02-27  volume spike, stock-specific move  month_end_review, market_wide_volume
+```
+
 ## Peer groups: index, sector, turnover cohort (size proxy)
 
 Briefing II asks to compare a stock with peers by **sector and size**, not only by index.
@@ -214,6 +265,29 @@ c[1].metric("Median turnover", f"€{k['median_turnover_eur']['stock'] / 1e6:.1f
 - For charts over time, build a peer series like `index_benchmark()` does, from `peer_group(isin, by)["isins"]`:
   `daily()[daily()["isin"].isin(isins)].groupby("date")[col].median()`. Mind the column vs `DataFrame.isin` gotcha.
 
+### For C3: show context days in grey with an "index day" badge
+
+C2 does not touch `app/`; this is a suggestion.
+
+- **Chart markers:** colour unusual days with a non-empty `context` grey and use the normal colour for the rest, so that
+  company news stands out.
+  ```python
+  anom = baseline.anomalies(isin)
+  news, ctx = anom[anom["context"] == ""], anom[anom["context"] != ""]
+  # fig.add_scatter(... news ...)                       normal colour, hover: reason
+  # fig.add_scatter(... ctx ..., marker_color="grey")   hover: reason + context
+  ```
+- **Tables (episodes, Compare page):** add a badge column, e.g. `"🏷️ index day"` when `"index_event"` or
+  `"index_change"` is in `context`, and `"📅 calendar / market-wide"` for the other flags. Show the flag text as a tooltip
+  from `CONTEXT_HELP`:
+  ```python
+  from engine.baseline import CONTEXT_HELP
+  help_text = "\n".join(CONTEXT_HELP[f] for f in row["context"].split(", ") if f)
+  st.caption(f"🏷️ index day", help=help_text)   # or column_config / hover text
+  ```
+- Word it as "index day" / "possible index or calendar effect", never "no news": the flags give a likely reason,
+  not proof.
+
 ## Known limits
 
 - The index median uses `idx_latest`, so a stock that changed index is compared with its current index.
@@ -224,3 +298,7 @@ c[1].metric("Median turnover", f"€{k['median_turnover_eur']['stock'] / 1e6:.1f
 - The turnover cohort is a size proxy: a large but rarely traded company can land in `small`. Old ISINs (FRE, QIA,
   ACT) are ranked on their own last 60 trading days.
 - Alzchem's two ISINs have different tickers (ACT, ACT0), so they can appear in each other's peer lists.
+- Context: an INDEX event matches on its `reaction_day` only. GXI's row is the STOXX announcement (8 Apr); the exit
+  itself shows up as `index_change` on 10 Apr, the first day off the list, and the last member day (9 Apr) has no flag.
+- `month_end_review` is a calendar rule ("possible" MSCI review), not the official MSCI calendar. Only the 2 INDEX
+  rows in `events.csv` are confirmed index events.
