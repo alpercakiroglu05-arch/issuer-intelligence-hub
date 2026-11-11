@@ -18,7 +18,7 @@
 
 ## Q&A: one-sentence answers
 
-- **Hallucinations?** Every number is computed in code; the LLM sees only that JSON, and a numbers check rejects any figure not in it.
+- **Hallucinations?** Every number is computed in code, and the LLM sees only that JSON. Without a model the same text comes from a template. (An automatic check that rejects any number not in the JSON is planned; only claim it once C4 has merged it.)
 - **Which data?** Only Deutsche Börse exchange data plus public corporate calendars. No personal data.
 - **Is this investment advice / MAR?** No. It explains past trading, never predicts or recommends.
 - **Who buys it, what does it cost?** DB offers it in the Issuer Services Hub (free for Prime/General Standard, Scale); premium tier for deeper analytics.
