@@ -14,33 +14,76 @@ import plotly.graph_objects as go  # noqa: E402
 import streamlit as st  # noqa: E402
 from plotly.subplots import make_subplots  # noqa: E402
 
-from components import bps, eur, pct0, setup  # noqa: E402
-from engine import baseline  # noqa: E402
+import pandas as pd  # noqa: E402
+
+from components import bps, eur, pct, pct0, setup  # noqa: E402
+from engine import baseline, compare, data  # noqa: E402
 
 isin = setup("Dashboard")
 
 
 @st.cache_data
 def load(isin):
-    return baseline.profile(isin), baseline.anomalies(isin), baseline.kpis(isin)
+    return (baseline.profile(isin), baseline.anomalies(isin), baseline.kpis(isin),
+            baseline.liquidity_trend(isin), baseline.anomaly_episodes(isin))
 
 
-prof, anom, k = load(isin)
+prof, anom, k, trend, episodes = load(isin)
+
+
+@st.cache_data
+def peer_median(isin: str, by: str, col: str) -> pd.Series:
+    """Daily median of `col` across the stock's peer group (index, sector or turnover cohort)."""
+    if by == "index":
+        return baseline.index_benchmark(k["index"], col)
+    isins = compare.peer_group(isin, by)["isins"]
+    d = data.daily()
+    return d[d["isin"].isin(isins)].groupby("date")[col].median()
 st.title(f"{k['name'].title()} · how the share trades")
-st.caption(f"{k['index']} · {k['period']} · compared with the median {k['index']} stock")
+
+# Peer benchmarking by index, sector or size (brief point II; engine.compare.peer_group, C2)
+PEERS = {"Index": "index", "Sector": "sector", "Size": "size"}
+choice = st.segmented_control("Compare with", list(PEERS), default="Index") or "Index"
+by = PEERS[choice]
+key = f"{by}_median"
+g = k["peer_groups"][by]
+peer = g["name"] if by != "size" else f"{g['name']} cohort"
+st.caption(f"{k['period']} · compared with the median stock of **{g['label']}** ({g['n']} peers)"
+           + (" · sector unknown, showing the index" if g["fallback"] else "")
+           + (" · size = turnover cohort (market cap is not in the data)" if by == "size" else ""))
+if g["n"] < 3:
+    st.warning("Small peer group: these medians rest on fewer than 3 other stocks.")
 
 c = st.columns(5)
 c[0].metric("Median daily turnover", eur(k["median_turnover_eur"]["stock"]),
-            f"index {eur(k['median_turnover_eur']['index_median'])}", delta_color="off")
+            f"{peer} {eur(k['median_turnover_eur'][key])}", delta_color="off")
 c[1].metric("Trading cost XLM 25k", bps(k["median_xlm_25k_bps"]["stock"]),
-            f"index {bps(k['median_xlm_25k_bps']['index_median'])}", delta_color="off")
+            f"{peer} {bps(k['median_xlm_25k_bps'][key])}", delta_color="off")
 c[2].metric("Auction share", pct0(k["median_auction_share"]["stock"]),
-            f"index {pct0(k['median_auction_share']['index_median'])}", delta_color="off")
+            f"{peer} {pct0(k['median_auction_share'][key])}", delta_color="off")
 c[3].metric("Agent (client) share", pct0(k["median_agent_share"]["stock"]),
-            f"index {pct0(k['median_agent_share']['index_median'])}", delta_color="off")
+            f"{peer} {pct0(k['median_agent_share'][key])}", delta_color="off")
 lc = k["liquidity_check"]
 c[4].metric("Liquidity category (est.)", lc["category_estimate"],
             f"4m: {eur(lc['avg_turnover_eur_4m'])}/day · {bps(lc['median_xlm_25k_bps_4m'])}", delta_color="off")
+
+# "Has our liquidity improved?" (engine.baseline.liquidity_trend, C2)
+st.markdown(f"**Has our liquidity improved?** · {trend['period']}")
+s, ds = trend["stock"], trend["ds_category"] or {}
+lt = st.columns(4)
+lt[0].metric("Liquidity trend", trend["verdict"].capitalize() if trend["verdict"] else "n/a",
+             {"stock-specific": "stock-specific", "market-wide": "market-wide"}.get(trend["vs_index"], ""),
+             delta_color="off", help=trend["help"])
+lt[1].metric("Trading cost XLM 25k", bps(s["xlm_25k_bps"]["now"]),
+             None if trend["xlm_25k_change_pct"] is None else pct(trend["xlm_25k_change_pct"]),
+             delta_color="inverse", help="Lower is better. Median of the last 60 trading days vs the 60 before.")
+lt[2].metric("Median daily turnover", eur(s["turnover_eur"]["now"]),
+             None if trend["turnover_change_pct"] is None else pct(trend["turnover_change_pct"]),
+             help="Higher is better. Median of the last 60 trading days vs the 60 before.")
+lt[3].metric("Designated Sponsor category (est.)", ds.get("now") or "n/a",
+             "unchanged" if ds.get("now") and ds.get("now") == ds.get("before")
+             else (f"was {ds['before']}" if ds.get("before") else ""), delta_color="off")
+st.caption(trend["summary"])
 
 # Price + turnover with anomaly markers
 fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -54,11 +97,11 @@ st.plotly_chart(fig, width="stretch")
 
 left, right = st.columns(2)
 with left:
-    st.markdown("**Trading cost (XLM, EUR 25k order) vs index median**")
-    bench = baseline.index_benchmark(k["index"], "xlm_25k")
+    st.markdown(f"**Trading cost (XLM, EUR 25k order) vs {peer} median**")
+    bench = peer_median(isin, by, "xlm_25k")
     f2 = go.Figure()
     f2.add_scatter(x=prof["date"], y=prof["xlm_25k"], name=k["ticker"], mode="lines")
-    f2.add_scatter(x=bench.index, y=bench.values, name=f"{k['index']} median", mode="lines", line=dict(dash="dot"))
+    f2.add_scatter(x=bench.index, y=bench.values, name=f"{peer} median", mode="lines", line=dict(dash="dot"))
     f2.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), yaxis_title="bps", legend=dict(orientation="h"))
     st.plotly_chart(f2, width="stretch")
 with right:
@@ -71,13 +114,31 @@ with right:
     st.plotly_chart(f3, width="stretch")
 
 st.markdown("### Unusual days")
-show = anom.copy()
-show["date"] = show["date"].dt.date
-st.dataframe(show[["date", "reason", "ret", "abn_ret", "vol_ratio", "xlm_25k_ratio"]].style.format(
-    {"ret": "{:+.1%}", "abn_ret": "{:+.1%}", "vol_ratio": "{:.1f}x", "xlm_25k_ratio": "{:.1f}x"}, na_rep="–"),
-    width="stretch", hide_index=True)
+st.caption("Consecutive unusual days are merged into one episode. The announcement column links each episode to "
+           "a sourced event from events/events.csv (empty = no company news found).")
+ev = data.events()
+ev = ev[ev["isin"] == isin]
+ev_day = pd.to_datetime(ev["reaction_day"])
+
+
+def linked_event(start, end) -> str:
+    hit = ev[(ev_day >= start) & (ev_day <= end)]
+    return " · ".join(hit["title"])  # titles already name the event type ("FY 2025 results", "Ad hoc: ...")
+
+
+show = episodes.copy()
+show["event"] = [linked_event(a, b) for a, b in zip(show["start"], show["end"], strict=False)]
+for col in ("start", "end", "peak_date"):
+    show[col] = pd.to_datetime(show[col]).dt.date
+st.dataframe(show[["start", "end", "days", "event", "reason", "peak_abn_ret", "total_abn_ret", "max_vol_ratio"]].style.format(
+    {"peak_abn_ret": "{:+.1%}", "total_abn_ret": "{:+.1%}", "max_vol_ratio": "{:.1f}x"}, na_rep="–"),
+    width="stretch", hide_index=True,
+    column_config={"event": "announcement", "peak_abn_ret": "stock-specific move (peak day)",
+                   "total_abn_ret": "stock-specific move (episode)", "max_vol_ratio": "turnover vs normal (max)"})
 if len(show):
-    day = st.selectbox("Open an impact card for", show["date"].tolist())
+    opts = list(show.itertuples())
+    pick = st.selectbox("Open an impact card for", range(len(opts)),
+                        format_func=lambda i: f"{opts[i].peak_date} · {opts[i].event or opts[i].reason}"[:110])
     if st.button("⚡ Generate impact card", type="primary"):
-        st.session_state["impact_day"] = str(day)
+        st.session_state["impact_day"] = str(opts[pick].peak_date)
         st.switch_page("pages/2_Impact_Card.py")
