@@ -41,6 +41,16 @@ plain factual tone. Ratios: 'x times normal'."""
 
 LANG = {"en": "English", "de": "German"}
 
+# German number style (same as report/fmt.py); added to the DE prompt only, so the EN prompt and its cache stay as they are
+SYSTEM_DE_STYLE = """
+German number and date style (also in the first sentence): decimal comma, a space before %, the minus sign −,
+e.g. 'um −23,2 %, die MDAX-Vergleichswerte um −1,5 % (unternehmensspezifisch: −21,7 %)';
+dates as 27.03.2026; ratios as '8,6-fach'; amounts as '2,5 Mio. EUR' or '561 Tsd. EUR'; spreads in bps."""
+
+
+def system_prompt(lang: str = "en") -> str:
+    return SYSTEM.format(language=LANG.get(lang, "English")) + (SYSTEM_DE_STYLE if lang == "de" else "")
+
 
 def narrate_with_meta(card: dict, lang: str = "en") -> dict:
     """{"text", "source": "llm" | "template", "model", "rejected": [numbers not in the JSON]}.
@@ -48,7 +58,7 @@ def narrate_with_meta(card: dict, lang: str = "en") -> dict:
     meta = {"source": "template", "model": None, "rejected": []}
     try:
         msg = llm.chat([
-            {"role": "system", "content": SYSTEM.format(language=LANG.get(lang, "English"))},
+            {"role": "system", "content": system_prompt(lang)},
             {"role": "user", "content": json.dumps(card, default=str)},
         ])
         text = (msg.content or "").strip()

@@ -89,3 +89,10 @@ def test_assistant_answer_with_invented_number_falls_back(monkeypatch):
     out = agent.ask("Has our liquidity improved?", isin_of("EVD"))
     assert "47.3" not in out and "Stable" in out   # deterministic answer = liquidity_trend summary
     assert os.environ["LLM_PROVIDER"] == "none"
+
+
+def test_prompt_asks_for_german_number_style_in_de_only():
+    from ai.narrate import LANG, SYSTEM, system_prompt
+    assert system_prompt("en") == SYSTEM.format(language=LANG["en"])   # EN prompt (and its cache) unchanged
+    de = system_prompt("de")
+    assert "German" in de and "−23,2 %" in de and "27.03.2026" in de and "8,6-fach" in de and "Mio. EUR" in de
