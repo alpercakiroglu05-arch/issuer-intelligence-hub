@@ -11,6 +11,8 @@ falls back to the template text.
 "Derivable" means: the JSON value itself, ×100 (percent), ÷1e3/1e6/1e9 (EUR k/m/bn), or a group size + 1
 ("#3 of 215" when n = 214), rounded to the decimals written in the text. Signs are ignored ("fell 23.2 %"
 for -0.232). Dates and clock times are split into their parts. German number style (21,7) is understood.
+A German short date without a year ("am 29.05.", "14.7.:") counts as a date only when the JSON has that day
+and month in an ISO date; "EUR 1,628m" in a JSON string also yields 1628 (English thousands separator).
 Limitation: a small integer (e.g. "12") can match some unrelated value by chance; invented figures with
 decimals or large values are caught.
 """
@@ -20,6 +22,8 @@ import re
 
 _DATE_ISO = re.compile(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b")
 _DATE_DE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
+_DATE_DE_SHORT = re.compile(r"(?<![\d.,])(\d{1,2})\.(\d{1,2})\.(?![\d,])")  # "29.05." / "14.7.:", no year
+_THOUSANDS = re.compile(r"(?<![\d.,])\d{1,3}(?:,\d{3})+(?![\d,])")                       # "1,628" in "EUR 1,628m"
 _TIME = re.compile(r"\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b")
 _NUM = re.compile(r"(?<![\w.])[-+−]?\d+(?:[.,]\d+)?")
 
@@ -38,6 +42,19 @@ def _walk(x, out: list):
             _walk(v, out)
     elif isinstance(x, str):
         out.extend(float(n) for n in re.findall(r"\d+(?:\.\d+)?", x))
+        out.extend(float(n.replace(",", "")) for n in _THOUSANDS.findall(x))
+
+
+def _days_in(x, out: set):
+    """(month, day) of every ISO date in the payload's strings."""
+    if isinstance(x, dict):
+        for v in x.values():
+            _days_in(v, out)
+    elif isinstance(x, (list, tuple)):
+        for v in x:
+            _days_in(v, out)
+    elif isinstance(x, str):
+        out.update((int(m), int(d)) for _, m, d in _DATE_ISO.findall(x))
 
 
 def allowed_values(payload) -> list[float]:
@@ -100,6 +117,12 @@ def meaning_errors(text: str, card) -> list[str]:
 
 def unsupported_numbers(text: str, payload) -> list[str]:
     allowed = allowed_values(payload)
+    days: set = set()
+    _days_in(json.loads(json.dumps(payload, default=str)), days)
+    t = _DATE_DE.sub(" ", _DATE_ISO.sub(" ", text))  # dates with a year are handled in _numbers anyway
+    for m in _DATE_DE_SHORT.finditer(t):
+        if (int(m.group(2)), int(m.group(1))) in days:  # a real date of the data, not a decimal number
+            text = text.replace(m.group(0), " ", 1)
     bad = []
     for written, x, dec in _numbers(text):
         tol = 0.5 * 10 ** -dec + 1e-6
