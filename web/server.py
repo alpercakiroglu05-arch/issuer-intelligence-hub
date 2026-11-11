@@ -74,8 +74,8 @@ def r(x, nd=6):
 def sectors() -> dict:
     if not SECTORS_CSV.exists():
         return {}
-    s = pd.read_csv(SECTORS_CSV)
-    return dict(zip(s["ticker"], s["sector"]))
+    s = pd.read_csv(SECTORS_CSV, dtype=str).dropna(subset=["sector"])  # KCO has no sector -> no NaN in JSON
+    return dict(zip(s["ticker"], s["sector"], strict=False))
 
 
 @lru_cache(maxsize=1)
@@ -289,7 +289,7 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*a, directory=str(WEB), **kw)
 
     def log_message(self, fmt, *args):  # quieter console
-        if "/api/" in (args[0] if args else ""):
+        if "/api/" in str(args[0] if args else ""):  # args[0] is an HTTPStatus for errors (e.g. favicon 404)
             sys.stderr.write("%s\n" % (fmt % args))
 
     def _json(self, obj, code=200):
@@ -343,6 +343,11 @@ def main():
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8600)
     a = ap.parse_args()
+    for stream in (sys.stdout, sys.stderr):  # Windows consoles (cp1252/cp1254) cannot print "→"
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     if not (DATA_DIR / "daily_features.parquet").exists():
         sys.exit(f"No processed data in {DATA_DIR}. Copy it from OneDrive or run the ingest scripts (README).")
     print("warming up the engine …", flush=True)
