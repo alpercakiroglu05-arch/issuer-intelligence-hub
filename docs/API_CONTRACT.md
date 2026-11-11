@@ -93,7 +93,8 @@ in the direction of the day's move, still holding 5 minutes later. Thresholds in
 | `engine.compare.event_types()` / `same_type_events(type, index=None)` / `percentile(card, table)` / `comparison_for(card)` | list / DataFrame (last column `context`, same flags as `anomalies()`) / dict / dict | C2 (v1 by C1) |
 | `engine.compare.metrics_all()` | DataFrame: every stock-day with the card metrics + `notable`, `reason` | C2 (v1 by C1) |
 | `engine.compare.peer_group(isin, by="index"\|"sector"\|"size")` | dict: `by, name, label, isins, n, fallback` (sector unknown → `fallback: "index"`). Stock and other ISINs of the same ticker excluded | C2 |
-| `engine.compare.sector_peers(isin)` / `size_peers(isin)` / `size_cohort(isin)` / `size_cohorts()` | list[str] / list[str] / str / Series isin→cohort. Sector from `events/sectors.csv`; size = **turnover cohort (size proxy)**, not market cap | C2 |
+| `engine.compare.sector_peers(isin)` / `size_peers(isin)` | list[str]. Sector from `events/sectors.csv`; size = the **10 stocks closest in median turnover** (`config.SIZE_PEERS_N`), not market cap | C2 |
+| `engine.compare.peer_medians(isin, days=60)` | dict: `stock` and `groups[index\|sector\|size]` (`peer_group` keys + `values`: turnover_eur, xlm_25k, auction_share, agent_share, volatility). **The one peer benchmark**: `kpis()`, the web API and the report read it | C2 |
 | `ai.narrate.narrate(card, lang)` | str (DE/EN), template fallback without LLM | C4 |
 | `ai.agent.ask(question, isin)` | str | C4 |
 | `ai.agent.run(question, isin, history, context, lang)` | dict: `text, source, model, steps[{tool,args}], actions[{view,isin,day,event_id,event_type,index}], check{total,unsupported}` | C4 (v2 by C3) |

@@ -44,7 +44,8 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 pip install -r requirements.txt
 python web/server.py                      # demo UI (web front end, C3): http://127.0.0.1:8600
 streamlit run app/Home.py                 # backup UI and analyst view: http://localhost:8501
-pytest                                    # 108 tests (incl. web API); data tests skip if data/ is empty
+pytest                                    # 137 tests (incl. web API); data tests skip if data/ is empty
+python web/warm_cache.py                  # re-warm the demo caches (summaries + assistant) after ANY prompt, card or engine change
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
 - Before a PR, run `pytest` **and** a headless page check:
