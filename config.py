@@ -61,6 +61,9 @@ DS_LOOKBACK_DAYS = 84      # ~4 months
 # Anomaly thresholds
 ANOMALY_Z = 3.0
 
+# Liquidity trend (engine/baseline.py): a change of more than +-10% in XLM or turnover counts as a move
+LIQUIDITY_TREND_TOL = 0.10
+
 # Same-type comparison (engine/compare.py): smallest group worth a percentile
 COMPARE_MIN_GROUP = 5
 

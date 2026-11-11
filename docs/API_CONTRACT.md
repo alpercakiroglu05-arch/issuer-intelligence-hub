@@ -81,6 +81,8 @@ in the direction of the day's move, still holding 5 minutes later. Thresholds in
 | `engine.baseline.profile(isin, start, end)` | daily time series for the dashboard | C2 |
 | `engine.baseline.kpis(isin, days=60)` | dict: medians vs index + liquidity category estimate | C2 |
 | `engine.baseline.anomalies(isin)` | DataFrame: unusual days with `reason`, `severity` | C2 |
+| `engine.baseline.liquidity_trend(isin, window=60)` | dict: last vs previous `window` days, XLM 25k + turnover change vs index median, `verdict` (improved/worsened/mixed/stable/null), `vs_index`, `help`, DS category now vs before, `monthly` series, `summary` (see `docs/C2_ENGINE.md`) | C2 |
+| `engine.baseline.anomaly_episodes(isin)` | DataFrame: consecutive unusual days merged: `start, end, days, peak_date, peak_abn_ret, total_abn_ret, max_vol_ratio, reason, severity` | C2 |
 | `engine.impact.impact_card(isin, day, event=None)` | dict (schema above) | C2 |
 | `engine.onset.onset(isin, day, event_time=None)` | dict: news onset minute (see `intraday.onset`) | C1 |
 | `engine.auctions.auction_profile(isin)` | DataFrame per day: open/close auction EUR, close auction share and price move | C1 |
