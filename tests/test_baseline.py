@@ -149,7 +149,7 @@ def test_kpis_keeps_index_keys_and_adds_sector_and_size():
         assert {"stock", "index_median", "sector_median", "size_median"} <= set(k[key])
         assert k[key]["index_median"] is not None and k[key]["sector_median"] is not None
     assert k["peer_groups"]["sector"]["name"] == "Media & Telecom"
-    assert k["peer_groups"]["size"]["label"] == "Turnover cohort (size proxy): mid"
+    assert k["peer_groups"]["size"]["label"] == "Similar size: 10 closest by turnover"
     assert k["liquidity_check"]["category_estimate"] in ("A", "B") and k["flags"] == []
 
 

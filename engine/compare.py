@@ -9,8 +9,9 @@ The challenge asks: "compare events of the same type, e.g. all quarterly results
     percentile(card, table)                -> dict, where this card sits in the table
     comparison_for(card)                   -> dict | None, fills card["comparison"]
     sector_peers(isin)                     -> list[str] of ISINs (events/sectors.csv, fallback: same index)
-    size_peers(isin) / size_cohort(isin)   -> turnover cohort (size proxy, NOT market cap): large / mid / small
+    size_peers(isin)                       -> the SIZE_PEERS_N stocks closest in median turnover (size proxy, NOT market cap)
     peer_group(isin, by)                   -> dict, by = "index" | "sector" | "size"
+    stock_medians(days) / peer_medians(isin) -> THE peer benchmark; web, Streamlit, report and assistant all use it
 
 Event sources
 -------------
@@ -28,8 +29,8 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from config import (ANOMALY_Z, BASELINE_DAYS, BASELINE_GAP, CAR_DAYS, COMPARE_MIN_GROUP, SECTORS_CSV,
-                    SIZE_COHORT_DAYS, SIZE_COHORT_LABELS)
+from config import (ANOMALY_Z, BASELINE_DAYS, BASELINE_GAP, CAR_DAYS, COMPARE_MIN_GROUP, PEER_DAYS, SECTORS_CSV,
+                    SIZE_COHORT_DAYS, SIZE_COHORT_LABELS, SIZE_PEERS_N)
 from engine.data import daily, events
 
 AUTO_TYPE = "NOTABLE_DAY"
@@ -157,9 +158,9 @@ def comparison_for(card: dict) -> dict | None:
     return None
 
 
-# ---------- peer groups: index / sector / turnover cohort (size proxy) ----------
+# ---------- peer groups: index / sector / similar size (closest turnover) ----------
 PEER_BY = ("index", "sector", "size")
-SIZE_LABEL = "Turnover cohort (size proxy)"
+SIZE_LABEL = "Similar size"
 
 
 def _latest() -> pd.DataFrame:
@@ -190,6 +191,52 @@ def size_cohort(isin: str) -> str | None:
     return size_cohorts().get(isin)
 
 
+PEER_COLS = ("turnover_eur", "xlm_25k", "auction_share", "agent_share", "volatility")
+
+
+@lru_cache(maxsize=4)
+def stock_medians(days: int = PEER_DAYS) -> pd.DataFrame:
+    """Per ISIN: medians over the market's last `days` trading days (one window for every stock).
+    volatility = annualised std of daily returns. The base of every peer benchmark."""
+    d = daily()
+    dates = np.sort(d["date"].unique())[-days:]
+    last = d[d["date"].isin(dates)]
+    m = last.groupby("isin").agg(turnover_eur=("turnover_eur", "median"), xlm_25k=("xlm_25k", "median"),
+                                 auction_share=("auction_share", "median"), agent_share=("agent_share", "median"),
+                                 volatility=("ret", "std"))
+    m["volatility"] = m["volatility"] * math.sqrt(252)
+    return m
+
+
+def _closest_turnover(isin: str, candidates: list[str], n: int = SIZE_PEERS_N) -> list[str]:
+    """The n candidates whose median turnover is closest to the stock's (log distance)."""
+    to = stock_medians()["turnover_eur"]
+    mine = to.get(isin)
+    if mine is None or not mine > 0:
+        return []
+    cand = to.reindex(candidates)
+    cand = cand[cand > 0]
+    return (np.log(cand) - math.log(mine)).abs().sort_values(kind="stable").head(n).index.tolist()
+
+
+def peer_medians(isin: str, days: int = PEER_DAYS) -> dict:
+    """THE peer benchmark: for index, sector and size, the median over the peers of each peer's median over the
+    last `days` trading days. Peers exclude the stock and other ISINs of the same company."""
+    m = stock_medians(days)
+    me = m.reindex([isin]).iloc[0]
+
+    def num(v):
+        return None if pd.isna(v) else float(v)
+
+    groups = {}
+    for by in PEER_BY:
+        g = peer_group(isin, by)
+        frame = m.reindex(g["isins"]).dropna(how="all")
+        groups[by] = {**g, "values": {c: num(frame[c].median()) for c in PEER_COLS} if len(frame) else None}
+    return {"isin": isin, "period": f"median of the last {days} trading days; peers exclude the stock itself",
+            "stock": {c: num(me[c]) for c in PEER_COLS}, "groups": groups}
+
+
 def peer_group(isin: str, by: str = "index") -> dict:
     """Peers of `isin` (the stock itself and other ISINs of the same ticker excluded).
     by="sector" falls back to the index when the sector is unknown or has no other member."""
@@ -210,10 +257,10 @@ def peer_group(isin: str, by: str = "index") -> dict:
                     "isins": peers["isin"].tolist(), "n": len(peers), "fallback": None}
         fallback = "index"
     if by == "size":
-        cohort = size_cohort(isin)
-        peers = others[others["isin"].map(size_cohorts()) == cohort]
-        return {"by": "size", "name": cohort, "label": f"{SIZE_LABEL}: {cohort}",
-                "isins": peers["isin"].tolist(), "n": len(peers), "fallback": None}
+        peers = _closest_turnover(isin, others["isin"].tolist())
+        name = f"{len(peers)} closest by turnover"
+        return {"by": "size", "name": name, "label": f"{SIZE_LABEL}: {name}",
+                "isins": peers, "n": len(peers), "fallback": None}
     peers = others[others["idx_latest"] == idx]
     return {"by": "index", "name": idx, "label": f"Index: {idx}",
             "isins": peers["isin"].tolist(), "n": len(peers), "fallback": fallback}
@@ -225,5 +272,5 @@ def sector_peers(isin: str) -> list[str]:
 
 
 def size_peers(isin: str) -> list[str]:
-    """ISINs in the same turnover cohort (size proxy, not market cap)."""
+    """The SIZE_PEERS_N ISINs closest in median turnover (size proxy, not market cap)."""
     return peer_group(isin, "size")["isins"]

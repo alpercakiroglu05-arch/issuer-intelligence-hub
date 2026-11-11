@@ -96,42 +96,27 @@ def universe() -> list[dict]:
     return out
 
 
-@lru_cache(maxsize=1)
-def stock_medians(days: int = 60) -> pd.DataFrame:
-    """Per stock: medians over its last `days` trading days (peer benchmarking)."""
-    d = data.daily().sort_values("date")
-    last = d.groupby("isin").tail(days)
-    m = last.groupby("isin").agg(turnover_eur=("turnover_eur", "median"), xlm_25k=("xlm_25k", "median"),
-                                 auction_share=("auction_share", "median"), agent_share=("agent_share", "median"),
-                                 volatility=("ret", "std"))
-    m["volatility"] = m["volatility"] * math.sqrt(252)
-    u = data.universe().set_index("isin")
-    m = m.join(u[["ticker", "name", "idx_latest", "avg_turnover_eur"]])
-    return m
-
-
-PEER_COLS = ["turnover_eur", "xlm_25k", "auction_share", "agent_share", "volatility"]
+PEER_COLS = list(compare.PEER_COLS)
 
 
 def peers(isin: str) -> dict:
-    """Index, sector and size peers as defined by the engine (engine.compare.peer_group), medians from stock_medians."""
-    m = stock_medians()
-    me = m.loc[isin]
+    """Index, sector and size peers with the engine's one benchmark (engine.compare.peer_medians): the same
+    numbers as Streamlit, the Part A report and the assistant."""
+    p = compare.peer_medians(isin)
 
-    def med(frame):
-        return {c: r(frame[c].median()) for c in PEER_COLS} if len(frame) else None
+    def vals(v):
+        return {c: r(v[c]) for c in PEER_COLS} if v else None
 
     groups = []
     for by in ("index", "sector", "size"):
-        g = compare.peer_group(isin, by)
+        g = p["groups"][by]
         if by == "sector" and g["by"] != "sector":  # unknown sector: the engine falls back to the index
             continue
-        frame = m.loc[[i for i in g["isins"] if i in m.index]]
-        groups.append({"key": by, "label": g["label"], "name": g["name"], "n": len(frame), "values": med(frame),
-                       "members": [{"ticker": t, "name": n} for t, n in zip(frame["ticker"], frame["name"])][:12]})
-    return {"stock": {c: r(me[c]) for c in PEER_COLS}, "groups": groups,
-            "period": "median of the last 60 trading days; volatility = annualised std of daily returns; "
-                      "size = turnover cohort (market cap is not in the data)"}
+        groups.append({"key": by, "label": g["label"], "name": g["name"], "n": g["n"], "values": vals(g["values"]),
+                       "members": [{"ticker": data.ticker_of(i), "name": data.display_name(i)} for i in g["isins"]][:12]})
+    return {"stock": vals(p["stock"]), "groups": groups,
+            "period": p["period"] + "; volatility = annualised std of daily returns; "
+                      "size = the 10 stocks closest in turnover (market cap is not in the data)"}
 
 
 def cost_curve(isin: str) -> dict | None:
@@ -375,7 +360,7 @@ def main():
         sys.exit(f"No processed data in {DATA_DIR}. Copy it from OneDrive or run the ingest scripts (README).")
     print("warming up the engine …", flush=True)
     universe()
-    stock_medians()
+    compare.stock_medians()
     compare.metrics_all()
     print(f"Issuer Intelligence Hub → http://{a.host}:{a.port}", flush=True)
     ThreadingHTTPServer((a.host, a.port), Handler).serve_forever()

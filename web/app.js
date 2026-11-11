@@ -160,7 +160,7 @@ function resolveGate() {
 }
 async function openIsin(isin, {fromGate = true, then = null} = {}) {
   const u = U(isin); if (!u) return;
-  const steps = [L("Reading 213 trading days on Xetra", "213 Xetra-Handelstage werden gelesen"), L("Benchmarking against index, size cohort and sector", "Vergleich mit Index, Größenklasse und Sektor"),
+  const steps = [L("Reading 213 trading days on Xetra", "213 Xetra-Handelstage werden gelesen"), L("Benchmarking against index, similar-size stocks and sector", "Vergleich mit Index, ähnlich großen Aktien und Sektor"),
     L("Finding unusual days and matching the event calendar", "Auffällige Tage finden und mit dem Kalender abgleichen"), L("Preparing your dashboard", "Ihr Dashboard wird vorbereitet")];
   let timer;
   if (fromGate) {
@@ -319,7 +319,7 @@ function peersBlock() {
   const rows = [["turnover_eur", L("Turnover per day", "Umsatz pro Tag"), v => EUR(v)], ["xlm_25k", L("Trading cost €25k (XLM)", "Handelskosten 25 T€ (XLM)"), v => BPS(v)],
     ["auction_share", L("Auction share", "Auktionsanteil"), v => P(v, 0, false)], ["agent_share", L("Client (agent) share", "Anteil Kundenorders"), v => P(v, 0, false)], ["volatility", L("Volatility (annualised)", "Volatilität (annualisiert)"), v => P(v, 0, false)]];
   const SZ = {large: L("large", "groß"), mid: L("mid", "mittel"), small: L("small", "klein")};
-  const lab = x => x.key === "index" ? `${S.iss.meta.index}` : x.key === "size" ? `${L("Size", "Größe")}: ${SZ[x.name] || esc(x.name)}` : esc(x.name);
+  const lab = x => x.key === "index" ? `${S.iss.meta.index}` : x.key === "size" ? L("Similar size", "Ähnliche Größe") : esc(x.name);
   const sec = g.find(x => x.key === "sector");
   const members = sec && sec.members.length ? `<b>${esc(sec.name)}</b>: ${sec.members.map(m => esc(nice({ticker: m.ticker, name: m.name}))).join(", ")}${sec.n > sec.members.length ? " …" : ""}. ` : "";
   return `<div class="sec-head"><div><h2 class="h2">${L("Peer benchmark", "Peer-Vergleich")}</h2><p class="sec-note">${L("Medians of the last 60 trading days, per peer group: index, sector, and size. Arrows compare you with the index median.", "Mediane der letzten 60 Handelstage je Vergleichsgruppe: Index, Sektor und Größe. Pfeile vergleichen mit dem Indexmedian.")}</p></div></div>
