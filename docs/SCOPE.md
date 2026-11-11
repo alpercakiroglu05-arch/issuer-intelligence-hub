@@ -3,23 +3,23 @@
 **Challenge:** Deutsche Börse: *Issuer Intelligence Hub and corporate event impact tracker*
 **Problem in one sentence:** Mid- and small-cap IR teams cannot see how their own share trades or how the market reacted to their announcements. They have no terminal and no analyst, and broker reports arrive days later and cost extra.
 **User:** Head of Investor Relations at an MDAX/SDAX company. After every announcement, the CFO asks: *"Was it us or the market? Who sold? Did liquidity suffer?"*
-**Demo story:** The IR manager of CTS Eventim (MDAX) opens the dashboard and sees the normal state: turnover, trading cost vs the MDAX, and more than half of turnover in the closing auction. They click the unusual day 27 Mar 2026 and get the impact card: −21.7 % vs peers, 8.6× normal turnover, agent orders net selling, sell-off all day. Then the German summary, then the PDF IR snapshot.
+**Demo story:** The IR manager of CTS Eventim (MDAX) opens the dashboard and sees the normal state: turnover, trading cost vs the MDAX, and more than half of turnover in the closing auction. They click 27 Mar 2026 (FY results and 2026 targets, released the evening before at 17:45) and get the impact card: −21.7 % vs peers, 8.6× normal turnover, agent orders net selling, the market started pricing the news at 09:03, and the closing auction was 3.6× normal and set the price 1.5 % below the last trade. It is the 3rd-largest stock-specific move of 215 unusual MDAX days in 2026. Then the German summary, then the PDF IR snapshot.
 
 ## Must (the demo does not work without it)
 
 - [x] Part A dashboard on real data: turnover, XLM vs index, who trades, unusual days
 - [x] Part B impact card in one click, from an event or a notable day
 - [x] DE/EN summary (template now, LLM once the key is in `.env`) + HTML/PDF IR snapshot
-- [ ] `events/events.csv` for the 3 hero stocks, verified, **with time of day**
-- [ ] Intraday chart for the hero events (`ingest/build_intraday.py`)
-- [ ] LLM connected (JAIF endpoint) with numbers check
+- [x] `events/events.csv` for the hero stocks, sourced, **with time of day** (80 events incl. the DAX H1 season)
+- [x] Intraday chart and news onset for every event stock (`ingest/build_intraday.py`, 44 stocks)
+- [ ] LLM connected (JAIF endpoint) with numbers check (C4; until then template texts)
 
 ## Should (only after every Must is done)
 
-- [ ] Compare events of the same type (all DAX results 2026) with percentile on the card
+- [x] Compare events of the same type (all DAX H1 results 2026) with percentile on the card
 - [ ] Assistant v2 with tool calling
-- [ ] Sector peers (`events/sectors.csv`) instead of index peers
-- [ ] Eurex single-stock derivatives positioning before events
+- [ ] Sector and size peers in addition to index peers (brief point II; proposed: C2)
+- [x] ~~Eurex single-stock derivatives positioning~~ checked and skipped: participant split censored for >90 % of small-cap series
 
 ## Won't (good ideas, not in these 32 hours: pitch slide "what's next")
 

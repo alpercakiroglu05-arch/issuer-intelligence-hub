@@ -122,7 +122,7 @@ def render_card(card: dict) -> None:
     ca[3].metric("Closing auction price vs last trade", pct(au["close_auction_move"]),
                  band(au["close_auction_move_baseline_abs"]), delta_color="off")
     if _na(au["close_auction_eur"]):
-        st.caption("Auction volumes need the trade-by-trade data, built so far for the hero stocks.")
+        st.caption("Auction volumes need trade-by-trade bars (built for every stock in events.csv: run ingest/build_intraday.py).")
     elif not _na(au["close_auction_share"]):
         st.caption(f"Closing auction = {pct0(au['close_auction_share'])} of the day's turnover "
                    f"(normal {pct0(au['close_auction_share_baseline'])}).")

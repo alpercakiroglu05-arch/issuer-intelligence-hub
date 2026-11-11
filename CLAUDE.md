@@ -43,7 +43,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 ```bash
 pip install -r requirements.txt
 streamlit run app/Home.py                 # http://localhost:8501
-pytest                                    # 15 tests; data tests skip if data/ is empty
+pytest                                    # 42 tests; data tests skip if data/ is empty
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
 - Before a PR, run `pytest` **and** a headless page check:
@@ -113,23 +113,28 @@ Hero stocks (max 3 per challenge, set in `config.HERO_TICKERS`; the team may sti
 
 Xetra liquidity rule (Being Public Guide p. 32): XLM (EUR 25k) ≤ 100 bps **and** ≥ EUR 2.5m/day (4-month average) means category A; otherwise a Designated Sponsor is needed. `engine.baseline.kpis()` gives an estimate.
 
-## Status (end of Wed 15:40)
+## Status (Wed 19:45, all PRs up to #17 merged, 42 tests green)
 
-Done and merged: PR #1 (skeleton) and PR #2 (intraday).
-- **Ingest:** daily, events and intraday all ✅.
-- **Engine:** `baseline` ✅ and `impact` v1 ✅. Its intraday block is filled.
-- **AI:** LLM wrapper (none/openai/azure/anthropic) ✅, template + LLM narrative ✅, assistant v1 ✅.
-- **Report:** HTML/PDF ✅.
-- **App:** 5 pages ✅, running on real data.
-
-Submission text (13:30, "what data, model, logic"): `docs/SUBMISSION.md`. Keep its numbers in sync if the engine changes.
+Done on `main`:
+- **Ingest:** daily (174 stocks x 213 days), events (80 sourced events), intraday (44 event stocks, 3.8M bars).
+- **Engine:**
+  - `baseline`: KPIs, anomalies, liquidity trend, episodes.
+  - `impact`: card incl. auctions vs normal.
+  - `onset`: news onset.
+  - `auctions`: exact uncross volumes.
+  - `compare`: same-type percentiles, with Kaan's summary sentence.
+- **AI:** template narrative DE/EN + LLM wrapper; assistant v1. **No LLM connected** (`LLM_PROVIDER=none`).
+- **Report:** HTML/PDF snapshot of the impact card.
+- **Docs:** `docs/SUBMISSION.md` is the submission text (13:30, "what data, model, logic"); keep its numbers in sync if the engine changes. `docs/C2_ENGINE.md` documents the C2 functions.
 
 Open (see README checklists):
-1. ~~Event timing from data~~ ✅ `engine/onset.py` → `card["intraday"]["onset"]`; fills `event.timing` when the time is unknown. Hits 17 of 19 days with |abn z| ≥ 3. Onsets: EVT/GXI 08:02 pre-market, EVD 09:03, HDD 29 Oct 12:02.
-2. ~~`engine/compare.py`~~ ✅ v1: same-type table + percentiles → `card["comparison"]`. Falls back to auto-detected unusual days (871 in 2026: DAX 211, MDAX 215, SDAX 445) until `events.csv` has enough typed events. EVD 27 Mar = #3 of 215 unusual MDAX days by stock-specific move.
-3. LLM: JAIF endpoint/key from the organisers → `.env`. Then a numbers check (every number in the text must exist in the JSON) and an answer cache for the live demo (C4).
-4. ~~`events/events.csv`~~ ✅ 80 events with source links: all 2026 events of EVD, EVT, HDD, GXI + the first H1/Q3 publication of all 40 DAX members (H1 group: 39 events). Researched by Claude because the research team could not; the team should spot-check the hero rows before the pitch.
-5. UI polish of the impact card (the demo moment), the compare page and the intraday chart with an event marker (C3).
-6. Optional: sector peers (`events/sectors.csv`), Eurex OI positioning, a Part A PDF.
+1. **Peer benchmarking by sector and size** (brief point II): needs `events/sectors.csv` for all stocks plus a size cohort (market cap is not in the data, so use a turnover cohort). Proposed owner: C2 (Kaan).
+2. **Part A export** (brief: the dashboard result "can be exported as a short report"). Owner C4, no commits yet.
+3. **LLM:** JAIF key -> `.env`, numbers check, answer cache (C4). Until then texts are templates. Do not claim a numbers check in the pitch.
+4. **Dashboard (C3):** show `liquidity_trend()` and `anomaly_episodes()` (code ready, see `docs/C2_ENGINE.md` -> "For C3"), plus the auction share over time (brief point I). C3 has no commits yet.
+5. **Team setup:** everyone runs `git pull` + `python ingest/build_intraday.py` once (~3 min, raw data is on every laptop).
+6. **Human check:** spot-check the hero rows in `events.csv` (source link, time) before the pitch.
+
+Decided: Eurex open interest is skipped (participant split censored for >90 % of small-cap series), and Xetra TES is a "what's next" idea.
 
 Housekeeping: the empty repo `Bthn28/issuer-intelligence-hub` can be deleted, and merged branches can be removed.

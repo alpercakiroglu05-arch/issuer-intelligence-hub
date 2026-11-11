@@ -8,7 +8,7 @@ to their announcements. They have no terminal and no analyst, so they wait days 
 This tool answers two questions with one click:
 
 - **Part A, Dashboard: "How does our share normally trade?"** Turnover, trading cost (XLM spread), auctions, who trades, comparison with index peers, unusual days.
-- **Part B, Impact card: "What happened when we announced X?"** Move vs. peers, volume vs. normal, spread, auctions, participant flows and intraday reaction, exported as an IR snapshot (DE/EN).
+- **Part B, Impact card: "What happened when we announced X?"** Move vs. peers, volume vs. normal, spread, opening/closing auction vs normal, participant flows, the minute the market started pricing the news, and a rank among events of the same type, exported as an IR snapshot (DE/EN).
 
 > **Design rule: numbers come from code, words come from the LLM.**
 > The engine computes every figure deterministically. The LLM only sees the resulting JSON and writes text.
@@ -25,15 +25,15 @@ pip install -r requirements.txt
 cp .env.example .env                                   # optional: add LLM key
 ```
 
-**Data.** Raw data is never in git. Copy the processed files into `data/` from the shared OneDrive folder:
-`daily_features.parquet`, `universe.csv`, `events.parquet`, `intraday_bars.parquet`.
+**Data.** Data is never in git. Everyone has the raw excerpt: set `IIH_RAW_DIR` in `.env` and run the three ingest steps below (about 4 minutes in total).
+`events.parquet` is rebuilt from `events/events.csv` automatically when the CSV is newer.
 
 ```bash
 streamlit run app/Home.py      # demo UI -> http://localhost:8501
 pytest                         # smoke tests (data tests skip if data/ is empty)
 ```
 
-Rebuild the processed data. Only the data owner (C1) needs the 8.9 GB raw excerpt for this.
+Build the processed data from the 8.9 GB raw excerpt (once, and after `git pull` when `events.csv` changed):
 
 ```bash
 python ingest/build_daily.py "<path to Futury MDS Data Excerpt>" data     # ~25 s → daily_features.parquet, universe.csv, hero_candidates.csv
@@ -46,17 +46,17 @@ python ingest/build_intraday.py                  # ~3 min, every stock in events
 ## Architecture
 
 ```
- Raw DB excerpt (8.9 GB)              events/events.csv (research team)
+ Raw DB excerpt (8.9 GB)              events/events.csv (80 sourced events)
   XETRA_OHLC · FLOW_DYNAMICS ·                │
   XLM spreads · index_constituents ·          │
   XETRA_ONBOOK_TRADES                         │
           │  ingest/  (run once)              │
           ▼                                   ▼
   data/daily_features.parquet   data/intraday_bars.parquet   data/events.parquet
-  (174 stocks × 213 days)       (1-min bars, hero stocks)    (+ timing, reaction_day)
+  (174 stocks × 213 days)       (1-min bars, 44 event stocks) (80 events + timing, reaction_day)
           └───────────────┬───────────────────┘
                           ▼
-  engine/   baseline.py (Part A) · impact.py (Part B) · compare.py      ← deterministic
+  engine/   baseline.py (Part A) · impact.py · onset.py · auctions.py (Part B) · compare.py  ← deterministic
                           ▼  JSON
   ai/       narrate.py (DE/EN text) · agent.py (Q&A)                    ← LLM sees JSON only
                           ▼
@@ -68,12 +68,12 @@ python ingest/build_intraday.py                  # ~3 min, every stock in events
 futury-build-days-2026/
 ├── config.py              paths, windows, thresholds (single source of truth)
 ├── ingest/                build_daily.py ✅ · build_events.py ✅ · build_intraday.py ✅
-├── engine/                data.py ✅ · baseline.py ✅ · impact.py ✅ (v1) · compare.py 🔲
+├── engine/                data.py ✅ · baseline.py ✅ · impact.py ✅ · onset.py ✅ · auctions.py ✅ · compare.py ✅
 ├── ai/                    llm.py ✅ · narrate.py ✅ · agent.py ✅ (v1)
 ├── report/                template.html ✅ · export.py ✅
 ├── app/                   Home.py · pages/1_Dashboard · 2_Impact_Card · 3_Compare · 4_Assistant
-├── events/                events.csv · sectors.csv   (filled by the research team)
-├── docs/                  API_CONTRACT · SCOPE · PITCH
+├── events/                events.csv (80 sourced events) · sectors.csv (4 rows, to be filled)
+├── docs/                  API_CONTRACT · SUBMISSION (data, model, logic) · C2_ENGINE · SCOPE · PITCH
 ├── tests/                 smoke tests (pytest)
 └── data/                  processed files (gitignored)
 ```
@@ -86,18 +86,23 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 
 ### C1 · Data. Owner: Oguzhan
 - [x] `ingest/build_intraday.py`: 1-min bars (first EVD, EVT, HDD, GXI; now all event stocks)
-- [x] Sanity check: daily sum of bars = `turnover_eur` (ratio 1.000 on all 213 days × 4 stocks)
+- [x] Sanity check: daily sum of bars = `turnover_eur` (ratio 1.000 for all 44 stocks)
 - [x] News onset (`engine/onset.py`, PR #5): "the market started pricing the news at HH:MM" on the card; infers the timing when the announcement time is unknown; lists volatility interruptions
 - [x] Opening/closing auctions (`engine/auctions.py`, PR #6): volume vs normal and price formation, measured at the exact uncross minute (= 97.6–99.7 % of flow auction turnover)
 - [x] Intraday bars for all 44 stocks in `events.csv` (3.8M bars, ~170 MB; every ISIN of a ticker, FRE and QIA changed ISIN), read per stock with `engine.data.intraday(isin)`. Onset and auction volumes now work for the DAX H1 events too
-- [ ] Ongoing: share `data/events.parquet` on OneDrive when `events.csv` changes (the app already rebuilds it from the CSV by itself)
-- [ ] Optional: Eurex single-stock options and futures open interest (`EUREX_OPEN_INTEREST_DYNAMICS_EQUITYINDEX`, join on `ISIN_UNDERLYING`) to show derivatives positioning before events
+- [x] `events/events.csv`: 80 sourced events (the research team could not, so C1 took it over)
+- [x] `build_intraday.py` without arguments builds every stock in `events.csv` (PR #16)
+- [x] `docs/SUBMISSION.md`: submission text (data, model, logic, validation)
+- [x] Eurex open interest checked and skipped: the participant split is censored for >90 % of small-cap series
 
 ### C2 · Engine. Owner: Kaan (ydnka)
 - [x] `engine/compare.py` v1 (PR #7, written by C1 to unblock the demo): `same_type_events`, `percentile`, `comparison_for`, `sector_peers`. Fills `card["comparison"]`; falls back to auto-detected unusual days until `events.csv` has typed events. **C2 owns it from here.**
 - [x] `impact.py`: intraday block refined (news onset, exact auction volumes)
 - [x] `baseline.py`: liquidity trend ("has liquidity improved?"), merge consecutive anomaly days
 - [x] Unit tests: GXI 2026-02-11 should give ret ≈ −31.4 %, abnormal ≈ −30.5 %, volume ≈ 20× normal (`test_impact_card_known_values`)
+- [x] `compare.py` extras: summary sentence, percentiles never round up to 100 % (PR #11); `anomalies()` crash fix (PR #10)
+- [ ] **Peer benchmarking by sector and size** (brief point II): `sectors.csv` for all stocks + a turnover cohort (market cap is not in the data)
+- [ ] Index-day context in `anomalies()` (expiry Fridays, index reviews, market-wide days; use the `INDEX` rows of `events.csv`)
 
 ### C3 · Frontend. Owner: Alper
 - [ ] Impact card design (the demo moment): follow the designer's sketch
@@ -105,6 +110,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] Compare page: scatter of abnormal return vs volume ratio, selected stock highlighted (PR #7)
 - [ ] Polish: colors, empty states, loading, one clean end-to-end flow for the pitch
 - [ ] Part A: auction share over time chart on the dashboard (brief point I)
+- [ ] Dashboard: show `liquidity_trend()` ("has our liquidity improved?") and `anomaly_episodes()`. The code is ready; see `docs/C2_ENGINE.md` → "For C3"
 
 ### C4 · AI + report. Owner: ________
 - [ ] Get the JAIF / LLM endpoint working in `.env`
@@ -113,8 +119,8 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [ ] `report/`: PDF layout, a small chart, **Part A snapshot** (the brief asks for an exportable dashboard report). Auction and comparison rows are already in the event snapshot
 
 ### Non-code (research and pitch team)
-- [x] `events/events.csv`: 80 sourced events (hero stocks + first H1/Q3 publication of all 40 DAX members). **Please spot-check the hero rows (source link, time) before the pitch.**
-- `events/sectors.csv`: sector of every DAX/MDAX/SDAX stock
+- **Please spot-check the hero rows of `events/events.csv`** (source link, time) before the pitch.
+- `events/sectors.csv`: sector of every DAX/MDAX/SDAX stock (needed for brief point II, see C2)
 - Pitch deck (3–5 slides), demo script, backup video (2–3 min), and the list "what else IR needs + which data"
 
 ---
@@ -128,6 +134,7 @@ All schemas (`daily_features`, `intraday_bars`, `events.csv`, `impact_card` JSON
 - **OHLC**: open/high/low/close are **quoted mid prices**. Use auction prices for returns. Ignore `ADJUSTED_PRICE`. Use EUR lines only.
 - **Trades**: timestamps are **UTC** and must be converted to Europe/Berlin (watch DST). Empty `SIDE` = auction trade. Trading runs 08:00–22:00, so filter to the session you need.
 - **Index lists**: if a day is missing, use the previous file. TKCC was an MDAX member for one day only (spin-off on 28 Oct).
+- **ISIN changes**: Fresenius (FRE) and Qiagen (QIA) changed ISIN in 2026, so one ticker can map to two ISINs in `universe.csv`.
 
 ## Conventions
 See **[CONTRIBUTING.md](CONTRIBUTING.md)**. In short:
@@ -140,7 +147,7 @@ See **[CONTRIBUTING.md](CONTRIBUTING.md)**. In short:
 | When | Milestone |
 |---|---|
 | Wed 18:00 | End-to-end on real daily data (✅ skeleton) + events v1 |
-| Wed 22:00 | Intraday bars + comparison + LLM text live |
+| Wed 22:00 | Intraday bars ✅ + comparison ✅ + LLM text live (open, C4) |
 | Thu 08:30 | Review, cut scope |
 | Thu 11:00 | **Feature freeze** |
 | Thu 12:00 | Backup demo video recorded |
