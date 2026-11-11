@@ -84,33 +84,36 @@ futury-build-days-2026/
 
 Everyone works on their own files, so merge conflicts are rare. Contracts between modules are fixed (see below).
 
-### C1 · Data. Owner: ________
-- [x] `ingest/build_intraday.py`: 1-min bars for EVD, EVT, HDD, GXI (163k bars)
+### C1 · Data. Owner: Oguzhan
+- [x] `ingest/build_intraday.py`: 1-min bars (first EVD, EVT, HDD, GXI; now all event stocks)
 - [x] Sanity check: daily sum of bars = `turnover_eur` (ratio 1.000 on all 213 days × 4 stocks)
-- [ ] Peers' intraday bars for the comparison view (rerun with more tickers)
-- [ ] Run `build_events.py` whenever the research team updates `events.csv`, and share outputs on OneDrive
+- [x] News onset (`engine/onset.py`, PR #5): "the market started pricing the news at HH:MM" on the card; infers the timing when the announcement time is unknown; lists volatility interruptions
+- [x] Opening/closing auctions (`engine/auctions.py`, PR #6): volume vs normal and price formation, measured at the exact uncross minute (= 97.6–99.7 % of flow auction turnover)
+- [x] Intraday bars for all 44 stocks in `events.csv` (3.8M bars, ~170 MB; every ISIN of a ticker, FRE and QIA changed ISIN), read per stock with `engine.data.intraday(isin)`. Onset and auction volumes now work for the DAX H1 events too
+- [ ] Ongoing: share `data/events.parquet` on OneDrive when `events.csv` changes (the app already rebuilds it from the CSV by itself)
 - [ ] Optional: Eurex single-stock options and futures open interest (`EUREX_OPEN_INTEREST_DYNAMICS_EQUITYINDEX`, join on `ISIN_UNDERLYING`) to show derivatives positioning before events
 
-### C2 · Engine. Owner: ________
-- [ ] `engine/compare.py`: `same_type_events`, `percentile`, `sector_peers`. This fills `card["comparison"]`.
-- [ ] `impact.py`: refine the intraday block once bars exist (minutes to price discovery)
-- [ ] `baseline.py`: liquidity trend ("has liquidity improved?"), merge consecutive anomaly days
-- [ ] Unit tests: GXI 2026-02-11 should give ret ≈ −31.4 %, abnormal ≈ −30.5 %, volume ≈ 20× normal
+### C2 · Engine. Owner: Kaan (ydnka)
+- [x] `engine/compare.py` v1 (PR #7, written by C1 to unblock the demo): `same_type_events`, `percentile`, `comparison_for`, `sector_peers`. Fills `card["comparison"]`; falls back to auto-detected unusual days until `events.csv` has typed events. **C2 owns it from here.**
+- [x] `impact.py`: intraday block refined (news onset, exact auction volumes)
+- [x] `baseline.py`: liquidity trend ("has liquidity improved?"), merge consecutive anomaly days
+- [x] Unit tests: GXI 2026-02-11 should give ret ≈ −31.4 %, abnormal ≈ −30.5 %, volume ≈ 20× normal (`test_impact_card_known_values`)
 
-### C3 · Frontend. Owner: ________
+### C3 · Frontend. Owner: Alper
 - [ ] Impact card design (the demo moment): follow the designer's sketch
-- [ ] Intraday chart: event-time marker, highlighted auctions
-- [ ] Compare page: scatter of abnormal return vs volume ratio, selected stock highlighted
+- [ ] Intraday chart: event-time marker ✅ (onset line, PR #5), highlighted auctions still open
+- [x] Compare page: scatter of abnormal return vs volume ratio, selected stock highlighted (PR #7)
 - [ ] Polish: colors, empty states, loading, one clean end-to-end flow for the pitch
+- [ ] Part A: auction share over time chart on the dashboard (brief point I)
 
 ### C4 · AI + report. Owner: ________
 - [ ] Get the JAIF / LLM endpoint working in `.env`
 - [ ] `narrate.py`: tune the prompt and add a numbers check (every number in the text must exist in the JSON)
 - [ ] `agent.py` v2: tool calling with `TOOLS` (kpis, anomalies, impact_card)
-- [ ] `report/`: PDF layout, a small chart, Part A snapshot
+- [ ] `report/`: PDF layout, a small chart, **Part A snapshot** (the brief asks for an exportable dashboard report). Auction and comparison rows are already in the event snapshot
 
 ### Non-code (research and pitch team)
-- `events/events.csv`: events of the hero stocks **with time of day**, plus DAX 2026 results dates for comparisons
+- [x] `events/events.csv`: 80 sourced events (hero stocks + first H1/Q3 publication of all 40 DAX members). **Please spot-check the hero rows (source link, time) before the pitch.**
 - `events/sectors.csv`: sector of every DAX/MDAX/SDAX stock
 - Pitch deck (3–5 slides), demo script, backup video (2–3 min), and the list "what else IR needs + which data"
 

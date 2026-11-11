@@ -43,7 +43,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 ```bash
 pip install -r requirements.txt
 streamlit run app/Home.py                 # http://localhost:8501
-pytest                                    # 7 tests; data tests skip if data/ is empty
+pytest                                    # 15 tests; data tests skip if data/ is empty
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
 - Before a PR, run `pytest` **and** a headless page check:
@@ -74,8 +74,8 @@ Each folder has a `NOTES.md` and a PDF data dictionary.
 | ❌ | Eurex settlement prices (5.2 GB), other Eurex, ETP flows, Xetra TES | not needed |
 
 Processed files in `data/`: `daily_features.parquet` (174 stocks × 213 days, 76 cols), `universe.csv`,
-`events.parquet`, `intraday_bars.parquet` (EVD, EVT, HDD, GXI; 163k 1-min bars), `hero_candidates.csv`.
-Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `ingest/build_intraday.py <tickers>` (~130 s).
+`events.parquet`, `intraday_bars.parquet` (all 44 stocks in `events.csv`: heroes + DAX 40; 3.8M 1-min bars, ~170 MB; read one stock with `engine.data.intraday(isin)`, never the whole file in app code), `hero_candidates.csv`.
+Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `ingest/build_intraday.py <tickers>` (~160 s for 44 stocks; add `--rebuild` when the ticker list is unchanged but the code changed).
 
 ### Pitfalls (all handled in ingest; keep them in mind for new code)
 - **Flows:**
@@ -96,18 +96,20 @@ Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `
 
 ### Validations already done (good for jury Q&A)
 - Flow one-sided total / OHLC turnover = **1.000** (median over all stock-days).
-- Sum of 1-min bars / daily turnover = **1.000** on all 852 stock-days.
+- Sum of 1-min bars / daily turnover = **1.000** for every one of the 44 stocks (46 ISINs).
+- Opening + closing auction volume from the trade file = 97.6–99.7 % of flow auction turnover (median per hero stock); the rest is midday auction and volatility interruptions.
+- Onset vs announcement time: for all 7 events announced during trading hours (6 hero + Beiersdorf), the detected onset comes after the announcement (lag 2–117 min). Over all 39 sourced events with a release time (44 stocks), the timing inferred from the onset matches the release time in 33 (85 %).
 - Auction share is real: EVD on 27 Oct had **83 %** of turnover in the closing auction (raw trades and flows agree).
   60-day medians: DAX 51 %, MDAX 52 %, SDAX 34 %.
 
 ## Findings for the demo and pitch
 
 Hero stocks (max 3 per challenge, set in `config.HERO_TICKERS`; the team may still change them):
-- **EVD CTS Eventim (MDAX), main demo flow.** On 27 Mar: −23.2 % (peers −1.5 %, abnormal −21.7 %), 8.6× normal turnover, agent orders net selling (−36 %). The gap at the open was only −2.3 %; the sell-off ran all day, the low came at 16:44, and **€25.8m** traded in the closing auction. Only 7 % of turnover came in the first 15 minutes.
-- **EVT Evotec (SDAX).** On 14 Jul: −24 %, a −22 % gap at the open (news before the open). 19 % of turnover traded in the first 15 minutes; the low came at 09:18.
-- **HDD Heidelberger Druck (SDAX).** A small cap (~€1.3m/day, XLM ~90 bps, close to the Designated Sponsor thresholds) with several strong days. This is the liquidity story.
-- **GXI Gerresheimer, a pitch story only.** On 11 Feb: −31.4 % (peers −0.9 %), 20× turnover, 20 % of turnover in the first 15 minutes, low at 09:22. It **left the SDAX on 9 Apr**, so there is no XLM data after that. This gives the "index early-warning" idea.
-- The **reasons** for these moves are NOT in the data. The research team must verify them; never invent causes.
+- **EVD CTS Eventim (MDAX), main demo flow.** Trigger (sourced): FY 2025 results and 2026 targets on 26 Mar at 17:45, after the close; dpa-AFX blamed disappointing targets and the dividend cut (€1.66 → €1.44). On 27 Mar: −23.2 % (peers −1.5 %, abnormal −21.7 %), 8.6× normal turnover, agent orders net selling (−36 %). The opening auction (09:02) was only −2.3 %, but the market started pricing the news at **09:03** (onset detector): −15 % by 09:18, i.e. 65 % of the day's move within 15 minutes, with volatility interruptions at 09:07 and 09:12. The low came at 16:44. The closing auction (17:35) traded **€25.6m** (3.6× normal) and set the price 1.5 % below the last trade (normal ±0.2 %); the opening auction was 9.6× normal.
+- **EVT Evotec (SDAX).** Trigger (sourced): ad hoc guidance cut on 13 Jul at 21:17. On 14 Jul: −24 %, a −22 % gap at the open (news before the open). 19 % of turnover traded in the first 15 minutes; the low came at 09:18.
+- **HDD Heidelberger Druck (SDAX).** A small cap (~€1.3m/day, XLM ~90 bps, close to the Designated Sponsor thresholds) with several strong days. This is the liquidity story. Sourced triggers: Q3 results 5 Feb 07:30 (−14 %), drone-defense JV ad hoc 18 Mar 14:15 (+9 %), dpa-AFX drone-defense report 14 Apr 06:10 (+19 %), guidance cut 15 Apr 17:59 (−11 % next day), **guidance cut ad hoc 29 Oct at 12:00:53 → onset detector says 12:02**.
+- **GXI Gerresheimer, a pitch story only.** Trigger (sourced): ad hoc on 10 Feb at 22:28 (results postponed over an accounting investigation, guidance cut, impairments). On 11 Feb: −31.4 % (peers −0.9 %), 20× turnover, 20 % of turnover in the first 15 minutes, low at 09:22. It **left the SDAX on 9 Apr**, so there is no XLM data after that. This gives the "index early-warning" idea.
+- The **reasons** for these moves are NOT in the trading data. They come from `events/events.csv` (80 sourced events, researched 11 Nov). Quote only what the linked source says; never invent causes. Not found (no company news): EVD 27 Feb, 5 Mar, 30 Mar; EVT 3 Feb, 14 Apr (analyst comments), 12 Oct. EVD 31 Aug (19× turnover) = MSCI Germany deletion effective at the close.
 
 Xetra liquidity rule (Being Public Guide p. 32): XLM (EUR 25k) ≤ 100 bps **and** ≥ EUR 2.5m/day (4-month average) means category A; otherwise a Designated Sponsor is needed. `engine.baseline.kpis()` gives an estimate.
 
@@ -121,10 +123,10 @@ Done and merged: PR #1 (skeleton) and PR #2 (intraday).
 - **App:** 5 pages ✅, running on real data.
 
 Open (see README checklists):
-1. **Event timing from data (C1, Oğuzhan + Claude, next):** find the minute where volume and price first break from normal in `intraday_bars`, and show "the market started pricing the news at HH:MM" on the card. This also fills unknown event times.
-2. `engine/compare.py` (C2): same-type event table + percentiles → `card["comparison"]`. Depends on `events.csv`.
+1. ~~Event timing from data~~ ✅ `engine/onset.py` → `card["intraday"]["onset"]`; fills `event.timing` when the time is unknown. Hits 17 of 19 days with |abn z| ≥ 3. Onsets: EVT/GXI 08:02 pre-market, EVD 09:03, HDD 29 Oct 12:02.
+2. ~~`engine/compare.py`~~ ✅ v1: same-type table + percentiles → `card["comparison"]`. Falls back to auto-detected unusual days (871 in 2026: DAX 211, MDAX 215, SDAX 445) until `events.csv` has enough typed events. EVD 27 Mar = #3 of 215 unusual MDAX days by stock-specific move.
 3. LLM: JAIF endpoint/key from the organisers → `.env`. Then a numbers check (every number in the text must exist in the JSON) and an answer cache for the live demo (C4).
-4. `events/events.csv`: the research team adds verified events **with time of day**, plus DAX results dates. Today the rows are `TBD` seeds.
+4. ~~`events/events.csv`~~ ✅ 80 events with source links: all 2026 events of EVD, EVT, HDD, GXI + the first H1/Q3 publication of all 40 DAX members (H1 group: 39 events). Researched by Claude because the research team could not; the team should spot-check the hero rows before the pitch.
 5. UI polish of the impact card (the demo moment), the compare page and the intraday chart with an event marker (C3).
 6. Optional: sector peers (`events/sectors.csv`), Eurex OI positioning, a Part A PDF.
 

@@ -54,13 +54,19 @@ summary = text(json.dumps(card, default=str), lang)
 st.info(summary)
 
 # Intraday chart (appears once C1 has built data/intraday_bars.parquet)
-bars = data.intraday()
+bars = data.intraday(isin)
 if bars is not None:
-    b = bars[(bars["isin"] == isin) & (bars["ts_local"].dt.date == pd.Timestamp(day).date())]
+    b = bars[bars["ts_local"].dt.date == pd.Timestamp(day).date()]
     if len(b):
         f = go.Figure()
         f.add_scatter(x=b["ts_local"], y=b["close"], mode="lines", name="Price")
         f.add_bar(x=b["ts_local"], y=b["volume_eur"], name="Turnover", yaxis="y2", opacity=0.35)
+        o = (card.get("intraday") or {}).get("onset") or {}
+        if o.get("time"):
+            t_on = pd.Timestamp(f"{day} {o['time']}").tz_localize(b["ts_local"].dt.tz)
+            f.add_shape(type="line", x0=t_on, x1=t_on, y0=0, y1=1, yref="paper", line=dict(color="red", dash="dash"))
+            f.add_annotation(x=t_on, y=1, yref="paper", text=f"news priced from {o['time']}", showarrow=False,
+                             xanchor="left", font=dict(color="red"))
         f.update_layout(height=320, yaxis2=dict(overlaying="y", side="right", showgrid=False),
                         margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h"))
         st.plotly_chart(f, width="stretch")
