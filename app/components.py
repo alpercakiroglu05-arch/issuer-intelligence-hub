@@ -96,5 +96,16 @@ def render_card(card: dict) -> None:
         c3[1].metric("Turnover in first 60 min", pct0(i["volume_share_first_60min"]))
         c3[2].metric("Closing auction", eur(i["close_auction_eur"]))
         c3[3].metric("Intraday low at", i["time_of_low"] or "n/a")
+        o = i.get("onset") or {}
+        if o.get("time"):
+            where = {"pre_market": "pre-market", "opening_auction": "opening auction",
+                     "at_open": "right after the open", "continuous": "during the session"}[o["session"]]
+            st.success(f"⏱ **The market started pricing the news at {o['time']}** ({where}): "
+                       f"{pct(o['ret_at_onset'])} vs. previous close at {o['volume_ratio_at_onset']:.1f}x normal "
+                       f"turnover for that time; {pct(o['ret_15min_after'])} 15 min later.")
+            if o["volatility_interruptions"]:
+                st.caption("Volatility interruptions (unscheduled auctions): " + ", ".join(o["volatility_interruptions"]))
+            if card["event"].get("timing_source") == "inferred_from_trading":
+                st.caption(f"Announcement time unknown → timing inferred from trading: **{card['event']['timing']}**.")
     if card["flags"]:
         st.warning("Data flags: " + ", ".join(card["flags"]))

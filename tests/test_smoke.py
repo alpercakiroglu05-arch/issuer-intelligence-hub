@@ -89,3 +89,18 @@ def test_impact_card_intraday_block():
     i = impact_card(isin_of("EVD"), "2026-03-27")["intraday"]
     assert i is not None
     assert i["close_auction_eur"] == pytest.approx(25.8e6, rel=0.02)
+
+
+@pytest.mark.skipif(not (HAS_DATA and HAS_BARS), reason="intraday_bars.parquet missing")
+def test_news_onset_heroes():
+    """Onset minute on the hero days (checked by eye against the 1-min bars)."""
+    from engine.data import isin_of
+    from engine.impact import impact_card
+    from engine.onset import onset
+    evt = onset(isin_of("EVT"), "2026-07-14")      # -21% already in pre-market trading at 08:02
+    assert (evt["time"], evt["session"], evt["inferred_timing"]) == ("08:02", "pre_market", "pre_open")
+    hdd = onset(isin_of("HDD"), "2026-10-29")      # intraday news around noon
+    assert (hdd["time"], hdd["inferred_timing"]) == ("12:02", "intraday")
+    card = impact_card(isin_of("EVT"), "2026-07-14")  # no announcement time -> timing filled from trading
+    assert card["event"]["timing"] == "pre_open"
+    assert card["event"]["timing_source"] == "inferred_from_trading"

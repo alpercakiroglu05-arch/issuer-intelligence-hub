@@ -60,3 +60,9 @@ DS_LOOKBACK_DAYS = 84      # ~4 months
 
 # Anomaly thresholds
 ANOMALY_Z = 3.0
+
+# News onset detection (engine/onset.py): first minute where price AND volume break from normal
+ONSET_PRICE_K = 2.0               # |move vs previous close| >= 2 x daily return std (baseline)
+ONSET_VOLUME_K = 3.0              # cumulative turnover >= 3 x normal for the time of day
+ONSET_MIN_TURNOVER_SHARE = 0.01   # ... and >= 1% of a normal day's turnover (ignores single odd prints)
+ONSET_PERSIST_MIN = 5             # price still beyond the threshold 5 minutes later

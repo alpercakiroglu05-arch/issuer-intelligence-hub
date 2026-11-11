@@ -17,7 +17,8 @@ Write 4-5 short sentences in {language}:
 1) what happened to the share price vs. index peers (abnormal return),
 2) how unusual the trading activity was (volume vs. normal),
 3) liquidity / spread and auctions,
-4) who traded (agent = client/institutional orders, prop, market makers), only if notable.
+4) who traded (agent = client/institutional orders, prop, market makers), only if notable,
+5) if intraday.onset.time is set: when the market started pricing the news (that clock time).
 Rules: use ONLY numbers that appear in the JSON (rounded); never invent causes or numbers;
 no investment advice; no predictions; plain factual tone. Ratios: 'x times normal'."""
 
@@ -41,6 +42,7 @@ def _p(x):
 
 def template_narrative(card: dict, lang: str = "en") -> str:
     p, v, l, a = card["price"], card["volume"], card["liquidity"], card["participants"]
+    o = (card.get("intraday") or {}).get("onset") or {}
     if lang == "de":
         t = (f"{card['name']} veränderte sich am {card['event']['reaction_day']} um {_p(p['ret'])}, "
              f"die {card['index']}-Vergleichswerte um {_p(p['peer_ret'])} (unternehmensspezifisch: {_p(p['abn_ret'])}). "
@@ -50,6 +52,8 @@ def template_narrative(card: dict, lang: str = "en") -> str:
         if a["agent_aggr_imbalance"] is not None:
             side = "Verkaufs" if a["agent_aggr_imbalance"] < 0 else "Kauf"
             t += f"Agentenorders zeigten einen {side}überhang von {abs(a['agent_aggr_imbalance']) * 100:.0f}%."
+        if o.get("time"):
+            t += f" Der Markt begann die Nachricht um {o['time']} Uhr einzupreisen ({_p(o['ret_at_onset'])})."
         return t
     t = (f"{card['name']} moved {_p(p['ret'])} on {card['event']['reaction_day']} while its {card['index']} peers "
          f"moved {_p(p['peer_ret'])} (stock-specific: {_p(p['abn_ret'])}). "
@@ -59,4 +63,6 @@ def template_narrative(card: dict, lang: str = "en") -> str:
     if a["agent_aggr_imbalance"] is not None:
         side = "selling" if a["agent_aggr_imbalance"] < 0 else "buying"
         t += f"Agent (client) orders were net {side}: imbalance {abs(a['agent_aggr_imbalance']) * 100:.0f}%."
+    if o.get("time"):
+        t += f" The market started pricing the news at {o['time']} ({_p(o['ret_at_onset'])} vs. previous close)."
     return t
