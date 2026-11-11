@@ -8,6 +8,7 @@ TODO C4:
   - add a numbers check: every number in the output must appear in the JSON (else fall back)
 """
 import json
+import math
 
 from ai import llm
 
@@ -16,8 +17,10 @@ You receive ONE JSON object with pre-computed trading statistics for one event d
 Write 4-5 short sentences in {language}:
 1) what happened to the share price vs. index peers (abnormal return),
 2) how unusual the trading activity was (volume vs. normal),
-3) liquidity / spread and auctions,
-4) who traded (agent = client/institutional orders, prop, market makers), only if notable.
+3) liquidity / spread and the opening/closing auctions (volume vs normal, auction price vs previous close / last trade),
+4) who traded (agent = client/institutional orders, prop, market makers), only if notable,
+5) if intraday.onset.time is set: when the market started pricing the news (that clock time),
+6) if comparison is set: how this event ranks among comparable events (percentiles, group size).
 Rules: use ONLY numbers that appear in the JSON (rounded); never invent causes or numbers;
 no investment advice; no predictions; plain factual tone. Ratios: 'x times normal'."""
 
@@ -39,8 +42,16 @@ def _p(x):
     return "n/a" if x is None else f"{x * 100:+.1f}%"
 
 
+def _pctile(x):
+    """Percentile, rounded down so 0.995 never reads as "100%"."""
+    return f"{math.floor(round(x * 100, 6))}%"
+
+
 def template_narrative(card: dict, lang: str = "en") -> str:
     p, v, l, a = card["price"], card["volume"], card["liquidity"], card["participants"]
+    o = (card.get("intraday") or {}).get("onset") or {}
+    au = card.get("auctions") or {}
+    cmp = card.get("comparison") or {}
     if lang == "de":
         t = (f"{card['name']} veränderte sich am {card['event']['reaction_day']} um {_p(p['ret'])}, "
              f"die {card['index']}-Vergleichswerte um {_p(p['peer_ret'])} (unternehmensspezifisch: {_p(p['abn_ret'])}). "
@@ -50,6 +61,15 @@ def template_narrative(card: dict, lang: str = "en") -> str:
         if a["agent_aggr_imbalance"] is not None:
             side = "Verkaufs" if a["agent_aggr_imbalance"] < 0 else "Kauf"
             t += f"Agentenorders zeigten einen {side}überhang von {abs(a['agent_aggr_imbalance']) * 100:.0f}%."
+        if o.get("time"):
+            t += f" Der Markt begann die Nachricht um {o['time']} Uhr einzupreisen ({_p(o['ret_at_onset'])})."
+        if au.get("close_auction_ratio") is not None:
+            t += (f" Die Schlussauktion war {au['close_auction_ratio']:.1f}-mal so groß wie normal und "
+                  f"bewegte den Kurs um {_p(au['close_auction_move'])} gegenüber dem letzten Handel.")
+        if cmp and cmp.get("abs_abn_ret_pctile") is not None:
+            what = "ungewöhnlichen Handelstagen" if cmp["group_type"] == "NOTABLE_DAY" else f"{cmp['group_type']}-Ereignissen"
+            t += (f" Im Vergleich mit {cmp['n']} {what} ({cmp['group_index']}, 2026) war die unternehmensspezifische "
+                  f"Bewegung {'die größte von allen' if cmp['abs_abn_ret_pctile'] == 1.0 else 'größer als bei ' + _pctile(cmp['abs_abn_ret_pctile'])}.")
         return t
     t = (f"{card['name']} moved {_p(p['ret'])} on {card['event']['reaction_day']} while its {card['index']} peers "
          f"moved {_p(p['peer_ret'])} (stock-specific: {_p(p['abn_ret'])}). "
@@ -59,4 +79,13 @@ def template_narrative(card: dict, lang: str = "en") -> str:
     if a["agent_aggr_imbalance"] is not None:
         side = "selling" if a["agent_aggr_imbalance"] < 0 else "buying"
         t += f"Agent (client) orders were net {side}: imbalance {abs(a['agent_aggr_imbalance']) * 100:.0f}%."
+    if o.get("time"):
+        t += f" The market started pricing the news at {o['time']} ({_p(o['ret_at_onset'])} vs. previous close)."
+    if au.get("close_auction_ratio") is not None:
+        t += (f" The closing auction was {au['close_auction_ratio']:.1f}x its normal size and moved the price "
+              f"{_p(au['close_auction_move'])} vs. the last trade.")
+    if cmp and cmp.get("abs_abn_ret_pctile") is not None:
+        move = ("the biggest of them" if cmp["abs_abn_ret_pctile"] == 1.0
+                else f"bigger than {_pctile(cmp['abs_abn_ret_pctile'])} of them")
+        t += f" Compared with {cmp['n']} {cmp['group']}, the stock-specific move was {move}."
     return t
