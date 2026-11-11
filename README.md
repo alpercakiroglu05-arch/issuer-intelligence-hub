@@ -32,8 +32,8 @@ cp .env.example .env                                   # optional: add LLM key
 ```bash
 python web/server.py           # demo UI (web front end) -> http://127.0.0.1:8600
 streamlit run app/Home.py      # backup UI / analyst view -> http://localhost:8501
-pytest                         # 126 tests incl. the web API (data tests skip if data/ is empty)
-python web/warm_cache.py       # re-warm the LLM demo cache after any prompt or card-JSON change
+pytest                         # 137 tests incl. the web API (data tests skip if data/ is empty)
+python web/warm_cache.py       # re-warm the demo caches (summaries + assistant) after any prompt, card or engine change
 ```
 
 Build the processed data from the 8.9 GB raw excerpt (once, and after `git pull` when `events.csv` changed):
