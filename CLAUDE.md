@@ -122,6 +122,8 @@ Done and merged: PR #1 (skeleton) and PR #2 (intraday).
 - **Report:** HTML/PDF ✅.
 - **App:** 5 pages ✅, running on real data.
 
+Submission text (13:30, "what data, model, logic"): `docs/SUBMISSION.md`. Keep its numbers in sync if the engine changes.
+
 Open (see README checklists):
 1. ~~Event timing from data~~ ✅ `engine/onset.py` → `card["intraday"]["onset"]`; fills `event.timing` when the time is unknown. Hits 17 of 19 days with |abn z| ≥ 3. Onsets: EVT/GXI 08:02 pre-market, EVD 09:03, HDD 29 Oct 12:02.
 2. ~~`engine/compare.py`~~ ✅ v1: same-type table + percentiles → `card["comparison"]`. Falls back to auto-detected unusual days (871 in 2026: DAX 211, MDAX 215, SDAX 445) until `events.csv` has enough typed events. EVD 27 Mar = #3 of 215 unusual MDAX days by stock-specific move.
