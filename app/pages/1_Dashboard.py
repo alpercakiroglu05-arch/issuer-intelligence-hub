@@ -17,7 +17,7 @@ from plotly.subplots import make_subplots  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from components import bps, eur, pct, pct0, setup  # noqa: E402
-from engine import baseline, data  # noqa: E402
+from engine import baseline, compare, data  # noqa: E402
 
 isin = setup("Dashboard")
 
@@ -29,18 +29,40 @@ def load(isin):
 
 
 prof, anom, k, trend, episodes = load(isin)
+
+
+@st.cache_data
+def peer_median(isin: str, by: str, col: str) -> pd.Series:
+    """Daily median of `col` across the stock's peer group (index, sector or turnover cohort)."""
+    if by == "index":
+        return baseline.index_benchmark(k["index"], col)
+    isins = compare.peer_group(isin, by)["isins"]
+    d = data.daily()
+    return d[d["isin"].isin(isins)].groupby("date")[col].median()
 st.title(f"{k['name'].title()} · how the share trades")
-st.caption(f"{k['index']} · {k['period']} · compared with the median {k['index']} stock")
+
+# Peer benchmarking by index, sector or size (brief point II; engine.compare.peer_group, C2)
+PEERS = {"Index": "index", "Sector": "sector", "Size": "size"}
+choice = st.segmented_control("Compare with", list(PEERS), default="Index") or "Index"
+by = PEERS[choice]
+key = f"{by}_median"
+g = k["peer_groups"][by]
+peer = g["name"] if by != "size" else f"{g['name']} cohort"
+st.caption(f"{k['period']} · compared with the median stock of **{g['label']}** ({g['n']} peers)"
+           + (" · sector unknown, showing the index" if g["fallback"] else "")
+           + (" · size = turnover cohort (market cap is not in the data)" if by == "size" else ""))
+if g["n"] < 3:
+    st.warning("Small peer group: these medians rest on fewer than 3 other stocks.")
 
 c = st.columns(5)
 c[0].metric("Median daily turnover", eur(k["median_turnover_eur"]["stock"]),
-            f"index {eur(k['median_turnover_eur']['index_median'])}", delta_color="off")
+            f"{peer} {eur(k['median_turnover_eur'][key])}", delta_color="off")
 c[1].metric("Trading cost XLM 25k", bps(k["median_xlm_25k_bps"]["stock"]),
-            f"index {bps(k['median_xlm_25k_bps']['index_median'])}", delta_color="off")
+            f"{peer} {bps(k['median_xlm_25k_bps'][key])}", delta_color="off")
 c[2].metric("Auction share", pct0(k["median_auction_share"]["stock"]),
-            f"index {pct0(k['median_auction_share']['index_median'])}", delta_color="off")
+            f"{peer} {pct0(k['median_auction_share'][key])}", delta_color="off")
 c[3].metric("Agent (client) share", pct0(k["median_agent_share"]["stock"]),
-            f"index {pct0(k['median_agent_share']['index_median'])}", delta_color="off")
+            f"{peer} {pct0(k['median_agent_share'][key])}", delta_color="off")
 lc = k["liquidity_check"]
 c[4].metric("Liquidity category (est.)", lc["category_estimate"],
             f"4m: {eur(lc['avg_turnover_eur_4m'])}/day · {bps(lc['median_xlm_25k_bps_4m'])}", delta_color="off")
@@ -75,11 +97,11 @@ st.plotly_chart(fig, width="stretch")
 
 left, right = st.columns(2)
 with left:
-    st.markdown("**Trading cost (XLM, EUR 25k order) vs index median**")
-    bench = baseline.index_benchmark(k["index"], "xlm_25k")
+    st.markdown(f"**Trading cost (XLM, EUR 25k order) vs {peer} median**")
+    bench = peer_median(isin, by, "xlm_25k")
     f2 = go.Figure()
     f2.add_scatter(x=prof["date"], y=prof["xlm_25k"], name=k["ticker"], mode="lines")
-    f2.add_scatter(x=bench.index, y=bench.values, name=f"{k['index']} median", mode="lines", line=dict(dash="dot"))
+    f2.add_scatter(x=bench.index, y=bench.values, name=f"{peer} median", mode="lines", line=dict(dash="dot"))
     f2.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), yaxis_title="bps", legend=dict(orientation="h"))
     st.plotly_chart(f2, width="stretch")
 with right:
