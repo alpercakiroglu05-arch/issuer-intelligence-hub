@@ -48,6 +48,8 @@ def anomalies(isin: str, z: float = ANOMALY_Z) -> pd.DataFrame:
     })
     hit = reasons.any(axis=1) & ~s["possible_corp_action"]
     out = s.loc[hit, ["date", "ret", "abn_ret", "vol_ratio", "vol_z", "abn_ret_z", "xlm_25k_ratio"]].copy()
+    if out.empty:  # apply() on an empty frame returns a DataFrame, not a Series
+        return out.assign(reason=pd.Series(dtype=str), severity=pd.Series(dtype=float))
     out["reason"] = reasons[hit].apply(lambda r: ", ".join(r.index[r]), axis=1)
     out["severity"] = out["abn_ret_z"].abs().fillna(0) + out["vol_z"].clip(lower=0).fillna(0)
     return out.sort_values("date", ascending=False).reset_index(drop=True)
