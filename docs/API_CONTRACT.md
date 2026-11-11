@@ -21,7 +21,12 @@ All trading hours (08:00–22:00) are kept. Filter the session you need. `is_auc
 
 ### `events/events.csv`, filled by hand
 `ticker, isin (optional), type, date (YYYY-MM-DD), time_local (HH:MM), title, source_url, verified (0/1)`
-Types: `FY Q1 H1 Q3 DIVIDEND_EX AGM ADHOC GUIDANCE MA CMD`.
+Types: `FY Q1 H1 Q3 DIVIDEND_EX AGM ADHOC GUIDANCE MA CMD INDEX`.
+- Results types follow the company's own fiscal year (Siemens' Apr–Jun quarter is `Q3`).
+- **A results event is the first time the figures became public.** If a company pre-released key figures by ad hoc, that row is the event (title says "preliminary … (ad hoc; full report …)"), so every company counts once per period and the row marks the day the price reacted.
+- `INDEX` = index inclusion/deletion (announcement or effective day, see title). `MA` also covers sourced media reports on takeover interest (title says "report").
+- `time_local` is Frankfurt time from the release timestamp (EQS/DGAP header); "(time = planned dpa-AFX slot)" in the title marks a pre-announced slot. Empty = unknown, never guessed.
+- `verified` = 1 when the linked source states the date (and the time, if given).
 `build_events.py` adds `timing` (pre_open / intraday / post_close) and `reaction_day`. A release after 17:35 counts on the next trading day.
 
 ### `impact_card()`: JSON (engine → app, AI, report)
