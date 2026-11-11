@@ -136,7 +136,11 @@ Done on `main`:
 - **Docs:** `docs/SUBMISSION.md` is the submission text (13:30, "what data, model, logic"); keep its numbers in sync if the engine changes. `docs/C2_ENGINE.md` documents the C2 functions.
 
 Open (see README checklists):
-1. **JAIF key** → `.env` (from the pinned message in our Discord team channel). Then pick the model (Kolibri-1 for DE/EN), check the texts and run the demo path once to fill the answer cache.
+1. ~~JAIF key~~ ✅ The key is in `.env`, taken from the top of the JAIF Model Handbook HTML. The model is **`hIP_1.0-Mistral/Mistral-Medium-3.5-128B`**, chosen after testing on EVD 27 Mar in EN and DE:
+   - **Kolibri-1** is fast, but its texts had *meaning* errors ("shares fell 21.7 %" where 21.7 % is the abnormal return; "09:03 before the open"). The numbers check cannot catch these, because the numbers are right.
+   - **GLM-5.3-Flash** is accurate but takes 20 s or more and writes long texts.
+   - **Mistral-Medium-3.5** is accurate, takes 5–7 s and writes clean German.
+   - Cache warm-up: 22 demo texts are in `data/llm_cache.json` (11 events, EN and DE). 21 passed the check. EVD Q1 (EN) was rejected because the model wrote "top 22 %", a number it derived itself, so the template is shown there.
 2. **German formatting** in the DE texts and snapshots (Kaan, tonight).
 3. **Web:** market context in *Unusual days*; optional the cost-by-order-size block (Kaan with Alper).
 4. **Thu morning:** demo dry run on the web UI; backup video at 12:00 on the web UI; Streamlit open as the live fallback.

@@ -121,7 +121,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] **Assistant without a model**: short answer + liquidity summary instead of a JSON dump (Streamlit, PR #28); the web has its own fallback answers
 - [x] **Answer cache** (`LLM_CACHE`, PR #28) so the live demo survives Wi-Fi/API outages
 - [ ] **German formatting** in the DE texts and snapshots (`−23,2 %`, `27.03.2026`, German group label): Kaan, tonight
-- [ ] **JAIF key**: `.env` already points at `https://hip-gw.hessian.ai/v1`; the workshop key is in the pinned message of our Discord team channel. Then pick the model (Kolibri-1 for DE/EN) and run the demo path once to fill the cache
+- [x] **JAIF**: gateway `https://hip-gw.hessian.ai/v1`, model `hIP_1.0-Mistral/Mistral-Medium-3.5-128B` (accurate, 5–7 s, good German; Kolibri-1 made meaning errors). The key is at the top of the JAIF Model Handbook HTML in Discord. The demo texts are pre-cached
 - [ ] Optional: `agent.py` v2 with tool calling
 
 ### Non-code (research and pitch team)
