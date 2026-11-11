@@ -104,3 +104,27 @@ def test_news_onset_heroes():
     card = impact_card(isin_of("EVT"), "2026-07-14")  # no announcement time -> timing filled from trading
     assert card["event"]["timing"] == "pre_open"
     assert card["event"]["timing_source"] == "inferred_from_trading"
+
+
+@pytest.mark.skipif(not (HAS_DATA and HAS_BARS), reason="intraday_bars.parquet missing")
+def test_auction_block_evd():
+    """CTS Eventim, 27 Mar 2026: closing auction uncross at 17:35 = EUR 25.59m, 1.5% below the last trade."""
+    from engine.data import isin_of
+    from engine.impact import impact_card
+    au = impact_card(isin_of("EVD"), "2026-03-27")["auctions"]
+    assert au["close_auction_eur"] == pytest.approx(25.59e6, rel=0.005)
+    assert au["open_auction_eur"] == pytest.approx(1.16e6, rel=0.01)
+    assert au["close_auction_move"] == pytest.approx(-0.0153, abs=0.0005)
+    assert au["open_auction_ratio"] > 5 and au["close_auction_ratio"] > 3
+
+
+@pytest.mark.skipif(not (HAS_DATA and HAS_BARS), reason="intraday_bars.parquet missing")
+def test_auction_volumes_match_flows():
+    """Opening + closing auction (trade bars) ~ all auction turnover in the flow data (rest: midday/volatility)."""
+    from engine.auctions import auction_profile
+    from engine.data import intraday, stock
+    for isin in intraday()["isin"].unique():
+        s, p = stock(isin), auction_profile(isin)
+        flow = s[[f"{x}_auct_buy" for x in ("mm", "agent", "prop")]].sum(axis=1)
+        r = ((p["open_auction_eur"] + p["close_auction_eur"]) / flow.where(flow > 0)).median()
+        assert 0.95 <= r <= 1.001, (isin, r)

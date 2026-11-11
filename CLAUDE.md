@@ -43,7 +43,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 ```bash
 pip install -r requirements.txt
 streamlit run app/Home.py                 # http://localhost:8501
-pytest                                    # 8 tests; data tests skip if data/ is empty
+pytest                                    # 10 tests; data tests skip if data/ is empty
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
 - Before a PR, run `pytest` **and** a headless page check:
@@ -97,13 +97,14 @@ Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `
 ### Validations already done (good for jury Q&A)
 - Flow one-sided total / OHLC turnover = **1.000** (median over all stock-days).
 - Sum of 1-min bars / daily turnover = **1.000** on all 852 stock-days.
+- Opening + closing auction volume from the trade file = 97.6–99.7 % of flow auction turnover (median per hero stock); the rest is midday auction and volatility interruptions.
 - Auction share is real: EVD on 27 Oct had **83 %** of turnover in the closing auction (raw trades and flows agree).
   60-day medians: DAX 51 %, MDAX 52 %, SDAX 34 %.
 
 ## Findings for the demo and pitch
 
 Hero stocks (max 3 per challenge, set in `config.HERO_TICKERS`; the team may still change them):
-- **EVD CTS Eventim (MDAX), main demo flow.** On 27 Mar: −23.2 % (peers −1.5 %, abnormal −21.7 %), 8.6× normal turnover, agent orders net selling (−36 %). The opening auction (09:02) was only −2.3 %, but the market started pricing the news at **09:03** (onset detector): −15 % by 09:18, i.e. 65 % of the day's move within 15 minutes, with volatility interruptions at 09:07 and 09:12. The low came at 16:44 and **€25.8m** traded in the closing auction.
+- **EVD CTS Eventim (MDAX), main demo flow.** On 27 Mar: −23.2 % (peers −1.5 %, abnormal −21.7 %), 8.6× normal turnover, agent orders net selling (−36 %). The opening auction (09:02) was only −2.3 %, but the market started pricing the news at **09:03** (onset detector): −15 % by 09:18, i.e. 65 % of the day's move within 15 minutes, with volatility interruptions at 09:07 and 09:12. The low came at 16:44. The closing auction (17:35) traded **€25.6m** (3.6× normal) and set the price 1.5 % below the last trade (normal ±0.2 %); the opening auction was 9.6× normal.
 - **EVT Evotec (SDAX).** On 14 Jul: −24 %, a −22 % gap at the open (news before the open). 19 % of turnover traded in the first 15 minutes; the low came at 09:18.
 - **HDD Heidelberger Druck (SDAX).** A small cap (~€1.3m/day, XLM ~90 bps, close to the Designated Sponsor thresholds) with several strong days. This is the liquidity story.
 - **GXI Gerresheimer, a pitch story only.** On 11 Feb: −31.4 % (peers −0.9 %), 20× turnover, 20 % of turnover in the first 15 minutes, low at 09:22. It **left the SDAX on 9 Apr**, so there is no XLM data after that. This gives the "index early-warning" idea.

@@ -34,6 +34,11 @@ def bps(v):
     return "n/a" if _na(v) else f"{v:.0f} bps"
 
 
+def band(v):
+    """Typical absolute move, e.g. 'normal ±0.5%'."""
+    return "n/a" if _na(v) else f"normal ±{v * 100:.1f}%"
+
+
 def eur(v):
     if _na(v):
         return "n/a"
@@ -89,14 +94,31 @@ def render_card(card: dict) -> None:
     c2[2].metric("Abnormal return t0..t+5", pct(p["car_0_5"]))
     c2[3].metric("Spread back to normal after", "n/a" if l["days_to_normal"] is None else f"{l['days_to_normal']} days")
     c2[4].metric("Volume z-score", "n/a" if v["z"] is None else f"{v['z']:.1f}")
+    st.markdown("**Opening and closing auction**")
+    ca = st.columns(4)
+    norm = lambda r, b: "n/a" if _na(r) else f"{r:.1f}x normal ({eur(b)})"  # noqa: E731
+    ca[0].metric("Opening auction volume", eur(au["open_auction_eur"]),
+                 norm(au["open_auction_ratio"], au["open_auction_eur_baseline"]), delta_color="off")
+    ca[1].metric("Opening auction price vs prev. close", pct(au["open_auction_move"]),
+                 band(au["open_auction_move_baseline_abs"]), delta_color="off")
+    ca[2].metric("Closing auction volume", eur(au["close_auction_eur"]),
+                 norm(au["close_auction_ratio"], au["close_auction_eur_baseline"]), delta_color="off")
+    ca[3].metric("Closing auction price vs last trade", pct(au["close_auction_move"]),
+                 band(au["close_auction_move_baseline_abs"]), delta_color="off")
+    if _na(au["close_auction_eur"]):
+        st.caption("Auction volumes need the trade-by-trade data, built so far for the hero stocks.")
+    elif not _na(au["close_auction_share"]):
+        st.caption(f"Closing auction = {pct0(au['close_auction_share'])} of the day's turnover "
+                   f"(normal {pct0(au['close_auction_share_baseline'])}).")
     if card.get("intraday"):
         i = card["intraday"]
+        o = i.get("onset") or {}
+        st.markdown("**Intraday**")
         c3 = st.columns(4)
         c3[0].metric("Turnover in first 15 min", pct0(i["volume_share_first_15min"]))
         c3[1].metric("Turnover in first 60 min", pct0(i["volume_share_first_60min"]))
-        c3[2].metric("Closing auction", eur(i["close_auction_eur"]))
+        c3[2].metric("Volatility interruptions", len(o.get("volatility_interruptions") or []))
         c3[3].metric("Intraday low at", i["time_of_low"] or "n/a")
-        o = i.get("onset") or {}
         if o.get("time"):
             where = {"pre_market": "pre-market", "opening_auction": "opening auction",
                      "at_open": "right after the open", "continuous": "during the session"}[o["session"]]
