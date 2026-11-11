@@ -86,6 +86,7 @@ in the direction of the day's move, still holding 5 minutes later. Thresholds in
 | `engine.baseline.anomaly_episodes(isin)` | DataFrame: consecutive unusual days merged: `start, end, days, peak_date, peak_abn_ret, total_abn_ret, max_vol_ratio, reason, severity, context` | C2 |
 | `engine.impact.impact_card(isin, day, event=None)` | dict (schema above) | C2 |
 | `engine.onset.onset(isin, day, event_time=None)` | dict: news onset minute (see `intraday.onset`) | C1 |
+| `engine.xlm.cost_curve(isin, by="index", days=60)` / `curve_summary(curve)` | DataFrame per order size (`notional_eur, label, stock_bps, stock_fill, peer_bps, peer_fill`) / dict (largest size absorbed on most days, cost of €100k / €1m) | C1 |
 | `engine.auctions.auction_profile(isin)` | DataFrame per day: open/close auction EUR, close auction share and price move | C1 |
 | `engine.compare.event_types()` / `same_type_events(type, index=None)` / `percentile(card, table)` / `comparison_for(card)` | list / DataFrame (last column `context`, same flags as `anomalies()`) / dict / dict | C2 (v1 by C1) |
 | `engine.compare.metrics_all()` | DataFrame: every stock-day with the card metrics + `notable`, `reason` | C2 (v1 by C1) |

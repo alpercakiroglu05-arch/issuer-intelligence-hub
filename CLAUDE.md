@@ -43,7 +43,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 ```bash
 pip install -r requirements.txt
 streamlit run app/Home.py                 # http://localhost:8501
-pytest                                    # 42 tests; data tests skip if data/ is empty
+pytest                                    # 69 tests; data tests skip if data/ is empty
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
 - Before a PR, run `pytest` **and** a headless page check:
@@ -113,7 +113,7 @@ Hero stocks (max 3 per challenge, set in `config.HERO_TICKERS`; the team may sti
 
 Xetra liquidity rule (Being Public Guide p. 32): XLM (EUR 25k) ≤ 100 bps **and** ≥ EUR 2.5m/day (4-month average) means category A; otherwise a Designated Sponsor is needed. `engine.baseline.kpis()` gives an estimate.
 
-## Status (Wed 19:45, all PRs up to #17 merged, 42 tests green)
+## Status (Wed 21:45, all PRs up to #25 merged, 69 tests green incl. the XLM curve PR)
 
 Done on `main`:
 - **Ingest:** daily (174 stocks x 213 days), events (80 sourced events), intraday (44 event stocks, 3.8M bars).
@@ -125,6 +125,12 @@ Done on `main`:
   - `compare`: same-type percentiles, with Kaan's summary sentence.
 - **AI:** template narrative DE/EN + LLM wrapper; assistant v1. **No LLM connected** (`LLM_PROVIDER=none`).
 - **Report:** HTML/PDF snapshot of the impact card.
+- **Dashboard:**
+  - Compare with Index / Sector / Size (#20, #21).
+  - Liquidity trend and episodes with linked events plus market context (#19, #24, #25).
+  - Trading cost by order size (`engine/xlm.py`).
+  - Readable company names (`events/names.csv`, #23).
+- **Pitch:** `docs/PITCH.md` has the relevance lines from the Being Public Guide and a jury-scorecard map (Idea, Execution, Relevance, Pitch).
 - **Docs:** `docs/SUBMISSION.md` is the submission text (13:30, "what data, model, logic"); keep its numbers in sync if the engine changes. `docs/C2_ENGINE.md` documents the C2 functions.
 
 Open (see README checklists):

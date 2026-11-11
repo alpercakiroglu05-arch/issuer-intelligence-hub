@@ -178,3 +178,15 @@ def test_events_match_trading_days_and_cards():
     card = impact_card(isin_of("EVD"), h1["reaction_day"], h1.to_dict())
     assert card["event"]["reaction_day"] == "2026-08-21" and card["event"]["timing_source"] == "announcement"
     assert card["comparison"]["group_type"] == "H1" and card["comparison"]["n"] >= 30
+
+
+@needs_data
+def test_xlm_cost_curve():
+    """Order-size cost curve: cost rises with size, SAP's book absorbs EUR 10m, HDD's stops at EUR 500k."""
+    from engine.data import isin_of
+    from engine.xlm import cost_curve, curve_summary
+    c = cost_curve(isin_of("SAP"))
+    s = c["stock_bps"].dropna()
+    assert s.is_monotonic_increasing and curve_summary(c)["largest_absorbed_eur"] == 10e6
+    assert curve_summary(cost_curve(isin_of("HDD"), by="size"))["largest_absorbed_eur"] == 500e3
+    assert curve_summary(cost_curve(isin_of("GXI")))["largest_absorbed_eur"] is None   # left the SDAX: no XLM
