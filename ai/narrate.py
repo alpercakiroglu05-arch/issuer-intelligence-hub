@@ -8,6 +8,7 @@ TODO C4:
   - add a numbers check: every number in the output must appear in the JSON (else fall back)
 """
 import json
+import math
 
 from ai import llm
 
@@ -41,6 +42,11 @@ def _p(x):
     return "n/a" if x is None else f"{x * 100:+.1f}%"
 
 
+def _pctile(x):
+    """Percentile, rounded down so 0.995 never reads as "100%"."""
+    return f"{math.floor(round(x * 100, 6))}%"
+
+
 def template_narrative(card: dict, lang: str = "en") -> str:
     p, v, l, a = card["price"], card["volume"], card["liquidity"], card["participants"]
     o = (card.get("intraday") or {}).get("onset") or {}
@@ -63,7 +69,7 @@ def template_narrative(card: dict, lang: str = "en") -> str:
         if cmp and cmp.get("abs_abn_ret_pctile") is not None:
             what = "ungewöhnlichen Handelstagen" if cmp["group_type"] == "NOTABLE_DAY" else f"{cmp['group_type']}-Ereignissen"
             t += (f" Im Vergleich mit {cmp['n']} {what} ({cmp['group_index']}, 2026) war die unternehmensspezifische "
-                  f"Bewegung größer als bei {cmp['abs_abn_ret_pctile'] * 100:.0f}%.")
+                  f"Bewegung größer als bei {_pctile(cmp['abs_abn_ret_pctile'])}.")
         return t
     t = (f"{card['name']} moved {_p(p['ret'])} on {card['event']['reaction_day']} while its {card['index']} peers "
          f"moved {_p(p['peer_ret'])} (stock-specific: {_p(p['abn_ret'])}). "
@@ -80,5 +86,5 @@ def template_narrative(card: dict, lang: str = "en") -> str:
               f"{_p(au['close_auction_move'])} vs. the last trade.")
     if cmp and cmp.get("abs_abn_ret_pctile") is not None:
         t += (f" Compared with {cmp['n']} {cmp['group']}, the stock-specific move was bigger than "
-              f"{cmp['abs_abn_ret_pctile'] * 100:.0f}% of them.")
+              f"{_pctile(cmp['abs_abn_ret_pctile'])} of them.")
     return t
