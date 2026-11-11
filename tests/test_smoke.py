@@ -145,5 +145,34 @@ def test_compare_matches_card_and_ranks_evd():
     c = card["comparison"]
     assert c["group_type"] == "NOTABLE_DAY" and c["group_index"] == "MDAX" and c["n"] >= 100
     assert c["abs_abn_ret_pctile"] >= 0.98 and c["rank_abs_abn_ret"] <= 3
-    typed = compare.same_type_events("TBD")
-    assert set(typed["ticker"]) >= {"EVD", "GXI"}
+    typed = compare.same_type_events("H1")
+    assert set(typed["ticker"]) >= {"ADS", "SAP", "EVD"} and len(typed) >= 30
+
+
+def test_events_csv_is_clean():
+    """Every researched event has a known type, a source link and a parsable date/time; no duplicates."""
+    import pandas as pd
+    from config import EVENTS_CSV
+    e = pd.read_csv(EVENTS_CSV, dtype=str).fillna("")
+    types = {"FY", "Q1", "H1", "Q3", "DIVIDEND_EX", "AGM", "ADHOC", "GUIDANCE", "MA", "CMD", "INDEX"}
+    assert set(e["type"]) <= types
+    assert (e["source_url"].str.startswith("http")).all()
+    assert pd.to_datetime(e["date"], format="%Y-%m-%d").notna().all()
+    assert e["time_local"].str.fullmatch(r"(\d\d:\d\d)?").all()
+    assert not e.duplicated(["ticker", "type", "date"]).any()
+    assert set(e["verified"]) <= {"0", "1"}
+
+
+@needs_data
+def test_events_match_trading_days_and_cards():
+    """All events map to a trading day of a known stock; EVD's FY release (26 Mar 17:45) reacts on 27 Mar."""
+    from engine.data import events, isin_of
+    from engine.impact import impact_card
+    ev = events()
+    assert ev["isin"].notna().all() and ev["reaction_day"].notna().all()
+    fy = ev[(ev["ticker"] == "EVD") & (ev["type"] == "FY")].iloc[0]
+    assert fy["timing"] == "post_close" and str(fy["reaction_day"].date()) == "2026-03-27"
+    h1 = ev[(ev["ticker"] == "EVD") & (ev["type"] == "H1")].iloc[0]   # 20 Aug 17:45 -> reacts 21 Aug
+    card = impact_card(isin_of("EVD"), h1["reaction_day"], h1.to_dict())
+    assert card["event"]["reaction_day"] == "2026-08-21" and card["event"]["timing_source"] == "announcement"
+    assert card["comparison"]["group_type"] == "H1" and card["comparison"]["n"] >= 30

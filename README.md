@@ -113,7 +113,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [ ] `report/`: PDF layout, a small chart, **Part A snapshot** (the brief asks for an exportable dashboard report). Auction and comparison rows are already in the event snapshot
 
 ### Non-code (research and pitch team)
-- `events/events.csv`: events of the hero stocks **with time of day and source link** (cards still say "TBD"), plus one full results season for comparisons, e.g. all DAX H1 2026 results (late Jul – mid Aug). A type needs ≥ 5 events to get its own comparison group
+- [x] `events/events.csv`: 80 sourced events (hero stocks + first H1/Q3 publication of all 40 DAX members). **Please spot-check the hero rows (source link, time) before the pitch.**
 - `events/sectors.csv`: sector of every DAX/MDAX/SDAX stock
 - Pitch deck (3–5 slides), demo script, backup video (2–3 min), and the list "what else IR needs + which data"
 
