@@ -5,16 +5,16 @@ Part A - the "normal state" of a stock.  OWNER: C2 (engine).  STATUS: v1 works.
     index_benchmark(idx, col)  median of a column across the stock's index, per day
     anomalies(isin)            unusual days ("notable days") with a reason
     kpis(isin)                 headline numbers vs. index median + Xetra liquidity check
+    liquidity_trend(isin)      "has our liquidity improved?" last 60 vs previous 60 trading days
+    anomaly_episodes(isin)     consecutive unusual days merged into one episode
 
 TODO C2:
-  - anomalies(): merge consecutive anomaly days into one episode
-  - kpis(): add trend arrows (last 60d vs previous 60d) - "has liquidity improved?"
   - sector peers instead of index peers once events/sectors.csv is filled
 """
 import numpy as np
 import pandas as pd
 
-from config import ANOMALY_Z, DS_LOOKBACK_DAYS, DS_TURNOVER_MIN_EUR, DS_XLM_MAX_BPS
+from config import ANOMALY_Z, DS_LOOKBACK_DAYS, DS_TURNOVER_MIN_EUR, DS_XLM_MAX_BPS, LIQUIDITY_TREND_TOL
 from engine.data import daily, stock
 
 PROFILE_COLS = [
@@ -86,3 +86,140 @@ def kpis(isin: str, days: int = 60) -> dict:
         },
         "anomaly_days_last_period": int((anomalies(isin)["date"] >= recent["date"].min()).sum()),
     }
+
+
+# ---------- liquidity trend: "has our liquidity improved?" ----------
+TREND_HELP = {
+    "improved": "Trading got cheaper and/or more shares traded, and nothing got worse by more than 10%. "
+                "A good message for the board; check whether the whole index moved the same way.",
+    "worsened": "Trading got more expensive and/or fewer shares traded, and nothing improved by more than 10%. "
+                "Worth a conversation with the Designated Sponsor or a look at investor outreach.",
+    "mixed": "Trading got cheaper, but fewer shares traded (or the other way round). "
+             "Check both before telling the board that liquidity improved.",
+    "stable": "Trading cost and turnover both stayed within 10% of the previous period.",
+    None: "Not enough trading history for a comparison yet.",
+}
+
+
+def _chg(new, old):
+    """Relative change, None when a value is missing or the base is zero."""
+    if new is None or old is None or old == 0:
+        return None
+    return round(float(new / old - 1), 4)
+
+
+def _med(x: pd.Series, nd: int = 2):
+    v = x.median()
+    return None if pd.isna(v) else round(float(v), nd)
+
+
+def _word(chg: float, lower_is_better: bool) -> str:
+    if abs(chg) < LIQUIDITY_TREND_TOL:
+        return "about the same"
+    return "better" if (chg < 0) == lower_is_better else "worse"
+
+
+def _verdict(xlm_chg, to_chg, tol: float = LIQUIDITY_TREND_TOL) -> str:
+    """Absolute verdict. Lower XLM = better, higher turnover = better. A missing metric is ignored."""
+    better = (xlm_chg is not None and xlm_chg <= -tol) or (to_chg is not None and to_chg >= tol)
+    worse = (xlm_chg is not None and xlm_chg >= tol) or (to_chg is not None and to_chg <= -tol)
+    return "mixed" if better and worse else "improved" if better else "worsened" if worse else "stable"
+
+
+def _ds_category(frame: pd.DataFrame) -> str | None:
+    """Same rule as kpis(): XLM 25k <= DS_XLM_MAX_BPS and average turnover >= DS_TURNOVER_MIN_EUR -> A."""
+    xlm, avg = frame["xlm_25k"].median(), frame["turnover_eur"].mean()
+    if pd.isna(xlm) or pd.isna(avg):
+        return None
+    return "A" if (xlm <= DS_XLM_MAX_BPS and avg >= DS_TURNOVER_MIN_EUR) else "B"
+
+
+def liquidity_trend(isin: str, window: int = 60) -> dict:
+    """Last `window` trading days vs the `window` days before, for the stock and its index median."""
+    s = stock(isin)
+    idx = s["idx_latest"].iloc[-1]
+    n = len(s)
+    flags = ["short_history"] if n < 2 * window else []
+    now, before = s.tail(window), s.iloc[max(0, n - 2 * window): max(0, n - window)]
+
+    metrics = (("xlm_25k_bps", "xlm_25k"), ("turnover_eur", "turnover_eur"))
+    bench = {col: index_benchmark(idx, col) for _, col in metrics}
+    nd = {"xlm_25k": 2, "turnover_eur": 0}
+    stock_vals = {k: {"before": _med(before[col], nd[col]), "now": _med(now[col], nd[col])} for k, col in metrics}
+    index_vals = {k: {"before": _med(bench[col].reindex(before["date"]), nd[col]),
+                      "now": _med(bench[col].reindex(now["date"]), nd[col])} for k, col in metrics}
+    chg = {k: _chg(v["now"], v["before"]) for k, v in stock_vals.items()}
+    ichg = {k: _chg(v["now"], v["before"]) for k, v in index_vals.items()}
+    if chg["xlm_25k_bps"] is None:
+        flags.append("no_xlm")  # XLM only exists while the stock is an index member
+
+    verdict = None if "short_history" in flags else _verdict(chg["xlm_25k_bps"], chg["turnover_eur"])
+
+    # Market-wide or just us? Only the metrics that moved beyond the threshold count.
+    vs_index = None
+    if verdict in ("improved", "worsened", "mixed"):
+        moved = [k for k, c in chg.items() if c is not None and abs(c) >= LIQUIDITY_TREND_TOL]
+        own = [k for k in moved if ichg[k] is None or abs(chg[k] - ichg[k]) >= LIQUIDITY_TREND_TOL]
+        vs_index = "stock-specific" if own else "market-wide"
+
+    ds = {"now": _ds_category(s.tail(DS_LOOKBACK_DAYS)),
+          "before": _ds_category(s.iloc[max(0, n - 2 * DS_LOOKBACK_DAYS): max(0, n - DS_LOOKBACK_DAYS)])}
+
+    m = s.assign(month=s["date"].dt.strftime("%Y-%m"),
+                 index_xlm=bench["xlm_25k"].reindex(s["date"]).to_numpy(),
+                 index_to=bench["turnover_eur"].reindex(s["date"]).to_numpy())
+    monthly = [{"month": mo, "xlm_25k_bps": _med(g["xlm_25k"]), "turnover_eur": _med(g["turnover_eur"], 0),
+                "index_xlm_25k_bps": _med(g["index_xlm"]), "index_turnover_eur": _med(g["index_to"], 0)}
+               for mo, g in m.groupby("month")]
+
+    # Summary: every number comes from the fields above.
+    period = f"last {window} vs previous {window} trading days"
+    if verdict is None:
+        summary = f"Not enough trading history for a liquidity trend ({n} trading days, need {2 * window})."
+    else:
+        parts = []
+        if chg["xlm_25k_bps"] is not None:
+            parts.append(f"trading cost {chg['xlm_25k_bps'] * 100:+.0f}% ({_word(chg['xlm_25k_bps'], True)})")
+        if chg["turnover_eur"] is not None:
+            parts.append(f"turnover {chg['turnover_eur'] * 100:+.0f}% ({_word(chg['turnover_eur'], False)})")
+        summary = f"{verdict.capitalize()}: " + ", ".join(parts) + f", {period}."
+        iparts = [f"{label} {ichg[k] * 100:+.0f}%" for k, label in
+                  (("xlm_25k_bps", "trading cost"), ("turnover_eur", "turnover")) if ichg[k] is not None]
+        if iparts:
+            summary += f" {idx} median: " + ", ".join(iparts) + "."
+        if ds["now"] and ds["before"] and ds["now"] != ds["before"]:
+            summary += f" Designated Sponsor category estimate: {ds['before']} -> {ds['now']}."
+
+    return {
+        "isin": isin, "ticker": s["ticker"].iloc[-1], "index": idx, "window": window, "period": period,
+        "stock": stock_vals, "index_median": index_vals,
+        "xlm_25k_change_pct": chg["xlm_25k_bps"], "turnover_change_pct": chg["turnover_eur"],
+        "index_xlm_25k_change_pct": ichg["xlm_25k_bps"], "index_turnover_change_pct": ichg["turnover_eur"],
+        "verdict": verdict, "vs_index": vs_index, "help": TREND_HELP[verdict],
+        "ds_category": ds, "monthly": monthly, "summary": summary, "flags": flags,
+    }
+
+
+# ---------- anomaly episodes ----------
+EPISODE_COLS = ["start", "end", "days", "peak_date", "peak_abn_ret", "total_abn_ret", "max_vol_ratio",
+                "reason", "severity"]
+
+
+def anomaly_episodes(isin: str, z: float = ANOMALY_Z) -> pd.DataFrame:
+    """Consecutive unusual trading days (Fri + Mon count as consecutive) merged into one episode.
+    peak = the day with the highest severity; total_abn_ret = sum of abnormal returns of the episode days."""
+    a = anomalies(isin, z)
+    if a.empty:
+        return pd.DataFrame(columns=EPISODE_COLS)
+    day_no = pd.Series(np.arange(len(stock(isin))), index=stock(isin)["date"])  # trading-day number
+    a = a.sort_values("date").reset_index(drop=True)
+    a["episode"] = day_no.reindex(a["date"]).to_numpy() - np.arange(len(a))  # constant within a run of days
+    rows = []
+    for _, g in a.groupby("episode", sort=False):
+        peak = g.loc[g["severity"].idxmax()]
+        reasons = dict.fromkeys(r for rs in g["reason"] for r in rs.split(", "))
+        rows.append({"start": g["date"].min(), "end": g["date"].max(), "days": len(g),
+                     "peak_date": peak["date"], "peak_abn_ret": peak["abn_ret"],
+                     "total_abn_ret": g["abn_ret"].sum(min_count=1), "max_vol_ratio": g["vol_ratio"].max(),
+                     "reason": ", ".join(reasons), "severity": g["severity"].max()})
+    return pd.DataFrame(rows, columns=EPISODE_COLS).sort_values("start", ascending=False).reset_index(drop=True)

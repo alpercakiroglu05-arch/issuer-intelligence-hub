@@ -93,10 +93,10 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [ ] Ongoing: share `data/events.parquet` on OneDrive when `events.csv` changes (the app already rebuilds it from the CSV by itself)
 - [ ] Optional: Eurex single-stock options and futures open interest (`EUREX_OPEN_INTEREST_DYNAMICS_EQUITYINDEX`, join on `ISIN_UNDERLYING`) to show derivatives positioning before events
 
-### C2 · Engine. Owner: Kaan
+### C2 · Engine. Owner: Kaan (ydnka)
 - [x] `engine/compare.py` v1 (PR #7, written by C1 to unblock the demo): `same_type_events`, `percentile`, `comparison_for`, `sector_peers`. Fills `card["comparison"]`; falls back to auto-detected unusual days until `events.csv` has typed events. **C2 owns it from here.**
 - [x] `impact.py`: intraday block refined (news onset, exact auction volumes)
-- [ ] `baseline.py`: liquidity trend ("has liquidity improved?"), merge consecutive anomaly days
+- [x] `baseline.py`: liquidity trend ("has liquidity improved?"), merge consecutive anomaly days
 - [x] Unit tests: GXI 2026-02-11 should give ret ≈ −31.4 %, abnormal ≈ −30.5 %, volume ≈ 20× normal (`test_impact_card_known_values`)
 
 ### C3 · Frontend. Owner: Alper
