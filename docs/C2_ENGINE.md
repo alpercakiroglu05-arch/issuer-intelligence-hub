@@ -132,7 +132,14 @@ date        reason                             context
 2026-02-27  volume spike, stock-specific move  month_end_review, market_wide_volume
 ```
 
-## Peer groups: index, sector, turnover cohort (size proxy)
+## Peer groups: index, sector, similar size
+
+**One benchmark everywhere.** `engine.compare.peer_medians(isin)` is the only place that computes peer medians:
+for each group, the median over the peers of each peer's median over the market's last `config.PEER_DAYS` (60)
+trading days; the stock itself is never in its peer group. `kpis()` (Streamlit, assistant, Part A report) and the
+web API (`web/server.py` `peers()`) both read it, and `tests/test_compare.py` checks that they agree.
+(Before, the web and the report used different size groups and aggregations: EVD's size peers showed €12.8m / 18 bps
+in the web and €4.5m / 35 bps in the report.)
 
 Briefing II asks to compare a stock with peers by **sector and size**, not only by index.
 `engine.compare.peer_group(isin, by)` returns `{by, name, label, isins, n, fallback}` for `by` = `"index"`, `"sector"`
@@ -182,19 +189,18 @@ or `"size"`. The stock itself and other ISINs of the same ticker (FRE, QIA) are 
     https://www.cashmarket.deutsche-boerse.com/cash-en/Data-Tech/statistics/listed-companies (the blob URL changes when
     Deutsche Börse publishes a new file).
 
-### Size: turnover cohort (size proxy), NOT market cap
+### Size: the 10 stocks closest in turnover, NOT market cap
 
-Market capitalisation is not in the data. The size group is a **turnover cohort**:
-- take each ISIN's median daily turnover over its last `config.SIZE_COHORT_DAYS` (60) trading days;
-- split all 174 ISINs into terciles: `large`, `mid`, `small` (58 each, `config.SIZE_COHORT_LABELS`).
-
-Always call it **"turnover cohort (size proxy)"** in the UI. `peer_group(..., "size")["label"]` already says
-`"Turnover cohort (size proxy): mid"`.
+Market capitalisation is not in the data. The size group is the **`config.SIZE_PEERS_N` (10) stocks whose median
+daily turnover over the last 60 trading days is closest** to the stock's (log distance, any index).
+`peer_group(..., "size")["label"]` says `"Similar size: 10 closest by turnover"`.
+The old terciles (`size_cohort()`, `size_cohorts()`) still exist but are no longer a peer group: a third of all
+stocks was too wide a group for "similar size".
 
 ### Where the groups are used
 
-- **`kpis()`:** every median pair now has `index_median` (unchanged), `sector_median` and `size_median`, computed the
-  same way as the index median (per-stock median over the window, then the median across the group including the stock).
+- **`kpis()`:** every median pair has `index_median`, `sector_median` and `size_median`, all from `peer_medians()`
+  (per-stock median over the window, then the median across the peers, the stock itself excluded).
   - `peer_groups`: `{index, sector, size}` with `name, label, n, fallback`.
   - `flags`: `small_peer_group` when any group has fewer than `config.MIN_PEER_GROUP` (3) peers; `no_sector` when the
     sector is unknown.
@@ -207,9 +213,9 @@ Example, HDD (SDAX, small cap), median XLM 25k over the last 60 days:
 - the stock: 72 bps
 - index (SDAX): 71 bps
 - sector (Industrials, 45 peers): 32 bps
-- turnover cohort `small` (57 peers): 77 bps
+- turnover cohort `small` (57 peers): 77 bps (old definition; now the 10 closest by turnover)
 
-The sector mixes large and small industrials, so for a small cap the turnover cohort is the fairer benchmark.
+The sector mixes large and small industrials, so for a small cap the size group is the fairer benchmark.
 
 ## For C3: using this on the Dashboard (`app/pages/1_Dashboard.py`)
 
@@ -261,7 +267,7 @@ c[0].metric("Trading cost XLM 25k", bps(k["median_xlm_25k_bps"]["stock"]),
 c[1].metric("Median turnover", f"€{k['median_turnover_eur']['stock'] / 1e6:.1f}m",
             f"peers €{k['median_turnover_eur'][key] / 1e6:.1f}m", delta_color="off")
 ```
-- Use the engine's `label` as is; it says "Turnover cohort (size proxy)" and never "market cap".
+- Use the engine's `label` as is; it says "Similar size: 10 closest by turnover" and never "market cap".
 - For charts over time, build a peer series like `index_benchmark()` does, from `peer_group(isin, by)["isins"]`:
   `daily()[daily()["isin"].isin(isins)].groupby("date")[col].median()`. Mind the column vs `DataFrame.isin` gotcha.
 
@@ -308,7 +314,13 @@ comes from the engine and is only formatted (`_fmt()`, same as the impact card s
 
 - **DE/EN are templates, no LLM.** `liquidity_trend()["summary"]` and `help` are English only, so the DE report
   builds the summary from the same fields (`_summary_de`); verdict, help, reasons and context words have DE tables
-  in `export.py`. Number format stays `-23.2%` in both languages (README C4 "German formatting" is separate).
+  in `export.py`.
+- **Number and date format** comes from `report/fmt.py` (`formatters(lang)`), shared with `ai/narrate.py` and the
+  impact card snapshot. EN: `-23.2%`, `EUR 2.5m`, `8.6x`, `2026-03-27`. DE: `−23,2 %`, `2,5 Mio. EUR` / `561 Tsd. EUR`,
+  `8,6-fach`, `27.03.2026`; bps stays `21 bps`. The PDF base font has no U+2212, so `to_pdf()` prints an ASCII `-`
+  (the HTML keeps the real minus). Event titles from `events.csv` are source text and stay as written.
+- The DE comparison label (`report.fmt.group_label(cmp, "de")`, e.g. "auffälligen Handelstagen, MDAX, Jan.–Okt. 2026")
+  is built from `comparison.group_type`, `group_index`, `period_start`, `period_end`.
 - Missing data never fails: no XLM (GXI after April, old QIA ISIN) → note in section 4; short history → verdict
   n/a; no sector (KCO) → "sector unknown, the index is used"; no episodes (HAG) → "No unusual days".
 - Tests: `tests/test_report_part_a.py` (EVD, HDD, HAG, GXI, KCO, old QIA; DE+EN HTML, `%PDF`, numbers equal to
@@ -321,8 +333,8 @@ comes from the engine and is only formatted (`_fmt()`, same as the impact card s
 - DS category is an estimate (order book turnover only, XLM median), not the official Deutsche Börse classification.
 - `monthly` covers Jan–Oct 2026 (the data excerpt); the first and last months can be partial.
 - Sectors are a snapshot (Deutsche Börse list of 31 Oct 2026); 1 stock (KCO) is blank. Utilities has only 2 stocks.
-- The turnover cohort is a size proxy: a large but rarely traded company can land in `small`. Old ISINs (FRE, QIA,
-  ACT) are ranked on their own last 60 trading days.
+- Size is a turnover proxy: a large but rarely traded company gets small-cap peers. Old ISINs (FRE, QIA) have no
+  turnover in the last 60 days and get no size peers.
 - Alzchem's two ISINs have different tickers (ACT, ACT0), so they can appear in each other's peer lists.
 - Context: an INDEX event matches on its `reaction_day` only. GXI's row is the STOXX announcement (8 Apr); the exit
   itself shows up as `index_change` on 10 Apr, the first day off the list, and the last member day (9 Apr) has no flag.

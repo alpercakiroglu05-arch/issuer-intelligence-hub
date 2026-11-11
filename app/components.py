@@ -111,7 +111,7 @@ def render_card(card: dict) -> None:
                 delta_color="off")
     cmp = card.get("comparison")
     if cmp:
-        rank = f" (#{cmp['rank_abs_abn_ret']} of {cmp['n'] + 1})" if cmp.get("rank_abs_abn_ret") else ""
+        rank = f" (rank {cmp['rank_abs_abn_ret']} of {cmp['n'] + 1}, this day included)" if cmp.get("rank_abs_abn_ret") else ""
         move = ("**the biggest of them**" if cmp["abs_abn_ret_pctile"] == 1.0
                 else f"bigger than **{pctile0(cmp['abs_abn_ret_pctile'])}** of them")
         st.info(f"📐 **Compared with {cmp['n']} {cmp['group']}:** the stock-specific move was "

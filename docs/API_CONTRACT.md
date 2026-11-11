@@ -45,7 +45,7 @@ Types: `FY Q1 H1 Q3 DIVIDEND_EX AGM ADHOC GUIDANCE MA CMD INDEX`.
                    "close_auction_move", "close_auction_move_baseline_abs"},
   "participants": {"agent_share", "agent_share_baseline", "agent_aggr_imbalance", "agent_aggr_imbalance_baseline", "agent_aggr_net_eur", "prop_share", "mm_share"},
   "intraday":     {"volume_share_first_15min", "volume_share_first_60min", "open_auction_eur", "close_auction_eur", "intraday_low", "intraday_high", "time_of_low", "onset"} | null,
-  "comparison":   {"group_type", "group_index", "group", "n", "abs_abn_ret_pctile", "abs_abn_ret_median", "vol_ratio_pctile", "vol_ratio_median", "xlm_ratio_pctile", "xlm_ratio_median", "rank_abs_abn_ret", "summary"} | null,
+  "comparison":   {"group_type", "group_index", "group", "n", "abs_abn_ret_pctile", "abs_abn_ret_median", "vol_ratio_pctile", "vol_ratio_median", "xlm_ratio_pctile", "xlm_ratio_median", "rank_abs_abn_ret", "period_start", "period_end", "summary"} | null,
   "flags":        ["flow_censored", "short_baseline", …] }
 ```
 `auctions` (engine/auctions.py): volumes in EUR from the trade bars at the exact uncross minute (OHLC auction timestamps),
@@ -61,6 +61,8 @@ index (from events.csv) if that has >= `config.COMPARE_MIN_GROUP` other events, 
 `*_median` = group median, `rank_abs_abn_ret` = 1 for the biggest stock-specific move. The metrics are computed vectorised
 with the card's own definitions (baseline t-65..t-6), so the card and the comparison table agree.
 `summary` = one English sentence built from these fields and the card (percentiles rounded down, never "100%").
+`period_start` / `period_end` = first / last day of the data the group is drawn from (ISO dates); `group` is an English
+label, so DE texts build their own label from `group_type`, `group_index` and the period (`report.fmt.group_label(cmp, "de")`).
 
 `event.timing_source`: `announcement` (from events.csv), `inferred_from_trading` (time unknown, filled from `intraday.onset`) or null.
 
@@ -91,7 +93,8 @@ in the direction of the day's move, still holding 5 minutes later. Thresholds in
 | `engine.compare.event_types()` / `same_type_events(type, index=None)` / `percentile(card, table)` / `comparison_for(card)` | list / DataFrame (last column `context`, same flags as `anomalies()`) / dict / dict | C2 (v1 by C1) |
 | `engine.compare.metrics_all()` | DataFrame: every stock-day with the card metrics + `notable`, `reason` | C2 (v1 by C1) |
 | `engine.compare.peer_group(isin, by="index"\|"sector"\|"size")` | dict: `by, name, label, isins, n, fallback` (sector unknown → `fallback: "index"`). Stock and other ISINs of the same ticker excluded | C2 |
-| `engine.compare.sector_peers(isin)` / `size_peers(isin)` / `size_cohort(isin)` / `size_cohorts()` | list[str] / list[str] / str / Series isin→cohort. Sector from `events/sectors.csv`; size = **turnover cohort (size proxy)**, not market cap | C2 |
+| `engine.compare.sector_peers(isin)` / `size_peers(isin)` | list[str]. Sector from `events/sectors.csv`; size = the **10 stocks closest in median turnover** (`config.SIZE_PEERS_N`), not market cap | C2 |
+| `engine.compare.peer_medians(isin, days=60)` | dict: `stock` and `groups[index\|sector\|size]` (`peer_group` keys + `values`: turnover_eur, xlm_25k, auction_share, agent_share, volatility). **The one peer benchmark**: `kpis()`, the web API and the report read it | C2 |
 | `ai.narrate.narrate(card, lang)` | str (DE/EN), template fallback without LLM | C4 |
 | `ai.agent.ask(question, isin)` | str | C4 |
 | `ai.agent.run(question, isin, history, context, lang)` | dict: `text, source, model, steps[{tool,args}], actions[{view,isin,day,event_id,event_type,index}], check{total,unsupported}` | C4 (v2 by C3) |

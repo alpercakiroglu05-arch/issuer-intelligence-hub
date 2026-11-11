@@ -69,7 +69,12 @@ LIQUIDITY_TREND_TOL = 0.10
 COMPARE_MIN_GROUP = 5
 
 # Peer groups (engine/compare.py peer_group): market cap is not in the data, so "size" is a
-# turnover cohort: median daily turnover over the last SIZE_COHORT_DAYS, terciles over all stocks.
+# peers: every benchmark (web, Streamlit, report, assistant) = median over the peers of each stock's median
+# over the last PEER_DAYS trading days (engine.compare.peer_medians). Size = the SIZE_PEERS_N stocks with the
+# closest median turnover (market cap is not in the data).
+PEER_DAYS = 60
+SIZE_PEERS_N = 10
+# turnover cohort (terciles, kept for size_cohort()); no longer the size peer group.
 SIZE_COHORT_DAYS = 60
 SIZE_COHORT_LABELS = ("large", "mid", "small")   # top / middle / bottom third by turnover
 MIN_PEER_GROUP = 3                               # fewer peers -> flag "small_peer_group"

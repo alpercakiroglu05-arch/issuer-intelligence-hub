@@ -32,7 +32,8 @@ cp .env.example .env                                   # optional: add LLM key
 ```bash
 python web/server.py           # demo UI (web front end) -> http://127.0.0.1:8600
 streamlit run app/Home.py      # backup UI / analyst view -> http://localhost:8501
-pytest                         # 108 tests incl. the web API (data tests skip if data/ is empty)
+pytest                         # 137 tests incl. the web API (data tests skip if data/ is empty)
+python web/warm_cache.py       # re-warm the demo caches (summaries + assistant) after any prompt, card or engine change
 ```
 
 Build the processed data from the 8.9 GB raw excerpt (once, and after `git pull` when `events.csv` changed):
@@ -107,7 +108,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] `baseline.py`: liquidity trend ("has liquidity improved?"), merge consecutive anomaly days
 - [x] Unit tests: GXI 2026-02-11 should give ret ≈ −31.4 %, abnormal ≈ −30.5 %, volume ≈ 20× normal (`test_impact_card_known_values`)
 - [x] `compare.py` extras: summary sentence, percentiles never round up to 100 % (PR #11); `anomalies()` crash fix (PR #10)
-- [x] **Peer benchmarking by sector and size** (brief point II, PR #20): `sectors.csv` from Deutsche Börse's listed-companies file + a turnover cohort as size proxy (market cap is not in the data)
+- [x] **Peer benchmarking by sector and size** (brief point II, PR #20): `sectors.csv` from Deutsche Börse's listed-companies file + the 10 stocks closest in turnover as size proxy (market cap is not in the data); one peer benchmark for web, Streamlit, report and assistant (`engine.compare.peer_medians`)
 - [x] Index-day context in `anomalies()` (expiry Fridays, index reviews, market-wide days; use the `INDEX` rows of `events.csv`)
 
 ### C3 · Frontend. Owner: Alper
@@ -120,7 +121,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] **Numbers check** (`ai/checks.py`, PR #28): every number in a model text must be in the card JSON, else the template is shown; both UIs say which text it is
 - [x] **Assistant without a model**: short answer + liquidity summary instead of a JSON dump (Streamlit, PR #28); the web has its own fallback answers
 - [x] **Answer cache** (`LLM_CACHE`, PR #28) so the live demo survives Wi-Fi/API outages
-- [ ] **German formatting** in the DE texts and snapshots (`−23,2 %`, `27.03.2026`, German group label): Kaan, tonight
+- [x] **German formatting** in the DE texts, snapshot, Part A report and the model prompt: `−23,2 %`, `27.03.2026`, `8,6-fach`, `2,5 Mio. EUR` (one place: `report/fmt.py`); the comparison group label is German too (`report.fmt.group_label`). EN output unchanged (Kaan, PR #33)
 - [x] **JAIF**: gateway `https://hip-gw.hessian.ai/v1`, model `hIP_1.0-Mistral/Mistral-Medium-3.5-128B` (accurate, 5–7 s, good German; Kolibri-1 made meaning errors). The key is at the top of the JAIF Model Handbook HTML in Discord. The demo texts are pre-cached
 - [ ] Optional: `agent.py` v2 with tool calling
 

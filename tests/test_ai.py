@@ -39,6 +39,29 @@ def test_llm_text_with_only_known_numbers_is_used(monkeypatch):
     assert out["source"] == "llm" and out["text"].startswith("TEST AG fell 23.2%")
 
 
+def test_template_narrative_de_uses_german_number_and_date_format():
+    from ai.checks import unsupported_numbers
+    from ai.narrate import template_narrative
+    card = {**CARD, "auctions": {"close_auction_ratio": 3.6, "close_auction_move": -0.0152},
+            "comparison": {**CARD["comparison"], "group_type": "NOTABLE_DAY", "group_index": "MDAX",
+                           "group": "unusual trading days, MDAX, Jan – Oct 2026",
+                           "period_start": "2026-01-02", "period_end": "2026-10-30"}}
+    de = template_narrative(card, "de")
+    assert "−21,7 %" in de and "27.03.2026" in de and "8,6-fachen" in de
+    assert "-21.7%" not in de and "2026-03-27" not in de
+    assert "auffälligen Handelstagen, MDAX, Jan.–Okt. 2026" in de and "unusual" not in de
+    assert unsupported_numbers(de, card) == []      # the numbers check understands the German style
+    en = template_narrative(card, "en")
+    assert "-21.7%" in en and "2026-03-27" in en and "unusual trading days, MDAX, Jan – Oct 2026" in en
+
+
+def test_numbers_check_understands_german_units():
+    from ai.checks import unsupported_numbers
+    text = "Umsatz 113,6 Mio. EUR statt 13,3 Mio. EUR (8,6-fach), Agenten −36 %, Rendite −23,2 % am 27.03.2026."
+    assert unsupported_numbers(text, CARD) == []
+    assert unsupported_numbers("Umsatz 47,5 Mio. EUR, 9,9-fach.", CARD) == ["47,5", "9,9"]
+
+
 def test_numbers_check_accepts_percentiles_rounded_down():
     """The UI never rounds a percentile up (0.939 -> 'bigger than 93 %'), so the check must accept it."""
     from ai.checks import unsupported_numbers
@@ -66,3 +89,10 @@ def test_assistant_answer_with_invented_number_falls_back(monkeypatch):
     out = agent.ask("Has our liquidity improved?", isin_of("EVD"))
     assert "47.3" not in out and "Stable" in out   # deterministic answer = liquidity_trend summary
     assert os.environ["LLM_PROVIDER"] == "none"
+
+
+def test_prompt_asks_for_german_number_style_in_de_only():
+    from ai.narrate import LANG, SYSTEM, system_prompt
+    assert system_prompt("en") == SYSTEM.format(language=LANG["en"])   # EN prompt (and its cache) unchanged
+    de = system_prompt("de")
+    assert "German" in de and "−23,2 %" in de and "27.03.2026" in de and "8,6-fach" in de and "Mio. EUR" in de

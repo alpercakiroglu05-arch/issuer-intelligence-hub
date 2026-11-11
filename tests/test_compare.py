@@ -66,8 +66,9 @@ def test_percentile_text_rounds_down(p, text):
     from engine.compare import _share
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
     from components import pctile0
-    from ai.narrate import _pctile
-    assert _share(p) == pctile0(p) == _pctile(p) == text
+    from report.fmt import formatters
+    assert _share(p) == pctile0(p) == formatters("en")["pctile"](p) == text
+    assert formatters("de")["pctile"](p) == text.replace("%", " %")
 
 
 def test_narrative_comparison_never_says_100_percent():
@@ -80,9 +81,9 @@ def test_narrative_comparison_never_says_100_percent():
         "comparison": {"group_type": "NOTABLE_DAY", "group_index": "MDAX", "n": 214,
                        "group": "unusual trading days, MDAX, Jan – Oct 2026", "abs_abn_ret_pctile": 0.995},
     }
-    for lang in ("en", "de"):
+    for lang, pct in (("en", "%"), ("de", " %")):
         t = narrate(card, lang)
-        assert "99%" in t and "100%" not in t
+        assert f"99{pct}" in t and f"100{pct}" not in t
 
 
 @needs_data
@@ -179,14 +180,41 @@ def test_size_cohorts_are_terciles():
 
 
 @needs_data
-def test_size_peers_same_cohort():
-    from engine.compare import peer_group, size_cohort, size_peers
+def test_size_peers_are_the_closest_by_turnover():
+    import numpy as np
+    from config import SIZE_PEERS_N
+    from engine.compare import peer_group, size_peers, stock_medians
     from engine.data import isin_of
-    sap = isin_of("SAP")
-    assert size_cohort(sap) == "large"
-    assert sap not in size_peers(sap)
-    assert {size_cohort(p) for p in size_peers(sap)} == {"large"}
-    assert peer_group(sap, "size")["label"] == "Turnover cohort (size proxy): large"
+    evd = isin_of("EVD")
+    peers = size_peers(evd)
+    assert len(peers) == SIZE_PEERS_N and evd not in peers
+    assert peer_group(evd, "size")["label"] == f"Similar size: {SIZE_PEERS_N} closest by turnover"
+    to = stock_medians()["turnover_eur"]
+    dist = (np.log(to.drop(evd)[to.drop(evd) > 0]) - np.log(to[evd])).abs()
+    assert dist[peers].max() <= dist.drop(peers).min()   # nobody outside the group is closer
+
+
+@needs_data
+def test_one_peer_benchmark_for_web_streamlit_and_report():
+    """Web API, kpis() (Streamlit, assistant) and the Part A report read the same numbers (engine.peer_medians)."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "web"))
+    import server
+    from engine.baseline import kpis
+    from engine.compare import peer_medians
+    from engine.data import isin_of
+    for t in ("EVD", "HDD", "SAP"):
+        i = isin_of(t)
+        pm, k, web = peer_medians(i), kpis(i), server.peers(i)
+        webg = {g["key"]: g for g in web["groups"]}
+        for by in ("index", "sector", "size"):
+            assert k["peer_groups"][by]["n"] == pm["groups"][by]["n"] == webg[by]["n"]
+            for col, kcol in (("turnover_eur", "median_turnover_eur"), ("xlm_25k", "median_xlm_25k_bps")):
+                v = pm["groups"][by]["values"][col]
+                assert k[kcol][f"{by}_median"] == v
+                assert abs(webg[by]["values"][col] - v) <= 1e-3 * max(1.0, abs(v))
+        assert abs(web["stock"]["turnover_eur"] - k["median_turnover_eur"]["stock"]) <= 1
 
 
 @needs_data
