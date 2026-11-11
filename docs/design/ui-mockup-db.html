@@ -1,0 +1,1219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Issuer Intelligence Hub</title>
+<meta name="description" content="Concept UI for the Issuer Intelligence Hub, styled to sit inside the Deutsche Börse web family. Futury Build Days 2026.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------------
+   Issuer Intelligence Hub: Deutsche Börse family look
+   Tokens copied from deutsche-boerse.com (measured 11 Nov 2026):
+   navy #000099 headings, sky #0099ff pills, body #404040, tiles #f5f5f5,
+   News Gothic (fallback: Archivo at 88 % width), square corners, pill buttons.
+------------------------------------------------------------------- */
+:root{
+  --navy:#000099; --navy-2:#00007a; --navy-deep:#00005c;
+  --sky:#0099ff; --sky-2:#0084e0; --sky-soft:#d7ebff; --sky-wash:#f3f9ff;
+  --ink:#404040; --ink-strong:#181813; --mute:#6f6f6f; --faint:#9b9b9b;
+  --rule:#e6e6e6; --rule-2:#bdbdbd; --tile:#f5f5f5; --paper:#fff;
+  --up:#2f9a41; --down:#d4202a; --graphite:#8c9198;
+  --font:"News Gothic","News Gothic BT Web",Archivo,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.2,.7,.1,1); --ease-io:cubic-bezier(.65,0,.35,1);
+  --wrap:1180px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.5 var(--font);font-stretch:88%;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:inherit;text-decoration:none}
+button,input,select{font:inherit;font-stretch:88%;color:inherit}
+button{background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--sky);outline-offset:3px}
+.num,.tbl td,.facts dd{font-variant-numeric:tabular-nums}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 32px}
+.ph::after{content:"°";color:var(--sky);margin-left:1px;font-weight:400}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+svg text{font-family:var(--font);font-stretch:88%}
+
+/* ---------- utility bar + header ---------- */
+.util{height:34px;overflow:hidden;transition:height .4s var(--ease)}
+.util .wrap{height:34px;display:flex;justify-content:flex-end;align-items:center;gap:24px;font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-strong)}
+.util .clock{font-weight:400;color:var(--mute);text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums}
+.util .stamp{font-weight:400;color:var(--mute);text-transform:none;letter-spacing:0;margin-right:auto}
+.lang{display:flex;gap:4px;align-items:center;color:var(--mute)}
+.lang button{font-weight:700;color:var(--mute);transition:color .2s}
+.lang button[aria-pressed=true]{color:var(--navy)}
+header.top{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.97);backdrop-filter:saturate(1.3) blur(10px);transition:box-shadow .3s}
+body.scrolled .util{height:0}
+body.scrolled header.top{box-shadow:0 1px 0 var(--rule),0 10px 30px -24px rgba(0,0,60,.35)}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding-top:4px;gap:24px}
+.brand{display:flex;align-items:center;gap:12px;flex:none}
+.brand svg{width:36px;height:36px;transition:width .4s var(--ease),height .4s var(--ease)}
+body.scrolled .brand svg{width:28px;height:28px}
+.brand .word{border-left:1px solid var(--ink);padding-left:11px;font-size:15px;line-height:1.08;letter-spacing:.05em;text-transform:uppercase;color:var(--ink)}
+.brand .word span{display:block}
+.brand .word em{font-style:normal;color:var(--mute);font-size:11px;letter-spacing:.07em}
+.hdr-tools{display:flex;align-items:center;gap:22px;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--ink-strong)}
+.hdr-tools button{display:flex;align-items:center;gap:8px}
+.hdr-tools svg{color:var(--sky)}
+.kbd{font:600 11px/1 var(--font);letter-spacing:0;border:1px solid var(--rule-2);border-bottom-width:2px;padding:2px 5px;border-radius:3px;color:var(--mute);text-transform:none}
+nav.main{position:relative;display:flex;gap:36px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
+nav.main::-webkit-scrollbar{display:none}
+nav.main button{flex:none;font-size:14px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--ink-strong);padding:12px 0 15px;transition:color .25s}
+nav.main button:hover,nav.main button[aria-current=page]{color:var(--navy)}
+nav.main button .n{font-weight:400;color:var(--faint);margin-right:6px;font-size:12px}
+.nav-ind{position:absolute;bottom:0;left:0;height:3px;width:0;background:var(--sky);transition:left .55s var(--ease),width .55s var(--ease);view-transition-name:navind}
+
+/* ---------- navy band (hero + page headers) ---------- */
+.band{position:relative;overflow:hidden;color:#fff;background:radial-gradient(900px 420px at 88% -10%,#1426c4 0%,rgba(20,38,196,0) 70%),var(--navy);view-transition-name:band}
+.band::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 98px);pointer-events:none}
+.band-in{position:relative;z-index:1;padding-top:52px;padding-bottom:48px}
+.band h1{margin:0;font-weight:700;font-size:58px;line-height:1.02;letter-spacing:-.012em;width:fit-content;view-transition-name:band-title}
+.band--sub .band-in{padding-top:40px;padding-bottom:40px}
+.band--sub h1{font-size:46px}
+.kicker{font-size:13px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#9fd2ff;margin-bottom:14px}
+.kicker b{color:#fff}
+.crumb{font-size:13px;color:#aebcff;margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap}
+.crumb button{color:#dfe5ff;border-bottom:1px solid rgba(255,255,255,.3);transition:border-color .2s}
+.crumb button:hover{border-color:#fff}
+.band .sub{font-size:19px;color:#dfe5ff;margin:14px 0 0;max-width:42em}
+.lede{font-size:21px;line-height:1.45;color:#e8ecff;max-width:31em;margin:18px 0 28px}
+.hero-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:56px;align-items:center}
+.hero-art{position:relative}
+.hero-art svg{width:100%;height:auto;display:block;overflow:visible}
+.hero-art .cap{display:flex;justify-content:space-between;font-size:12px;color:#aebcff;letter-spacing:.04em;text-transform:uppercase;margin-top:8px}
+.btns{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.band-row{display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap}
+.pick{display:inline-flex;align-items:center;gap:14px;cursor:pointer;color:#fff;text-align:left}
+.pick .chev{width:22px;height:22px;border:1.5px solid rgba(255,255,255,.55);border-radius:50%;display:grid;place-items:center;transition:transform .35s var(--ease),background .2s;flex:none;margin-top:8px}
+.pick:hover .chev{background:rgba(255,255,255,.12)}
+.pick[aria-expanded=true] .chev{transform:rotate(180deg)}
+.menu{position:absolute;z-index:20;margin-top:10px;background:#fff;color:var(--ink);min-width:340px;box-shadow:0 24px 60px -20px rgba(0,0,60,.5);opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity .25s,transform .35s var(--ease)}
+.menu.on{opacity:1;transform:none;pointer-events:auto}
+.menu button{display:flex;width:100%;justify-content:space-between;gap:16px;padding:14px 18px;border-bottom:1px solid var(--rule);text-align:left;transition:background .2s}
+.menu button:hover{background:var(--sky-wash)}
+.menu button b{color:var(--navy)}
+.menu button small{color:var(--mute)}
+.menu button[aria-current=true]{box-shadow:inset 3px 0 0 var(--sky)}
+.facts{display:grid;grid-template-columns:repeat(5,1fr);margin:44px 0 0;border-top:1px solid rgba(255,255,255,.4)}
+.facts div{padding:14px 18px 0 0}
+.facts div+div{padding-left:18px;border-left:1px solid rgba(255,255,255,.16)}
+.facts dt{font-size:13px;color:#aebcff;letter-spacing:.02em}
+.facts dd{margin:4px 0 0;font-size:24px;font-weight:700;letter-spacing:-.01em}
+.facts dd small{font-size:13px;font-weight:400;color:#c9d2ff;margin-left:4px}
+
+/* ---------- pill buttons (DB style) ---------- */
+.pill{display:inline-flex;align-items:center;gap:10px;background:var(--sky);color:#fff;font-weight:700;font-size:14px;letter-spacing:.03em;text-transform:uppercase;padding:13px 24px;border-radius:100px;transition:background .25s,box-shadow .25s,color .25s;white-space:nowrap}
+.pill:hover{background:var(--sky-2)}
+.pill .arr{transition:transform .4s var(--ease)}
+.pill:hover .arr{transform:translateX(5px)}
+.pill--ghost{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.65)}
+.pill--ghost:hover{background:rgba(255,255,255,.1)}
+.pill--line{background:transparent;color:var(--sky);box-shadow:inset 0 0 0 1.5px var(--sky)}
+.pill--line:hover{background:var(--sky-wash)}
+.pill--sm{padding:8px 16px;font-size:12px}
+.link{color:var(--sky);font-weight:700;display:inline-flex;gap:8px;align-items:center}
+.link .arr{transition:transform .4s var(--ease)}
+.link:hover .arr{transform:translateX(4px)}
+
+/* ---------- sections ---------- */
+.content{padding:4px 0 96px}
+.sec{padding-top:60px}
+.h2{margin:0;color:var(--navy);font-size:26px;line-height:1.15;font-weight:700;letter-spacing:.005em;text-transform:uppercase}
+.h3{margin:0 0 4px;color:var(--navy);font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:.01em}
+.sec-head{display:flex;justify-content:space-between;align-items:baseline;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+.sec-note{color:var(--mute);font-size:14px;margin:4px 0 0}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:64px}
+.cols-21{display:grid;grid-template-columns:1.55fr 1fr;gap:56px}
+.legend{display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:var(--mute);align-items:center}
+.legend i{display:inline-block;width:18px;height:2px;background:var(--navy);vertical-align:middle;margin-right:7px}
+.legend i.g{background:var(--graphite)}
+.legend i.b{height:10px;width:6px;background:var(--sky)}
+.legend i.s{height:10px;width:10px;background:var(--sky-soft)}
+.prose{font-size:17px;color:var(--ink);max-width:40em}
+.verdict{font-size:20px;line-height:1.4;color:var(--ink-strong);margin:0 0 22px;max-width:34em}
+.verdict b{color:var(--navy)}
+
+/* ---------- DB tables ---------- */
+.tbl{width:100%;border-collapse:collapse;font-size:16px}
+.tbl th{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);text-align:left;padding:0 10px 9px 4px;border-bottom:1px solid var(--ink)}
+.tbl td{padding:11px 10px 11px 4px;border-bottom:1px solid var(--rule-2);color:var(--ink-strong)}
+.tbl .r{text-align:right}
+.tbl .m{color:var(--mute)}
+.tbl td.ic{width:34px;padding-right:0}
+.tbl tr.go{cursor:pointer;transition:background .2s}
+.tbl tr.go td:first-child{transition:box-shadow .3s var(--ease)}
+.tbl tr.go:hover{background:var(--sky-wash)}
+.tbl tr.go:hover td:first-child{box-shadow:inset 3px 0 0 var(--sky)}
+.tbl tr.me td{background:var(--sky-wash);font-weight:700}
+.ar{width:16px;height:16px;display:inline-block;vertical-align:-3px;transition:transform .6s var(--ease)}
+.up{color:var(--up)} .dn{color:var(--down)} .nt{color:var(--navy)}
+.status{font-size:13px;color:var(--mute)}
+.status b{color:var(--navy);font-weight:700}
+
+/* ---------- charts ---------- */
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .gl{stroke:var(--rule);stroke-width:1}
+.chart .zero{stroke:var(--rule-2);stroke-width:1;stroke-dasharray:3 3}
+.chart .ax{fill:var(--mute);font-size:12px}
+.chart .axb{fill:var(--ink-strong);font-size:12px;font-weight:700}
+.draw{stroke-dasharray:1;stroke-dashoffset:1}
+.in .draw{animation:draw 1.9s var(--ease-io) .15s forwards}
+.in .draw.d2{animation-delay:.45s;animation-duration:1.6s}
+@keyframes draw{to{stroke-dashoffset:0}}
+.bar{transform:scaleY(0);transform-origin:bottom;transform-box:fill-box;transition:transform .8s var(--ease) calc(var(--i,0)*3ms),opacity .2s}
+.in .bar{transform:none}
+.barx{transform:scaleX(0);transform-origin:left;transform-box:fill-box;transition:transform 1s var(--ease) calc(.2s + var(--i,0)*.12s)}
+.barx.neg{transform-origin:right}
+.in .barx{transform:none}
+.ann{opacity:0;transform:translateY(5px);transform-box:fill-box}
+.in .ann{animation:annIn .6s var(--ease) forwards;animation-delay:calc(1.5s + var(--i,0)*.28s)}
+@keyframes annIn{to{opacity:1;transform:none}}
+.pulse{animation:pulse 2.4s var(--ease) infinite;transform-box:fill-box;transform-origin:center}
+@keyframes pulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(4);opacity:0}}
+.xh{pointer-events:none;opacity:0;transition:opacity .15s}
+.xh.on{opacity:1}
+.hit{fill:transparent;cursor:crosshair}
+.dot{transition:r .25s var(--ease),opacity .3s}
+.dot:hover{r:7}
+
+/* ---------- reveal on scroll ---------- */
+.rv{opacity:0;transform:translateY(24px);transition:opacity .9s var(--ease),transform .9s var(--ease);transition-delay:var(--d,0s)}
+.rv.in{opacity:1;transform:none}
+
+/* ---------- event page ---------- */
+.evtabs{display:flex;border-bottom:1px solid var(--rule-2);overflow-x:auto;scrollbar-width:none;margin-top:8px}
+.evtabs button{flex:none;text-align:left;padding:18px 26px 14px 0;margin-right:26px;border-bottom:3px solid transparent;margin-bottom:-1px;transition:border-color .35s var(--ease)}
+.evtabs button .d{display:block;font-weight:700;font-size:17px;color:var(--ink-strong);transition:color .2s}
+.evtabs button .k{font-size:13px;color:var(--mute)}
+.evtabs button:hover .d{color:var(--navy)}
+.evtabs button[aria-selected=true]{border-color:var(--sky)}
+.evtabs button[aria-selected=true] .d{color:var(--navy)}
+.ev-top{display:grid;grid-template-columns:1fr 1.1fr;gap:64px;align-items:start}
+.big{font-size:104px;line-height:.92;font-weight:700;letter-spacing:-.025em;margin:6px 0 8px}
+.big-cap{font-size:17px;color:var(--ink);max-width:24em}
+.mag{margin-top:36px}
+.mag-head{display:flex;justify-content:space-between;align-items:baseline}
+.mag-head b{font-size:30px;color:var(--navy)}
+.mag-scale{position:relative;height:40px;margin-top:6px}
+.mag-track{position:absolute;left:0;right:0;top:12px;height:6px;background:var(--tile)}
+.mag-fill{position:absolute;left:0;top:12px;height:6px;background:linear-gradient(90deg,var(--sky),var(--navy));width:0;transition:width 1.8s var(--ease-io) .35s}
+.in .mag-fill{width:var(--w)}
+.mag-ticks{position:absolute;left:0;right:0;top:24px;display:flex;justify-content:space-between;font-size:11px;color:var(--faint)}
+.mag-ticks span{width:0;display:flex;justify-content:center}
+.mag-note{font-size:13px;color:var(--mute);margin-top:4px}
+.decomp{position:relative;height:56px;margin:18px 0 10px}
+.decomp .seg{position:absolute;top:0;height:30px}
+.decomp .lab{position:absolute;top:36px;font-size:12px;color:var(--mute);white-space:nowrap}
+.flows .row{display:grid;grid-template-columns:150px 1fr 64px;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--rule)}
+.flows .trk{position:relative;height:18px}
+.flows .trk::before{content:"";position:absolute;left:50%;top:-6px;bottom:-6px;width:1px;background:var(--ink)}
+.flows .b{position:absolute;top:3px;height:12px;background:var(--navy)}
+.flows .nm{position:absolute;top:-3px;width:2px;height:24px;background:var(--graphite)}
+.flows .hdr2{display:flex;justify-content:space-between;font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;padding:0 64px 6px 164px}
+.note{background:var(--tile);padding:34px 38px 30px;position:relative}
+.note p{font-size:18px;line-height:1.62;color:var(--ink-strong);margin:16px 0 18px;transition:opacity .3s}
+.fig{border-bottom:1.5px dotted var(--sky);cursor:help;transition:background .2s}
+.fig:hover{background:var(--sky-soft)}
+.check{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--navy);font-weight:700}
+.note-foot{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid #dcdcdc;padding-top:16px}
+.note pre{background:#fff;border:1px solid var(--rule);padding:14px;font:12px/1.55 var(--mono);color:var(--ink);overflow:auto;max-height:0;opacity:0;margin:0;transition:max-height .6s var(--ease),opacity .4s,margin .4s;padding-top:0;padding-bottom:0}
+.note pre.on{max-height:420px;opacity:1;margin-top:16px;padding-top:14px;padding-bottom:14px}
+.seg-t{display:inline-flex;border:1px solid var(--rule-2);border-radius:100px;padding:3px;background:#fff;position:relative}
+.seg-t button{position:relative;z-index:1;padding:5px 14px;border-radius:100px;font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--mute);transition:color .3s}
+.seg-t button[aria-pressed=true]{color:#fff}
+.seg-t .th{position:absolute;top:3px;bottom:3px;border-radius:100px;background:var(--navy);transition:left .45s var(--ease),width .45s var(--ease)}
+.teaser{display:flex;justify-content:space-between;align-items:center;gap:24px;border-top:1px solid var(--ink);border-bottom:1px solid var(--rule-2);padding:22px 0;margin-top:60px;flex-wrap:wrap}
+.teaser p{margin:0;font-size:20px;color:var(--ink-strong)}
+
+/* ---------- compare ---------- */
+.sentence{font-size:32px;line-height:1.45;color:var(--ink-strong);margin:0 0 30px;max-width:30em}
+.sentence select{font:inherit;font-stretch:88%;font-weight:700;color:var(--navy);border:0;border-bottom:2px solid var(--sky);background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16'%3E%3Cpath d='M3 6l5 5 5-5' fill='none' stroke='%230099ff' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 2px center;-webkit-appearance:none;appearance:none;padding:0 26px 0 2px;cursor:pointer;border-radius:0}
+.pbar{height:6px;background:var(--tile);position:relative;min-width:80px}
+.pbar i{position:absolute;left:0;top:0;bottom:0;background:var(--navy)}
+.quad{fill:var(--faint);font-size:12px;letter-spacing:.05em;text-transform:uppercase}
+
+/* ---------- ask ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 8px}
+.chat{border-top:1px solid var(--ink);margin-top:22px}
+.msg{padding:22px 0;border-bottom:1px solid var(--rule)}
+.who{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
+.msg.q .txt{font-size:22px;color:var(--navy);font-weight:700}
+.msg.a .txt{font-size:18px;line-height:1.6;color:var(--ink-strong)}
+.trace{font:12.5px/1.75 var(--mono);color:var(--mute);margin:4px 0 12px;padding-left:12px;border-left:2px solid var(--sky-soft)}
+.trace div{opacity:0;animation:annIn .35s var(--ease) forwards;animation-delay:calc(var(--i)*.25s)}
+.trace b{color:var(--navy);font-weight:600}
+.caret{display:inline-block;width:2px;height:1.05em;background:var(--sky);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.ask-in{display:flex;align-items:center;border:1.5px solid var(--ink-strong);border-radius:100px;padding:6px 6px 6px 24px;margin-top:26px;transition:border-color .2s,box-shadow .3s}
+.ask-in:focus-within{border-color:var(--sky);box-shadow:0 0 0 4px var(--sky-soft)}
+.ask-in input{flex:1;border:0;outline:0;font-size:18px;background:transparent;min-width:0}
+.side-list{list-style:none;margin:0;padding:0}
+.side-list li{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule);font-size:15px}
+.side-list code{font:12px var(--mono);color:var(--navy);flex:none;width:150px}
+.disc{font-size:13px;color:var(--mute);margin-top:18px}
+
+/* ---------- ideas tiles (DB "Aktuelle Themen") ---------- */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.tile{background:var(--tile);display:flex;flex-direction:column;transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
+.tile:hover{transform:translateY(-5px);box-shadow:0 26px 50px -30px rgba(0,0,90,.45)}
+.tile .ill{height:150px;display:grid;place-items:center;border-bottom:1px solid #e8e8e8;background:linear-gradient(#fafafa,var(--tile))}
+.tile .ill svg{width:210px;height:120px}
+.tile .ill .hl{stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset 1.2s var(--ease-io)}
+.tile:hover .ill .hl,.tile.in .ill .hl{stroke-dashoffset:0}
+.tile .body{padding:22px 24px 22px;display:flex;flex-direction:column;flex:1}
+.tile h3{margin:0 0 8px;color:var(--navy);font-size:20px;line-height:1.2}
+.tile p{margin:0 0 16px;font-size:15.5px}
+.data{margin-top:auto;font-size:13.5px;border-top:1px solid #dedede;padding-top:12px}
+.data div{display:flex;gap:8px;padding:2px 0}
+.data b{flex:none;width:44px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);padding-top:2px}
+.data .need{color:var(--navy)}
+
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--rule);padding:54px 0 40px;margin-top:20px}
+.fcols{display:grid;grid-template-columns:repeat(4,1fr);gap:32px}
+.fcols h4{margin:0 0 14px;color:var(--navy);font-size:15px;text-transform:uppercase;letter-spacing:.02em}
+.fcols ul{list-style:none;margin:0;padding:0}
+.fcols li{display:flex;gap:10px;padding:5px 0;font-size:15px}
+.fcols li svg{flex:none;margin-top:4px;color:var(--sky)}
+.fbot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-size:13px;color:var(--mute);border-top:1px solid var(--rule);margin-top:40px;padding-top:18px}
+
+/* ---------- side dock (DB "Tools / Folgen / Kontakt") ---------- */
+.dock{position:fixed;right:0;bottom:28px;z-index:60;display:flex;flex-direction:column;gap:4px}
+.dock button{width:66px;height:56px;background:var(--sky);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;transition:background .25s,transform .35s var(--ease)}
+.dock button:hover{background:var(--sky-2);transform:translateX(-4px)}
+
+/* ---------- tooltip ---------- */
+#tip{position:fixed;z-index:90;pointer-events:none;background:#fff;border:1px solid var(--rule-2);box-shadow:0 12px 30px -12px rgba(0,0,60,.3);padding:9px 12px;font-size:13px;line-height:1.45;color:var(--ink-strong);opacity:0;transform:translateY(4px);transition:opacity .15s,transform .2s var(--ease);max-width:280px}
+#tip.on{opacity:1;transform:none}
+#tip .t{font-weight:700;color:var(--navy)}
+#tip .m{color:var(--mute)}
+
+/* ---------- dialogs ---------- */
+dialog{border:0;padding:0;background:transparent;max-width:none;max-height:none;color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,50,.42);backdrop-filter:blur(3px)}
+dialog[open]{animation:dlgIn .5s var(--ease)}
+dialog[open]::backdrop{animation:fade .4s}
+dialog.closing{animation:dlgOut .25s var(--ease-io) forwards}
+dialog.closing::backdrop{animation:fade .25s reverse forwards}
+@keyframes dlgIn{from{opacity:0;transform:translateY(18px) scale(.985)}}
+@keyframes dlgOut{to{opacity:0;transform:translateY(10px) scale(.99)}}
+@keyframes fade{from{opacity:0}}
+.xp{width:min(1040px,94vw);background:#fff;display:grid;grid-template-columns:300px 1fr;max-height:90vh}
+.xp-side{padding:30px 28px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:22px;overflow:auto}
+.xp-side h2{margin:0;color:var(--navy);font-size:20px;text-transform:uppercase}
+.xp-side label{display:flex;gap:10px;align-items:center;padding:6px 0;font-size:15px;cursor:pointer}
+.xp-side input[type=checkbox]{accent-color:var(--navy);width:16px;height:16px}
+.xp-side .lbl{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
+.xp-view{background:#e9ebef;padding:30px;overflow:auto}
+.sheet{background:#fff;width:100%;max-width:600px;margin:0 auto;aspect-ratio:1/1.414;padding:36px 40px;box-shadow:0 20px 50px -25px rgba(0,0,40,.4);font-size:11px;color:var(--ink-strong);display:flex;flex-direction:column;gap:14px}
+.sheet .sh-top{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid var(--navy);padding-bottom:10px}
+.sheet h3{margin:0;color:var(--navy);font-size:20px;line-height:1.15}
+.sheet .k{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.sheet table{width:100%;border-collapse:collapse}
+.sheet td{padding:5px 0;border-bottom:1px solid var(--rule)}
+.sheet .sec-x{transition:opacity .3s,max-height .4s var(--ease);overflow:hidden;max-height:400px}
+.sheet .sec-x.off{opacity:0;max-height:0}
+.sheet .foot{margin-top:auto;font-size:8.5px;color:var(--mute);border-top:1px solid var(--rule);padding-top:8px}
+.x-close{position:absolute;right:14px;top:12px;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;transition:background .2s}
+.x-close:hover{background:var(--tile)}
+.cmd{width:min(640px,92vw);background:#fff;margin-top:14vh;box-shadow:0 30px 80px -30px rgba(0,0,60,.6)}
+.cmd input{width:100%;border:0;border-bottom:1px solid var(--rule);padding:22px 24px;font-size:20px;outline:0}
+.cmd ul{list-style:none;margin:0;padding:8px 0;max-height:52vh;overflow:auto}
+.cmd li{display:flex;justify-content:space-between;gap:12px;padding:11px 24px;cursor:pointer;transition:background .15s}
+.cmd li[aria-selected=true]{background:var(--sky-wash);box-shadow:inset 3px 0 0 var(--sky)}
+.cmd li small{color:var(--mute)}
+.cmd .grp{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mute);padding:12px 24px 4px;cursor:default}
+.cmd .foot{display:flex;gap:16px;padding:10px 24px;border-top:1px solid var(--rule);font-size:12px;color:var(--mute)}
+#toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:var(--navy);color:#fff;padding:12px 22px;border-radius:100px;font-size:14px;font-weight:700;opacity:0;transition:opacity .3s,transform .45s var(--ease);z-index:95;pointer-events:none}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- page transitions ---------- */
+::view-transition-group(*){animation-duration:.6s;animation-timing-function:cubic-bezier(.2,.7,.1,1)}
+::view-transition-old(root){animation:vt-out .3s cubic-bezier(.65,0,.35,1) both}
+::view-transition-new(root){animation:vt-in .6s cubic-bezier(.2,.7,.1,1) .08s both}
+::view-transition-old(band),::view-transition-new(band){height:100%;width:100%;object-fit:cover;object-position:top;animation:none}
+::view-transition-old(band-title){animation:vt-out .25s cubic-bezier(.65,0,.35,1) both}
+::view-transition-new(band-title){animation:vt-title .65s cubic-bezier(.2,.7,.1,1) .1s both}
+@keyframes vt-out{to{opacity:0;transform:translateY(-10px)}}
+@keyframes vt-in{from{opacity:0;transform:translateY(22px)}}
+@keyframes vt-title{from{opacity:0;transform:translateY(16px);clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+.content.enter{animation:vt-in .6s var(--ease) both}
+
+/* ---------- responsive ---------- */
+@media (max-width:1000px){
+  .hero-grid,.ev-top,.cols,.cols-21{grid-template-columns:1fr;gap:40px}
+  .facts{grid-template-columns:repeat(3,1fr);row-gap:16px}
+  .facts div:nth-child(4){border-left:0;padding-left:0}
+  .tiles{grid-template-columns:1fr 1fr}
+  .fcols{grid-template-columns:1fr 1fr}
+  .xp{grid-template-columns:1fr}
+  .xp-side{border-right:0;border-bottom:1px solid var(--rule)}
+}
+@media (max-width:700px){
+  body{font-size:15px}
+  .wrap{padding:0 16px}
+  .util .stamp,.hdr-tools .kbd,.hdr-tools .t-lbl{display:none}
+  .band h1{font-size:40px}
+  .band--sub h1{font-size:34px}
+  .lede{font-size:18px}
+  .facts{grid-template-columns:1fr 1fr}
+  .facts div{border-left:0!important;padding-left:0!important}
+  .big{font-size:72px}
+  .sentence{font-size:23px}
+  .tiles,.fcols{grid-template-columns:1fr}
+  .flows .row{grid-template-columns:96px 1fr 52px}
+  .flows .hdr2{padding:0 52px 6px 110px}
+  .dock button{width:52px;height:48px;font-size:9px}
+  .note{padding:24px 20px}
+  nav.main{gap:24px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s!important;animation-delay:0s!important;transition-duration:.001s!important;transition-delay:0s!important}
+  .draw{stroke-dashoffset:0}
+}
+@media print{
+  body>*:not(#xp){display:none!important}
+  #xp{position:static;display:block}
+  #xp .xp{display:block;width:auto;max-height:none}
+  #xp .xp-side,#xp .x-close{display:none}
+  #xp .xp-view{background:none;padding:0}
+  #xp .sheet{box-shadow:none;max-width:none}
+  #xp::backdrop{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="util" id="util"><div class="wrap">
+  <span class="stamp" id="stamp"></span>
+  <span class="clock" id="clock"></span>
+  <a href="#" data-act="palette" id="u-help"></a>
+  <span class="lang"><button data-act="lang" data-v="de">DE</button>/<button data-act="lang" data-v="en">EN</button></span>
+</div></div>
+
+<header class="top">
+  <div class="wrap">
+    <div class="hdr">
+      <a class="brand" href="#" data-go="overview" aria-label="Issuer Intelligence Hub, home">
+        <svg viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" fill="#000099"/><polyline points="5,23 12,23 15,11 19,28 22,18 31,18" fill="none" stroke="#0099ff" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+        <span class="word"><span>Issuer Intelligence</span><span>Hub <em id="brand-sub"></em></span></span>
+      </a>
+      <div class="hdr-tools">
+        <button data-act="palette"><span class="t-lbl" id="t-search"></span><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 13l5 5" stroke="currentColor" stroke-width="2.2"/></svg><span class="kbd">⌘K</span></button>
+        <button data-act="export"><span class="t-lbl" id="t-export"></span><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10M6 9l4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+      </div>
+    </div>
+    <nav class="main" id="nav" aria-label="Main"></nav>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<footer><div class="wrap" id="foot"></div></footer>
+
+<div class="dock" id="dock"></div>
+<div id="tip" role="tooltip"></div>
+<div id="toast" role="status"></div>
+
+<dialog id="xp" aria-label="Export IR snapshot"></dialog>
+<dialog id="cmd" aria-label="Search"></dialog>
+
+<script>
+"use strict";
+/* ==================================================================
+   DATA
+   Real numbers come from CLAUDE.md (validated on the Xetra excerpt).
+   Everything else is a placeholder and is rendered with a ° mark.
+   Each event lists the keys whose values are real in `real`.
+================================================================== */
+const STOCKS={
+  EVD:{tk:"EVD",name:"CTS Eventim",legal:"CTS Eventim AG & Co. KGaA",idx:"MDAX",isin:"DE0005470306",seed:11,p0:96.5,
+    facts:{turn:18.6,xlm:6.8,auction:49,trades:6900},factsReal:"",
+    mix:{mm:21,agent:61,prop:18},
+    events:[
+      {id:"evd-0327",date:"2026-03-27",kind:"notable",ret:-23.2,peer:-1.5,mkt:-0.9,abn:-21.7,vol:8.6,xlmX:2.4,gap:-2.3,onset:23,lowMin:464,lowVal:-25.1,auction:25.8,first15:7,
+       flows:{mm:14,agent:-36,prop:9},mag:8.4,dVol:6,dSpr:3,shape:.8,decay:260,real:"ret peer abn vol gap low auction first15 agent"},
+      {id:"evd-1027",date:"2026-10-27",kind:"notable",ret:-3.8,peer:-.7,mkt:-.4,abn:-3.1,vol:3.4,xlmX:1.3,gap:-.6,onset:null,lowMin:380,lowVal:-2.2,pre:-1.7,auction:52.4,auctionShare:83,first15:6,
+       flows:{mm:3,agent:-9,prop:2},mag:4.1,dVol:2,dSpr:1,shape:1,decay:200,real:"auctionShare"},
+      {id:"evd-0813",date:"2026-08-13",kind:"results",ret:3.9,peer:.4,mkt:.2,abn:3.5,vol:2.6,xlmX:1.1,gap:4.8,onset:0,lowMin:42,lowVal:6.1,auction:9.7,first15:16,
+       flows:{mm:-4,agent:12,prop:-3},mag:3.6,dVol:2,dSpr:1,shape:1,decay:90,real:""}
+    ]},
+  EVT:{tk:"EVT",name:"Evotec",legal:"Evotec SE",idx:"SDAX",isin:"DE0005664809",seed:23,p0:7.9,
+    facts:{turn:9.8,xlm:14.5,auction:31,trades:5400},factsReal:"",
+    mix:{mm:26,agent:52,prop:22},
+    events:[
+      {id:"evt-0714",date:"2026-07-14",kind:"notable",ret:-24.0,peer:-.8,mkt:-.5,abn:-23.2,vol:11.5,xlmX:2.9,gap:-22.0,onset:0,lowMin:18,lowVal:-27.4,auction:6.1,first15:19,
+       flows:{mm:11,agent:-31,prop:6},mag:8.9,dVol:9,dSpr:4,shape:1,decay:45,real:"ret gap low first15"},
+      {id:"evt-0305",date:"2026-03-05",kind:"results",ret:6.2,peer:.9,mkt:.6,abn:5.3,vol:3.1,xlmX:1.2,gap:3.1,onset:12,lowMin:300,lowVal:7.4,auction:3.9,first15:12,
+       flows:{mm:-6,agent:15,prop:-2},mag:4.7,dVol:3,dSpr:1,shape:1,decay:120,real:""}
+    ]},
+  HDD:{tk:"HDD",name:"Heidelberger Druck",legal:"Heidelberger Druckmaschinen AG",idx:"SDAX",isin:"DE0007314007",seed:37,p0:1.42,
+    facts:{turn:1.3,xlm:90,auction:36,trades:610},factsReal:"turn xlm",
+    mix:{mm:38,agent:44,prop:18},
+    events:[
+      {id:"hdd-0512",date:"2026-05-12",kind:"notable",ret:14.2,peer:.6,mkt:.3,abn:13.6,vol:6.8,xlmX:.8,gap:5.5,onset:38,lowMin:290,lowVal:16.0,auction:1.1,first15:11,
+       flows:{mm:-8,agent:24,prop:5},mag:6.9,dVol:4,dSpr:2,shape:1,decay:180,real:""},
+      {id:"hdd-0903",date:"2026-09-03",kind:"notable",ret:-9.6,peer:-.4,mkt:-.2,abn:-9.2,vol:4.4,xlmX:1.9,gap:-1.2,onset:61,lowMin:410,lowVal:-11.3,auction:.9,first15:8,
+       flows:{mm:9,agent:-19,prop:-4},mag:5.8,dVol:4,dSpr:5,shape:.9,decay:160,real:""}
+    ]}
+};
+const IDX={
+  MDAX:{turn:14.2,xlm:9.4,auction:52,trades:5200,mix:{mm:24,agent:58,prop:18},real:"auction"},
+  SDAX:{turn:3.1,xlm:28,auction:34,trades:1900,mix:{mm:33,agent:48,prop:19},real:"auction"},
+  DAX:{auction:51}
+};
+const PAGES=["overview","event","compare","ask","ideas"];
+const state={stock:"EVD",ev:null,page:"overview",lang:"en",noteLang:null,cmp:{kind:"notable",idx:"all",dir:"down"},chat:[]};
+const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const de=()=>state.lang==="de";
+const L=(en,d)=>de()?d:en;
+const S=()=>STOCKS[state.stock];
+const E=()=>S().events.find(e=>e.id===state.ev)||S().events[0];
+const R=(e,k)=>(" "+e.real+" ").includes(" "+k+" ");
+const ph=x=>`<span class="ph">${x}</span>`;
+const val=(e,k,x)=>R(e,k)?x:ph(x);
+const sv=(e,k,x)=>R(e,k)?x:x+"°";
+function nf(v,d=1,lang){return new Intl.NumberFormat((lang||state.lang)==="de"?"de-DE":"en-GB",{minimumFractionDigits:d,maximumFractionDigits:d}).format(Math.abs(v))}
+const sg=(v,s)=>v<0?"−":(s&&v>0?"+":"");
+const pct=(v,d=1,s=true,lang)=>sg(Math.round(v*10**d)/10**d,s)+nf(v,d,lang)+((lang||state.lang)==="de"?" %":"%");
+const times=(v,d=1,lang)=>nf(v,d,lang)+"×";
+const eurm=(v,d=1,lang)=>(lang||state.lang)==="de"?nf(v,d,lang)+" Mio. €":"€"+nf(v,d,lang)+"m";
+const bps=(v,d=1)=>nf(v,d)+(de()?" Bp.":" bps");
+const int=v=>new Intl.NumberFormat(de()?"de-DE":"en-GB").format(Math.round(v));
+const MS=[["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],["Jan.","Feb.","März","Apr.","Mai","Juni","Juli","Aug.","Sep.","Okt.","Nov.","Dez."]];
+const ML=[["January","February","March","April","May","June","July","August","September","October","November","December"],["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"]];
+function dS(s,lang){const[y,m,d]=s.split("-").map(Number);return (lang||state.lang)==="de"?`${d}. ${MS[1][m-1]}`:`${d} ${MS[0][m-1]}`}
+function dL(s,lang){const[y,m,d]=s.split("-").map(Number);return (lang||state.lang)==="de"?`${d}. ${ML[1][m-1]} ${y}`:`${d} ${ML[0][m-1]} ${y}`}
+const tm=m=>{const t=540+Math.round(m);return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0")};
+const kindL=k=>k==="results"?L("Results day","Ergebnistag"):L("Notable day","Auffälliger Tag");
+const arrowSvg=(deg,cls="")=>`<svg class="ar ${cls}" viewBox="0 0 16 16" style="transform:rotate(${deg}deg)" aria-hidden="true"><path d="M2.5 8h10.5M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>`;
+const arrRet=v=>arrowSvg(v>1.5?-90:v>.3?-45:v<-1.5?90:v<-.3?45:0,v>.3?"up":v<-.3?"dn":"nt");
+const arrRel=(a,b)=>{const r=a/b;return arrowSvg(r>1.25?-90:r>1.05?-45:r<.8?90:r<.95?45:0,"nt")};
+const ARR=`<svg class="arr" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2"/></svg>`;
+const enc=s=>encodeURIComponent(s);
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function gauss(r){let u=0,v=0;while(!u)u=r();while(!v)v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+const f1=n=>n.toFixed(1);
+
+/* ---------- trading calendar + daily series (placeholder shapes) ---------- */
+const HOL=new Set(["2026-04-03","2026-04-06","2026-05-01"]);
+const DAYS=[];
+for(let d=new Date(Date.UTC(2026,0,2));d<=new Date(Date.UTC(2026,9,30));d.setUTCDate(d.getUTCDate()+1)){
+  const w=d.getUTCDay(),s=d.toISOString().slice(0,10);if(w>0&&w<6&&!HOL.has(s))DAYS.push(s)}
+const _year={};
+function year(s){
+  if(_year[s.tk])return _year[s.tk];
+  const r=rng(s.seed),evs={};s.events.forEach(e=>evs[e.date]=e);
+  let p=s.p0,ip=100,x=s.facts.xlm;
+  const out=DAYS.map((d,i)=>{
+    const e=evs[d];let iret=gauss(r)*.85,ret=iret*.7+gauss(r)*1.3,vol=Math.exp(gauss(r)*.3)*(r()<.035?2.6+r()*1.6:1);
+    x=x*.8+s.facts.xlm*.2*Math.exp(gauss(r)*.25);let xl=x;
+    if(e){ret=e.ret;iret=e.mkt;vol=e.vol;xl=s.facts.xlm*e.xlmX}
+    else if(vol>2.4)xl=x*(1.2+r()*.5);
+    p*=1+ret/100;ip*=1+iret/100;
+    return{d,i,ret,p,ip,vol,xl,ev:e||null}});
+  return _year[s.tk]=out;
+}
+
+/* ==================================================================
+   CHROME: nav, util, footer, dock
+================================================================== */
+const NAV={overview:["Overview","Übersicht"],event:["Event analysis","Ereignisanalyse"],compare:["Compare","Vergleich"],ask:["Assistant","Assistent"],ideas:["Next ideas","Weitere Ideen"]};
+function chrome(){
+  document.documentElement.lang=state.lang;
+  $("#nav").innerHTML=PAGES.map((p,i)=>`<button data-go="${p}" ${state.page===p?'aria-current="page"':""}><span class="n">0${i+1}</span>${NAV[p][de()?1:0]}</button>`).join("")+`<span class="nav-ind" id="navind"></span>`;
+  placeInd();
+  $$(".lang button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===state.lang));
+  $("#stamp").textContent=L("Data: Xetra, 2 Jan – 30 Oct 2026 · 213 trading days · 174 shares","Daten: Xetra, 2. Jan. – 30. Okt. 2026 · 213 Handelstage · 174 Aktien");
+  $("#u-help").textContent=L("Shortcuts","Tastenkürzel");
+  $("#brand-sub").textContent=L("· Issuer Services","· Issuer Services");
+  $("#t-search").textContent=L("Search","Suchen");
+  $("#t-export").textContent=L("Snapshot","Snapshot");
+  const I={x:'<svg width="18" height="18" viewBox="0 0 20 20"><path d="M10 3v10M6 9l4 4 4-4M4 16h12" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+    a:'<svg width="18" height="18" viewBox="0 0 20 20"><path d="M3 4h14v9H8l-4 3v-3H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+    s:'<svg width="18" height="18" viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12.5 12.5l5 5" stroke="currentColor" stroke-width="2.2"/></svg>'};
+  $("#dock").innerHTML=`<button data-act="export">${I.x}${L("Export","Export")}</button><button data-go="ask">${I.a}${L("Ask","Fragen")}</button><button data-act="palette">${I.s}${L("Search","Suche")}</button>`;
+  const li=(t,go)=>`<li><svg width="14" height="14" viewBox="0 0 16 16"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2"/></svg>${go?`<a href="#" data-go="${go}">${t}</a>`:`<span>${t}</span>`}</li>`;
+  $("#foot").innerHTML=`<div class="fcols">
+    <div><h4>Issuer Intelligence Hub</h4><ul>${PAGES.map(p=>li(NAV[p][de()?1:0],p)).join("")}</ul></div>
+    <div><h4>${L("Data","Daten")}</h4><ul>${li("Xetra OHLC & auctions")}${li("Xetra flow dynamics")}${li("Xetra Liquidity Measure (XLM)")}${li(L("Index constituents","Indexzusammensetzung"))}${li("Xetra on-book trades")}</ul></div>
+    <div><h4>${L("Method","Methode")}</h4><ul>${li(L("Numbers come from code","Zahlen kommen aus dem Code"))}${li(L("Words come from the LLM","Texte kommen vom LLM"))}${li(L("Every figure in a text is checked","Jede Zahl im Text wird geprüft"))}${li(L("Causes are verified by people","Ursachen prüfen Menschen"))}</ul></div>
+    <div><h4>${L("Project","Projekt")}</h4><ul>${li("Futury Build Days #4, Frankfurt")}${li(L("Deutsche Börse challenge","Deutsche-Börse-Challenge"))}${li(L("A module for the Issuer Services Hub","Ein Modul für den Issuer Services Hub"))}</ul></div>
+  </div>
+  <div class="fbot"><span>${L("Concept prototype. Not an official Deutsche Börse product. Values marked ° are placeholders until the engine provides them.","Konzept-Prototyp, kein offizielles Produkt der Deutschen Börse. Mit ° markierte Werte sind Platzhalter.")}</span><span>${L("Keys","Tasten")}: 1–5 · ⌘K · E</span></div>`;
+}
+function placeInd(){const a=$("#nav [aria-current=page]"),i=$("#navind");if(!a||!i)return;i.style.left=a.offsetLeft+"px";i.style.width=a.offsetWidth+"px"}
+
+/* ==================================================================
+   BANDS (navy headers)
+================================================================== */
+function band(){
+  const s=S(),e=E();
+  if(state.page==="overview")return heroBand(s);
+  const crumb=(t)=>`<nav class="crumb"><button data-go="overview">${s.name}</button><span>/</span><span>${t}</span></nav>`;
+  if(state.page==="event")return `<section class="band band--sub"><div class="wrap band-in">${crumb(NAV.event[de()?1:0])}
+    <div class="band-row"><div><h1>${dL(e.date)}</h1><p class="sub">${kindL(e.kind)} · ${s.legal} · ${s.idx} · <b>${L("cause not yet verified","Ursache noch nicht verifiziert")}</b></p></div>
+    <div class="btns"><button class="pill pill--ghost" data-act="export">${L("Export snapshot","Snapshot exportieren")} ${ARR}</button></div></div></div></section>`;
+  const t={compare:[L("Compare events","Ereignisse vergleichen"),L("How does this day rank against every similar day in DAX, MDAX and SDAX in 2026?","Wie schneidet dieser Tag im Vergleich zu allen ähnlichen Tagen in DAX, MDAX und SDAX 2026 ab?")],
+    ask:[L("Ask the data","Fragen Sie die Daten"),L("The assistant only sees the computed impact card. Numbers come from code, words from the language model.","Der Assistent sieht nur die berechnete Impact Card. Zahlen kommen aus dem Code, Texte vom Sprachmodell.")],
+    ideas:[L("What IR needs next","Was IR als Nächstes braucht"),L("Six ideas built on the same data, and what each one still needs.","Sechs Ideen auf derselben Datenbasis, und was jeweils noch fehlt.")]}[state.page];
+  return `<section class="band band--sub"><div class="wrap band-in">${crumb(NAV[state.page][de()?1:0])}<h1>${t[0]}</h1><p class="sub">${t[1]}</p></div></section>`;
+}
+function heroBand(s){
+  const ys=year(s),ix=IDX[s.idx],e0=s.events[0],last=ys[ys.length-1];
+  const ytd=(last.p/s.p0-1)*100,unusual=ys.filter(d=>d.vol>=2.5).length;
+  const more=s.facts.turn>ix.turn;
+  const lede=L(`${s.name} trades ${ph(eurm(s.facts.turn))} a day, ${more?"more":"less"} than the ${s.idx} median, and had ${ph(unusual)} unusual days in 2026. The largest was ${dS(e0.date)}: a ${val(e0,"abn",pct(e0.abn))} move that was specific to the share.`,
+    `${s.name} handelt ${ph(eurm(s.facts.turn))} pro Tag, ${more?"mehr":"weniger"} als der ${s.idx}-Median, und hatte 2026 ${ph(unusual)} auffällige Tage. Der größte war der ${dS(e0.date)}: eine titelspezifische Bewegung von ${val(e0,"abn",pct(e0.abn))}.`);
+  const fr=k=>(" "+s.factsReal+" ").includes(" "+k+" ");
+  const fv=(k,x)=>fr(k)?x:ph(x);
+  return `<section class="band band--hero"><div class="wrap band-in">
+    <div class="hero-grid">
+      <div>
+        <div class="kicker rv in">${s.idx} · ISIN <b>${s.isin}</b> · Xetra</div>
+        <div style="position:relative">
+          <button class="pick" data-act="stockmenu" aria-expanded="false" aria-haspopup="true"><h1>${s.name}</h1><span class="chev"><svg width="12" height="12" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="#fff" stroke-width="2"/></svg></span></button>
+          <div class="menu" id="stockmenu" role="menu">${Object.values(STOCKS).map(x=>`<button role="menuitem" data-stock="${x.tk}" aria-current="${x.tk===s.tk}"><span><b>${x.name}</b><br><small>${x.legal}</small></span><small>${x.tk} · ${x.idx}</small></button>`).join("")}</div>
+        </div>
+        <p class="lede">${lede}</p>
+        <div class="btns"><button class="pill" data-ev="${e0.id}">${L(`Read the ${dS(e0.date)} reaction`,`Reaktion vom ${dS(e0.date)} lesen`)} ${ARR}</button><button class="pill pill--ghost" data-act="export">${L("IR snapshot","IR-Snapshot")}</button></div>
+      </div>
+      <div class="hero-art" id="heroart">${heroArt(s,ys)}<div class="cap"><span>${L("2026, rebased","2026, indexiert")} · <span style="color:#fff">— ${s.tk}</span> &nbsp;<span style="opacity:.7">— ${s.idx}${L(" and peers"," und Peers")}°</span></span><span>${dS(e0.date)} ●</span></div></div>
+    </div>
+    <dl class="facts">
+      <div><dt>${L("Last close","Letzter Schluss")}</dt><dd>${ph("€"+nf(last.p,2))}</dd></div>
+      <div><dt>${L("Year to date","Seit Jahresbeginn")}</dt><dd>${ph(pct(ytd))}</dd></div>
+      <div><dt>${L("Turnover per day","Umsatz pro Tag")}</dt><dd>${fv("turn",eurm(s.facts.turn))}</dd></div>
+      <div><dt>${L("Cost to trade €25k","Handelskosten 25 T€")}</dt><dd>${fv("xlm",nf(s.facts.xlm,1))}<small>${L("bps","Bp.")}</small></dd></div>
+      <div><dt>${L("Closing auction share","Anteil Schlussauktion")}</dt><dd>${ph(pct(s.facts.auction,0,false))}</dd></div>
+    </dl>
+  </div></section>`;
+}
+function heroArt(s,ys){
+  const W=520,H=250,r=rng(s.seed+5),n=ys.length;
+  const walks=[];for(let k=0;k<7;k++){let v=100;const dr=(r()-.5)*.0016;walks.push(ys.map((d,i)=>{v*=1+(d.ip/(ys[i-1]?ys[i-1].ip:100)-1)+gauss(r)*.009+dr;return v}))}
+  const all=ys.map(d=>d.p/s.p0*100).concat(ys.map(d=>d.ip)).concat(...walks);
+  const lo=Math.min(...all)-4,hi=Math.max(...all)+4;
+  const x=i=>i/(n-1)*W,y=v=>H-(v-lo)/(hi-lo)*H;
+  const peers=walks.map(w=>`<path d="${w.map((v,i)=>`${i?"L":"M"}${f1(x(i))},${f1(y(v))}`).join("")}" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="1" class="draw d2" pathLength="1"/>`).join("");
+  const ip=ys.map((d,i)=>`${i?"L":"M"}${f1(x(i))},${f1(y(d.ip))}`).join("");
+  const sp=ys.map((d,i)=>`${i?"L":"M"}${f1(x(i))},${f1(y(d.p/s.p0*100))}`).join("");
+  const e=ys.find(d=>d.ev&&d.ev.id===s.events[0].id);
+  return `<svg viewBox="0 0 ${W} ${H}" aria-label="Price 2026">
+    <line x1="0" x2="${W}" y1="${y(100)}" y2="${y(100)}" stroke="#fff" stroke-opacity=".25" stroke-dasharray="2 4"/>
+    ${peers}<path d="${ip}" fill="none" stroke="#9fd2ff" stroke-opacity=".7" stroke-width="1.3" class="draw d2" pathLength="1"/>
+    <path d="${sp}" fill="none" stroke="#fff" stroke-width="2" class="draw" pathLength="1" stroke-linejoin="round"/>
+    ${e?`<g class="ann" style="--i:0"><circle cx="${x(e.i)}" cy="${y(e.p/s.p0*100)}" r="5" fill="#0099ff" class="pulse"/><circle cx="${x(e.i)}" cy="${y(e.p/s.p0*100)}" r="5" fill="#0099ff" stroke="#fff" stroke-width="2"/>
+    <text x="${x(e.i)+12}" y="${y(e.p/s.p0*100)+24}" fill="#fff" font-size="14" font-weight="700" paint-order="stroke" stroke="#000099" stroke-width="5">${pct(e.ev.ret)}</text></g>`:""}
+  </svg>`;
+}
+
+/* ==================================================================
+   PAGE 1: OVERVIEW (Part A)
+================================================================== */
+function pOverview(){
+  const s=S(),ys=year(s),ix=IDX[s.idx];
+  const ixv=(k,x)=>(" "+ix.real+" ").includes(" "+k+" ")?x:ph(x);
+  const fr=k=>(" "+s.factsReal+" ").includes(" "+k+" ");
+  const fv=(k,x)=>fr(k)?x:ph(x);
+  const peers={turn:ix.turn*1.15,xlm:ix.xlm*.9,auction:ix.auction-3,trades:ix.trades*1.1};
+  const rows=[
+    [L("Turnover per day","Umsatz pro Tag"),fv("turn",eurm(s.facts.turn)),ph(eurm(peers.turn)),ixv("turn",eurm(ix.turn)),arrRel(s.facts.turn,ix.turn)],
+    [L("Cost to trade €25k (XLM)","Handelskosten 25 T€ (XLM)"),fv("xlm",bps(s.facts.xlm)),ph(bps(peers.xlm)),ixv("xlm",bps(ix.xlm)),arrRel(s.facts.xlm,ix.xlm)],
+    [L("Closing auction share","Anteil Schlussauktion"),ph(pct(s.facts.auction,0,false)),ph(pct(peers.auction,0,false)),ixv("auction",pct(ix.auction,0,false)),arrRel(s.facts.auction,ix.auction)],
+    [L("Trades per day","Trades pro Tag"),ph(int(s.facts.trades)),ph(int(peers.trades)),ph(int(ix.trades)),arrRel(s.facts.trades,ix.trades)],
+    [L("Client (agent) share","Anteil Kundenorders"),ph(pct(s.mix.agent,0,false)),ph(pct(ix.mix.agent+1,0,false)),ph(pct(ix.mix.agent,0,false)),arrRel(s.mix.agent,ix.mix.agent)]
+  ];
+  const unusual=[...ys].filter(d=>d.vol>=2.4||d.ev).sort((a,b)=>b.vol-a.vol).slice(0,6);
+  return `
+  <section class="sec wrap rv">
+    <div class="sec-head"><div><h2 class="h2">${L("2026 at a glance","2026 auf einen Blick")}</h2><p class="sec-note">${L("Price vs index above, daily turnover vs normal below. Click a marked day to open its reading.","Oben Kurs gegen Index, unten Tagesumsatz gegen Normal. Markierten Tag anklicken, um die Analyse zu öffnen.")}</p></div>
+    <div class="legend"><span><i></i>${s.tk}</span><span><i class="g"></i>${s.idx}</span><span><i class="b"></i>${L("unusual turnover","auffälliger Umsatz")}</span><span><i class="b" style="background:var(--navy)"></i>${L("event with reading","Ereignis mit Analyse")}</span></div></div>
+    <div class="chart" id="yearchart">${yearChart(s,ys)}</div>
+  </section>
+
+  <section class="sec wrap">
+    <div class="cols">
+      <div class="rv">
+        <div class="sec-head"><h2 class="h2">${L("How the share trades","So wird die Aktie gehandelt")}</h2></div>
+        <table class="tbl"><thead><tr><th>${L("Daily average","Tagesdurchschnitt")}</th><th class="r">${s.tk}</th><th class="r">${L("Peers","Peers")}</th><th class="r">${s.idx}</th><th class="ic"></th></tr></thead>
+        <tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td class="r"><b>${r[1]}</b></td><td class="r m">${r[2]}</td><td class="r m">${r[3]}</td><td class="ic">${r[4]}</td></tr>`).join("")}</tbody></table>
+        <p class="sec-note">${L("Arrows compare the share with the index median. 60-day medians of the closing auction share: DAX 51%, MDAX 52%, SDAX 34%.","Pfeile vergleichen mit dem Indexmedian. 60-Tage-Mediane Schlussauktion: DAX 51 %, MDAX 52 %, SDAX 34 %.")}</p>
+      </div>
+      <div class="rv" style="--d:.1s">
+        <div class="sec-head"><h2 class="h2">${L("Who trades","Wer handelt")}</h2></div>
+        ${mixBars(s,ix)}
+        <div style="margin-top:42px"><h3 class="h3">${L("Xetra liquidity category","Xetra-Liquiditätskategorie")}</h3>${liqCheck(s)}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec wrap">
+    <div class="cols">
+      <div class="rv">
+        <div class="sec-head"><div><h2 class="h2">${L("Cost to trade","Handelskosten")}</h2><p class="sec-note">${L("XLM for a €25k order, in basis points. Lower is better.","XLM für eine 25-T€-Order in Basispunkten. Niedriger ist besser.")}</p></div><div class="legend"><span><i></i>${s.tk}</span><span><i class="s"></i>${s.idx} ${L("middle half","mittlere Hälfte")}</span></div></div>
+        <div class="chart">${xlmChart(s,ys)}</div>
+      </div>
+      <div class="rv" style="--d:.1s">
+        <div class="sec-head"><h2 class="h2">${L("Unusual days","Auffällige Tage")}</h2></div>
+        <table class="tbl"><thead><tr><th>${L("Date","Datum")}</th><th class="r">${L("Return","Rendite")}</th><th class="ic"></th><th class="r">${L("Turnover","Umsatz")}</th><th>${L("Cause","Ursache")}</th></tr></thead><tbody>
+        ${unusual.map(d=>{const e=d.ev;return `<tr class="${e?"go":""}" ${e?`data-ev="${e.id}"`:""}><td>${dS(d.d)}</td><td class="r"><b>${e?val(e,"ret",pct(d.ret)):ph(pct(d.ret))}</b></td><td class="ic">${arrRet(d.ret)}</td><td class="r">${e?val(e,"vol",times(d.vol)):ph(times(d.vol))}</td>
+          <td class="status">${e?`<b>${L("Open reading","Analyse öffnen")}</b> ${ARR.replace('class="arr"','class="arr" style="color:var(--sky);vertical-align:-3px"')}`:L("cause open","Ursache offen")}</td></tr>`}).join("")}
+        </tbody></table>
+        <p class="sec-note">${L("The data shows that something happened, not why. Causes are added only after the research team verifies them.","Die Daten zeigen, dass etwas passiert ist, nicht warum. Ursachen werden erst nach Prüfung ergänzt.")}</p>
+      </div>
+    </div>
+  </section>`;
+}
+function yearChart(s,ys){
+  const W=1120,H=330,ml=8,mr=56,PT=10,PH=170,BT=214,BH=86,n=ys.length,cw=(W-ml-mr)/n;
+  const x=i=>ml+i*cw+cw/2;
+  const all=ys.map(d=>d.p/s.p0*100).concat(ys.map(d=>d.ip));
+  const lo=Math.min(...all)-3,hi=Math.max(...all)+3,y=v=>PT+(hi-v)/(hi-lo)*PH;
+  const vmax=Math.max(...ys.map(d=>d.vol)),vb=v=>Math.sqrt(v/vmax)*BH;
+  let g="";
+  [40,50,60,70,80,90,100,110,120,130,140,150,160].filter(v=>v>lo&&v<hi).forEach(v=>{g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}" class="${v===100?"zero":"gl"}"/><text x="${W-mr+8}" y="${y(v)+4}" class="ax">${v}</text>`});
+  let months="";let pm="";ys.forEach((d,i)=>{const m=d.d.slice(5,7);if(m!==pm){pm=m;months+=`<line x1="${x(i)-cw/2}" x2="${x(i)-cw/2}" y1="${BT+BH}" y2="${BT+BH+6}" stroke="#bdbdbd"/><text x="${x(i)-cw/2+4}" y="${BT+BH+20}" class="ax">${MS[de()?1:0][+m-1]}</text>`}});
+  const bars=ys.map((d,i)=>{const h=vb(d.vol),c=d.ev?"var(--navy)":d.vol>=2.4?"var(--sky)":"#cfd3da";return`<rect class="bar" style="--i:${i}" x="${f1(x(i)-cw*.36)}" y="${f1(BT+BH-h)}" width="${f1(cw*.72)}" height="${f1(h)}" fill="${c}"/>`}).join("");
+  const flags=ys.filter(d=>d.ev).map((d,k)=>`<g class="ann" style="--i:${k}" data-ev="${d.ev.id}" cursor="pointer"><line x1="${x(d.i)}" x2="${x(d.i)}" y1="${y(d.p/s.p0*100)+6}" y2="${BT+BH-vb(d.vol)-4}" stroke="var(--navy)" stroke-dasharray="2 3"/><circle cx="${x(d.i)}" cy="${y(d.p/s.p0*100)}" r="4.5" fill="#fff" stroke="var(--navy)" stroke-width="2"/><text x="${x(d.i)>W*.8?x(d.i)-8:x(d.i)+8}" text-anchor="${x(d.i)>W*.8?"end":"start"}" y="${y(d.p/s.p0*100)-9}" class="axb" fill="var(--navy)">${dS(d.d)} · ${pct(d.ev.ret)}</text></g>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" id="ysvg" role="img" aria-label="${s.tk} 2026">
+    ${g}<text x="${W-mr+8}" y="${PT-0}" class="ax">${L("index","Index")}</text>
+    <path d="${ys.map((d,i)=>`${i?"L":"M"}${f1(x(i))},${f1(y(d.ip))}`).join("")}" fill="none" stroke="var(--graphite)" stroke-width="1.4" class="draw d2" pathLength="1"/>
+    <path d="${ys.map((d,i)=>`${i?"L":"M"}${f1(x(i))},${f1(y(d.p/s.p0*100))}`).join("")}" fill="none" stroke="var(--navy)" stroke-width="2" stroke-linejoin="round" class="draw" pathLength="1"/>
+    <line x1="${ml}" x2="${W-mr}" y1="${BT+BH}" y2="${BT+BH}" stroke="var(--ink)"/>
+    <line x1="${ml}" x2="${W-mr}" y1="${BT+BH-vb(1)}" y2="${BT+BH-vb(1)}" class="zero"/><text x="${W-mr+8}" y="${BT+BH-vb(1)+4}" class="ax">1× ${L("normal","normal")}</text>
+    ${bars}${months}${flags}
+    <g class="xh" id="yxh"><line x1="0" x2="0" y1="${PT}" y2="${BT+BH}" stroke="var(--ink)" stroke-width="1"/></g>
+    <rect class="hit" x="${ml}" y="0" width="${W-ml-mr}" height="${BT+BH}" id="yhit"/>
+  </svg>`;
+}
+function mixBars(s,ix){
+  const seg=(m,lbl)=>{const parts=[["mm",L("Market makers","Market Maker"),"var(--graphite)"],["agent",L("Clients (agent)","Kunden (Agent)"),"var(--navy)"],["prop",L("Proprietary","Eigenhandel"),"var(--sky)"]];
+    let x=0;return `<div style="display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:center;padding:10px 0;border-bottom:1px solid var(--rule)"><b style="font-size:14px">${lbl}</b><div style="display:flex;height:26px">${parts.map(([k,n,c],i)=>{const w=m[k];x+=w;return`<div class="barx" style="--i:${i};width:${w}%;background:${c};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;padding-left:8px;white-space:nowrap;overflow:hidden" data-tip="${enc(`<span class="t">${n}</span><br>${pct(w,0,false)} ${L("of one-sided turnover","des einseitigen Umsatzes")}°`)}">${w}%°</div>`}).join("")}</div></div>`};
+  return `<div style="border-top:1px solid var(--ink)">${seg(s.mix,s.tk)}${seg(ix.mix,s.idx)}</div>
+  <div class="legend" style="margin-top:12px"><span><i class="b" style="background:var(--graphite)"></i>${L("Market makers","Market Maker")}</span><span><i class="b" style="background:var(--navy)"></i>${L("Clients (agent)","Kunden (Agent)")}</span><span><i class="b"></i>${L("Proprietary","Eigenhandel")}</span></div>`;
+}
+function liqCheck(s){
+  const fr=k=>(" "+s.factsReal+" ").includes(" "+k+" ");
+  const okX=s.facts.xlm<=100,okT=s.facts.turn>=2.5;
+  const ruler=(lbl,v,vTxt,th,thTxt,max,ok,lowGood)=>{const p=Math.min(v/max,1)*100,t=th/max*100;
+    return `<div style="margin:18px 0 6px"><div style="display:flex;justify-content:space-between;font-size:14px"><span>${lbl}</span><b style="color:var(--navy)">${vTxt} <span style="font-weight:400;color:var(--mute)">${ok?"✓":"✕"} ${L("rule","Regel")} ${thTxt}</span></b></div>
+    <div style="position:relative;height:22px;margin-top:6px"><div style="position:absolute;left:0;right:0;top:9px;height:4px;background:var(--tile)"></div>
+    <div style="position:absolute;top:9px;height:4px;${lowGood?`left:0;width:${t}%`:`left:${t}%;right:0`};background:var(--sky-soft)"></div>
+    <div style="position:absolute;left:${t}%;top:2px;height:18px;width:1.5px;background:var(--ink)"></div>
+    <div class="barx" style="position:absolute;left:0;top:9px;height:4px;width:${p}%;background:var(--navy)"></div>
+    <div style="position:absolute;left:calc(${p}% - 6px);top:5px;width:12px;height:12px;border-radius:50%;background:#fff;border:2.5px solid var(--navy)"></div></div></div>`};
+  const pass=okX&&okT;
+  return `${ruler(L("Cost to trade €25k","Handelskosten 25 T€"),s.facts.xlm,fr("xlm")?bps(s.facts.xlm):bps(s.facts.xlm)+"°",100,"≤ 100",150,okX,true)}
+  ${ruler(L("Turnover per day (4-month avg.)","Umsatz pro Tag (4-Monats-Schnitt)"),s.facts.turn,fr("turn")?eurm(s.facts.turn):eurm(s.facts.turn)+"°",2.5,"≥ "+eurm(2.5),Math.max(5,s.facts.turn*1.25),okT,false)}
+  <p class="verdict" style="margin-top:16px;font-size:17px">${pass?L("<b>Category A (estimate).</b> No Designated Sponsor needed.","<b>Kategorie A (Schätzung).</b> Kein Designated Sponsor nötig."):L("<b>Designated Sponsor needed (estimate).</b> The share misses the turnover rule.","<b>Designated Sponsor nötig (Schätzung).</b> Die Umsatzregel wird verfehlt.")}</p>
+  <p class="sec-note" style="margin-top:-12px">${L("Rule: Being Public Guide, p. 32.","Regel: Being Public Guide, S. 32.")}</p>`;
+}
+function xlmChart(s,ys){
+  const W=540,H=220,ml=40,mr=8,mt=8,PH=180,n=ys.length,ix=IDX[s.idx];
+  const vals=ys.map(d=>d.xl),hi=Math.max(...vals,ix.xlm*1.6)*1.08,lo=0;
+  const x=i=>ml+i/(n-1)*(W-ml-mr),y=v=>mt+(hi-v)/(hi-lo)*PH;
+  const step=hi>60?20:hi>25?10:hi>12?4:2;
+  let g="";for(let v=0;v<=hi;v+=step)g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}" class="gl"/><text x="${ml-8}" y="${y(v)+4}" class="ax" text-anchor="end">${v}</text>`;
+  const band=`<rect x="${ml}" y="${y(ix.xlm*1.35)}" width="${W-ml-mr}" height="${y(ix.xlm*.75)-y(ix.xlm*1.35)}" fill="var(--sky-soft)" opacity=".7"/><line x1="${ml}" x2="${W-mr}" y1="${y(ix.xlm)}" y2="${y(ix.xlm)}" stroke="var(--graphite)" stroke-dasharray="4 3"/>`;
+  const path=ys.map((d,i)=>`${i?"L":"M"}${f1(x(i))},${f1(y(d.xl))}`).join("");
+  let months="",pm="";ys.forEach((d,i)=>{const m=d.d.slice(5,7);if(m!==pm&&(+m)%2===1){pm=m;months+=`<text x="${x(i)}" y="${H+4}" class="ax">${MS[de()?1:0][+m-1]}</text>`}else if(m!==pm)pm=m});
+  return `<svg viewBox="0 0 ${W} ${H+10}">${band}${g}<path d="${path}" fill="none" stroke="var(--navy)" stroke-width="1.5" class="draw" pathLength="1"/>${months}</svg>`;
+}
+
+/* ==================================================================
+   PAGE 2: EVENT ANALYSIS (Part B, the impact card)
+================================================================== */
+function intraSeries(s,e){
+  const r=rng(s.seed*97+parseInt(e.date.replace(/-/g,""))%9973),N=510,on=e.onset==null?0:e.onset;
+  const P=[],PE=[],V=[];let nz=0;
+  const end=e.pre!=null?e.pre:e.ret;
+  for(let m=0;m<=N;m++){
+    nz=nz*.9+gauss(r)*(Math.abs(e.ret)>8?.2:.08);
+    let b;
+    if(m<=on)b=e.gap+(on?(m/on)*e.gap*.04:0);
+    else if(m<=e.lowMin){const t=(m-on)/Math.max(1,e.lowMin-on);b=e.gap+(e.lowVal-e.gap)*Math.pow(t,e.shape||1)}
+    else{const t=(m-e.lowMin)/Math.max(1,N-e.lowMin);b=e.lowVal+(end-e.lowVal)*Math.sqrt(t)}
+    let v=b+nz*(m>on?1:.5);
+    if(m!==e.lowMin)v=e.lowVal<0?Math.max(v,e.lowVal+.08):Math.min(v,e.lowVal-.08);
+    if(m===0)v=e.gap;if(m===e.lowMin)v=e.lowVal;
+    P.push(v);
+    PE.push(e.peer*Math.min(1,m/200)+gauss(r)*.04);
+    const u=1+1.7*Math.exp(-m/22)+1.3*Math.exp(-(N-m)/28);
+    const act=m>=on?1+(e.vol-1)*1.3*Math.exp(-(m-on)/(e.decay||150)):1;
+    V.push(u*act*(.55+r()*.9));
+  }
+  return{P,PE,V,N};
+}
+function intraChart(s,e){
+  const W=1120,ml=56,mr=128,mt=30,PH=250,GAP=34,VH=84,H=mt+PH+GAP+VH+44,{P,PE,V,N}=intraSeries(s,e),AU=N+16;
+  const xm=m=>ml+m/(AU+8)*(W-ml-mr);
+  const lo=Math.min(...P,e.ret,e.peer,0),hi=Math.max(...P,e.ret,e.peer,0),pad=(hi-lo)*.1+.6,y0=lo-pad,y1=hi+pad;
+  const y=v=>mt+(y1-v)/(y1-y0)*PH;
+  const span=y1-y0,step=span>24?5:span>10?2:1;
+  let g="";for(let v=Math.ceil(y0/step)*step;v<=y1;v+=step){const z=Math.abs(v)<1e-9;g+=`<line x1="${ml}" x2="${W-mr+10}" y1="${f1(y(v))}" y2="${f1(y(v))}" class="${z?"zero":"gl"}"/><text x="${ml-10}" y="${f1(y(v)+4)}" class="ax" text-anchor="end">${pct(v,0)}</text>`}
+  g+=`<text x="${W-mr+14}" y="${f1(y(0)+4)}" class="ax">${L("prev. close","Vortagesschluss")}</text>`;
+  const times=[[0,"09:00"],[120,"11:00"],[240,"13:00"],[360,"15:00"],[510,"17:30"]];
+  const vb=[];for(let m=0;m<N;m+=5){let t=0;for(let k=m;k<m+5&&k<=N;k++)t+=V[k];vb.push(t)}
+  const vmax=Math.max(...vb),vy=mt+PH+GAP+VH;
+  const bw=xm(5)-xm(0)-1.4;
+  const bars=vb.map((t,i)=>{const h=t/vmax*VH*.92;const inF=i<3;return`<rect class="bar" style="--i:${i*2}" x="${f1(xm(i*5)+.7)}" y="${f1(vy-h)}" width="${f1(bw)}" height="${f1(h)}" fill="${inF?"var(--sky)":"#c4c9d1"}"/>`}).join("");
+  const ax=xm(AU),endY=y(e.ret);
+  const path=P.map((v,m)=>`${m?"L":"M"}${f1(xm(m))},${f1(y(v))}`).join("");
+  const peer=PE.map((v,m)=>`${m?"L":"M"}${f1(xm(m))},${f1(y(v))}`).join("");
+  const neg=e.ret<0,col=neg?"var(--down)":"var(--up)";
+  const lx=xm(e.lowMin),ly=y(e.lowVal),right=lx>W*.6;
+  const ext=e.lowVal<0?L("Low","Tief"):L("High","Hoch");
+  const share=e.auctionShare?` · ${sv(e,"auctionShare",pct(e.auctionShare,0,false))} ${L("of the day","des Tages")}`:"";
+  return `<svg viewBox="0 0 ${W} ${H}" id="isvg" role="img" aria-label="${L("Intraday price and turnover","Intraday-Kurs und Umsatz")}">
+    <rect x="${xm(0)}" y="${mt}" width="${xm(15)-xm(0)}" height="${PH+GAP+VH}" fill="var(--sky-wash)"/>
+    ${g}
+    ${times.map(([m,t])=>`<text x="${xm(m)}" y="${vy+20}" class="ax" text-anchor="${m===0?"start":"middle"}">${t}</text>`).join("")}
+    <text x="${ax}" y="${vy+36}" class="ax" text-anchor="middle">${L("Auction","Auktion")}</text>
+    <line x1="${ml}" x2="${W-mr+10}" y1="${vy}" y2="${vy}" stroke="var(--ink)"/>
+    <path d="${peer}" fill="none" stroke="var(--graphite)" stroke-width="1.4" class="draw d2" pathLength="1"/>
+    <path d="${path}" fill="none" stroke="var(--navy)" stroke-width="1.9" stroke-linejoin="round" class="draw" pathLength="1"/>
+    <line x1="${xm(N)}" y1="${f1(y(P[N]))}" x2="${ax}" y2="${f1(endY)}" stroke="var(--navy)" stroke-dasharray="3 3" class="ann" style="--i:4"/>
+    ${bars}
+    <g class="ann" style="--i:4"><rect x="${ax-bw*1.4}" y="${vy-VH}" width="${bw*2.8}" height="${VH}" fill="var(--navy)"/><path d="M${ax-bw*1.4-2},${vy-VH*.55} l${bw*2.8+4},-7 M${ax-bw*1.4-2},${vy-VH*.55+6} l${bw*2.8+4},-7" stroke="#fff" stroke-width="2.5"/></g>
+    <g class="ann" style="--i:0"><circle cx="${xm(0)}" cy="${y(P[0])}" r="4.5" fill="#fff" stroke="var(--navy)" stroke-width="2"/><text x="${xm(0)+10}" y="${y(P[0])+(neg?-14:22)}" class="axb" paint-order="stroke" stroke="#fff" stroke-width="4">${L("Open","Eröffnung")} ${sv(e,"gap",pct(e.gap))}</text></g>
+    ${e.onset>3?`<g class="ann" style="--i:1"><line x1="${xm(e.onset)}" x2="${xm(e.onset)}" y1="${mt-12}" y2="${vy}" stroke="var(--sky)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${xm(e.onset)+8}" y="${mt-2}" class="axb" fill="var(--sky)">${L("Market starts pricing it","Markt beginnt einzupreisen")} ${tm(e.onset)}°</text></g>`:""}
+    <g class="ann" style="--i:2"><circle cx="${lx}" cy="${ly}" r="4.5" fill="#fff" stroke="${col}" stroke-width="2"/><text x="${right?lx-10:lx+10}" y="${ly+(e.lowVal<0?20:-10)}" class="axb" text-anchor="${right?"end":"start"}" paint-order="stroke" stroke="#fff" stroke-width="4">${ext} ${sv(e,"low",tm(e.lowMin))}</text></g>
+    <g class="ann" style="--i:3"><text x="${ax-bw*2}" y="${vy-VH-8}" class="axb" text-anchor="end">${L("Closing auction","Schlussauktion")} ${sv(e,"auction",eurm(e.auction))}${share}</text></g>
+    <g class="ann" style="--i:5"><circle cx="${ax}" cy="${endY}" r="5" fill="${col}"/><text x="${ax+12}" y="${endY+7}" font-size="22" font-weight="700" fill="${col}">${sv(e,"ret",pct(e.ret))}</text><text x="${ax+12}" y="${endY+24}" class="ax">${L("close","Schluss")}</text></g>
+    <g class="ann" style="--i:6"><text x="${xm(0)+6}" y="${vy-VH-8}" class="ax" fill="var(--sky)">${L("first 15 min","erste 15 Min.")}: <tspan font-weight="700">${sv(e,"first15",pct(e.first15,0,false))}</tspan> ${L("of turnover","des Umsatzes")}</text></g>
+    <g class="xh" id="ixh"><line y1="${mt}" y2="${vy}" stroke="var(--ink)"/><circle r="4" fill="var(--navy)"/></g>
+    <rect class="hit" id="ihit" x="${ml}" y="${mt}" width="${xm(N)-ml}" height="${PH+GAP+VH}"/>
+  </svg>`;
+}
+function pEvent(){
+  const s=S(),e=E(),neg=e.abn<0,col=neg?"var(--down)":"var(--up)";
+  const share=Math.round(Math.abs(e.abn)/(Math.abs(e.mkt)+Math.abs(e.peer-e.mkt)+Math.abs(e.abn))*100);
+  const rows=[
+    [L("Share return","Rendite der Aktie"),val(e,"ret",pct(e.ret)),arrRet(e.ret)],
+    [L(`Peers (${s.idx})`,`Peers (${s.idx})`),val(e,"peer",pct(e.peer)),arrRet(e.peer)],
+    [L("Abnormal return","Abnormale Rendite"),`<b>${val(e,"abn",pct(e.abn))}</b>`,arrRet(e.abn)],
+    [L("Turnover vs normal","Umsatz gegenüber normal"),val(e,"vol",times(e.vol)),arrowSvg(e.vol>2?-90:-45,"nt")],
+    [L("Cost to trade €25k vs normal","Handelskosten 25 T€ gegenüber normal"),ph(times(e.xlmX)),arrowSvg(e.xlmX>1.2?-90:e.xlmX<.9?90:0,"nt")],
+    [L("Gap at the open","Eröffnungslücke"),val(e,"gap",pct(e.gap)),arrRet(e.gap)],
+    [e.lowVal<0?L("Low of the day","Tagestief"):L("High of the day","Tageshoch"),`${val(e,"low",tm(e.lowMin))} <span class="m">${ph(pct(e.lowVal))}</span>`,""],
+    [L("Closing auction","Schlussauktion"),val(e,"auction",eurm(e.auction))+(e.auctionShare?` <span class="m">· ${val(e,"auctionShare",pct(e.auctionShare,0,false))}</span>`:""),""]
+  ];
+  const parts=[[L("Market","Markt"),e.mkt,"#b9bec6"],[L("Sector / peers","Sektor / Peers"),e.peer-e.mkt,"var(--graphite)"],[s.name,e.abn,col]];
+  const tot=parts.reduce((a,p)=>a+Math.abs(p[1]),0);
+  let acc=0;
+  const segs=parts.map((p,i)=>{const w=Math.abs(p[1])/tot*100,left=acc;acc+=w;return`<div class="seg barx" style="--i:${i};left:${left}%;width:${w}%;background:${p[2]}" data-tip="${enc(`<span class="t">${p[0]}</span><br>${pct(p[1])}`)}"></div>`}).join("");
+  const segLeg=`<div class="legend" style="gap:26px;margin-top:4px">${parts.map((p,i)=>`<span><i class="b" style="background:${p[2]};width:10px"></i>${p[0]} <b style="color:var(--ink-strong);margin-left:4px">${i===2?val(e,"abn",pct(p[1])):ph(pct(p[1]))}</b></span>`).join("")}</div>`;
+  const fl=[["mm",L("Market makers","Market Maker"),2],["agent",L("Clients (agent)","Kunden (Agent)"),-1],["prop",L("Proprietary","Eigenhandel"),-2]];
+  const flows=fl.map(([k,n,norm],i)=>{const v=e.flows[k],w=Math.min(Math.abs(v),50);return`<div class="row"><span style="font-size:15px">${n}</span><div class="trk"><div class="b barx ${v<0?"neg":""}" style="--i:${i};${v<0?`right:50%`:`left:50%`};width:${w}%"></div><div class="nm" style="left:calc(${50+norm}% - 1px)" data-tip="${enc(L("Normal day","Normaler Tag")+": "+pct(norm,0))}°"></div></div><b class="r" style="text-align:right">${val(e,k,pct(v,0))}</b></div>`}).join("");
+  // aftershocks
+  const days=[];for(let t=-5;t<=15;t++){const v=t<0?1+Math.sin(t*1.7)*.12:t===0?e.vol:1+(e.vol-1)*Math.exp(-t/(Math.max(1,e.dVol)/2.2));days.push([t,v])}
+  const AW=540,AH=170,amax=Math.max(...days.map(d=>d[1])),bwA=AW/days.length;
+  const after=`<svg viewBox="0 0 ${AW} ${AH+26}">${days.map(([t,v],i)=>{const h=Math.sqrt(v/amax)*AH;return`<rect class="bar" style="--i:${i*12}" x="${f1(i*bwA+2)}" y="${f1(AH-h)}" width="${f1(bwA-4)}" height="${f1(h)}" fill="${t===0?"var(--navy)":v<=1.2?"#cfd3da":"var(--sky)"}" data-tip="${enc(`<span class="t">${t===0?L("Event day","Ereignistag"):(t>0?"+":"")+t+L(" days"," Tage")}</span><br>${L("Turnover","Umsatz")} ${times(v)}°`)}"/>`}).join("")}
+    <line x1="0" x2="${AW}" y1="${AH-Math.sqrt(1.2/amax)*AH}" y2="${AH-Math.sqrt(1.2/amax)*AH}" class="zero"/><text x="${AW}" y="${AH-Math.sqrt(1.2/amax)*AH-6}" class="ax" text-anchor="end">1.2× ${L("normal","normal")}</text>
+    <line x1="0" x2="${AW}" y1="${AH}" y2="${AH}" stroke="var(--ink)"/>
+    ${[-5,0,5,10,15].map(t=>`<text x="${f1((t+5)*bwA+bwA/2)}" y="${AH+18}" class="ax" text-anchor="middle">${t===0?L("day 0","Tag 0"):(t>0?"+":"")+t}</text>`).join("")}</svg>`;
+  return `
+  <div class="wrap"><div class="evtabs" role="tablist">${S().events.map(x=>`<button role="tab" data-ev="${x.id}" aria-selected="${x.id===e.id}"><span class="d">${dS(x.date)}</span><span class="k">${kindL(x.kind)} · ${pct(x.ret)}</span></button>`).join("")}</div></div>
+
+  <section class="sec wrap" style="padding-top:44px">
+    <div class="ev-top">
+      <div class="rv">
+        <div class="kicker" style="color:var(--mute)">${L("Stock-specific move","Titelspezifische Bewegung")}</div>
+        <div class="big" style="color:${col}"><span class="count" data-to="${e.abn}" data-f="pct"${R(e,"abn")?"":' data-ph="1"'}>${val(e,"abn",pct(e.abn))}</span></div>
+        <p class="big-cap">${L(`${s.name} closed ${val(e,"ret",pct(e.ret))} while its ${s.idx} peers moved ${val(e,"peer",pct(e.peer))}. Turnover was ${val(e,"vol",times(e.vol))} the normal level.`,`${s.name} schloss bei ${val(e,"ret",pct(e.ret))}, die ${s.idx}-Peers bei ${val(e,"peer",pct(e.peer))}. Der Umsatz lag beim ${val(e,"vol",times(e.vol))} des Normalniveaus.`)}</p>
+        <div class="mag">
+          <div class="mag-head"><span class="h3">${L("Impact magnitude","Impact-Stärke")}</span><b><span class="count" data-to="${e.mag}" data-f="n1" data-ph="1">${ph(nf(e.mag))}</span> <span style="font-size:15px;color:var(--mute);font-weight:400">/ 10</span></b></div>
+          <div class="mag-scale"><div class="mag-track"></div><div class="mag-fill" style="--w:${e.mag*10}%"></div><div class="mag-ticks">${[0,2,4,6,8,10].map(n=>`<span>${n}</span>`).join("")}</div></div>
+          <p class="mag-note">${L("One comparable number per event: abnormal return, turnover and spread combined.","Eine vergleichbare Zahl pro Ereignis: abnormale Rendite, Umsatz und Spread kombiniert.")}</p>
+        </div>
+      </div>
+      <div class="rv" style="--d:.12s">
+        <h2 class="h2" style="margin-bottom:16px">${L("Key figures","Kennzahlen")}</h2>
+        <table class="tbl"><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td class="r">${r[1]}</td><td class="ic">${r[2]}</td></tr>`).join("")}</tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec wrap rv">
+    <div class="sec-head"><div><h2 class="h2">${L("The day, minute by minute","Der Tag, Minute für Minute")}</h2><p class="sec-note">${L("Price change vs previous close, 1-minute bars from Xetra trades. Hover to read any minute.","Kursänderung gegen Vortagesschluss, 1-Minuten-Balken aus Xetra-Trades. Für jede Minute darüberfahren.")}</p></div>
+    <div class="legend"><span><i></i>${s.tk}</span><span><i class="g"></i>${L("Peers","Peers")}</span><span><i class="s"></i>${L("first 15 minutes","erste 15 Minuten")}</span></div></div>
+    <div class="chart" id="intra">${intraChart(s,e)}</div>
+  </section>
+
+  <section class="sec wrap">
+    <div class="cols">
+      <div class="rv">
+        <h2 class="h2">${L("Was it us or the market?","Waren wir es oder der Markt?")}</h2>
+        <p class="verdict" style="margin-top:14px"><b>${share}%</b> ${L(`of the move was specific to ${s.name}.`,`der Bewegung waren spezifisch für ${s.name}.`)}</p>
+        <div class="decomp" style="height:34px">${segs}</div>${segLeg}
+      </div>
+      <div class="rv" style="--d:.1s">
+        <h2 class="h2">${L("Who traded","Wer gehandelt hat")}</h2>
+        <p class="sec-note" style="margin-bottom:12px">${L("Net buying minus selling, as a share of each group's turnover. Grey tick: a normal day.","Nettokäufe minus -verkäufe im Verhältnis zum Umsatz der Gruppe. Grauer Strich: normaler Tag.")}</p>
+        <div class="flows"><div class="hdr2"><span>${L("net selling","Nettoverkauf")}</span><span>${L("net buying","Nettokauf")}</span></div>${flows}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec wrap">
+    <div class="cols">
+      <div class="rv">
+        <h2 class="h2">${L("Aftershocks","Nachwirkung")}</h2>
+        <p class="verdict" style="margin-top:14px">${L(`Turnover was back within 1.2× normal after <b>${ph(e.dVol)} days</b>; the spread after <b>${ph(e.dSpr)}</b>.`,`Der Umsatz lag nach <b>${ph(e.dVol)} Tagen</b> wieder unter 1,2× normal, der Spread nach <b>${ph(e.dSpr)}</b>.`)}</p>
+        <div class="chart">${after}</div>
+      </div>
+      <div class="rv" style="--d:.1s">${noteBlock(s,e)}</div>
+    </div>
+    <div class="teaser rv"><p>${L(`Among ${ph(58)} notable days in 2026, this move ranks <b>${ph("#3")}</b> by size.`,`Unter ${ph(58)} auffälligen Tagen 2026 liegt diese Bewegung auf Rang <b>${ph("3")}</b>.`)}</p><button class="pill pill--line" data-go="compare">${L("Compare similar days","Ähnliche Tage vergleichen")} ${ARR}</button></div>
+  </section>`;
+}
+function noteText(s,e,lang){
+  const F=(k,txt,path)=>`<span class="fig${R(e,k)?"":" ph"}" data-tip="${enc(`<span class="m">impact_card</span><br><b>${path}</b>`)}">${txt}</span>`;
+  const l=lang;
+  const ev=e.lowVal<0;
+  if(l==="de")return `Am ${dL(e.date,"de")} schloss die ${s.name}-Aktie bei ${F("ret",pct(e.ret,1,true,"de"),"returns.stock")}, während die ${s.idx}-Peers ${F("peer",pct(e.peer,1,true,"de"),"returns.peers")} verzeichneten. Die titelspezifische (abnormale) Bewegung betrug ${F("abn",pct(e.abn,1,true,"de"),"returns.abnormal")}. Der Umsatz erreichte das ${F("vol",times(e.vol,1,"de"),"volume.ratio")} des Normalniveaus; Kundenorders waren per Saldo ${e.flows.agent<0?"Verkäufer":"Käufer"} (${F("agent",pct(e.flows.agent,0,true,"de"),"flows.agent_imbalance")}). Die Eröffnung lag bei ${F("gap",pct(e.gap,1,true,"de"),"intraday.gap_open")}, das ${ev?"Tagestief":"Tageshoch"} um ${F("low",tm(e.lowMin),"intraday.extreme_time")}; in der Schlussauktion wurden ${F("auction",eurm(e.auction,1,"de"),"auctions.closing_eur")} gehandelt. Die Ursache ist noch nicht verifiziert.`;
+  return `On ${dL(e.date,"en")}, ${s.name} shares closed ${F("ret",pct(e.ret,1,true,"en"),"returns.stock")} while ${s.idx} peers moved ${F("peer",pct(e.peer,1,true,"en"),"returns.peers")}. The stock-specific (abnormal) move was ${F("abn",pct(e.abn,1,true,"en"),"returns.abnormal")}. Turnover reached ${F("vol",times(e.vol,1,"en"),"volume.ratio")} its normal level, and client orders were net ${e.flows.agent<0?"sellers":"buyers"} (${F("agent",pct(e.flows.agent,0,true,"en"),"flows.agent_imbalance")}). The share opened ${F("gap",pct(e.gap,1,true,"en"),"intraday.gap_open")}, the ${ev?"low":"high"} came at ${F("low",tm(e.lowMin),"intraday.extreme_time")}, and ${F("auction",eurm(e.auction,1,"en"),"auctions.closing_eur")} traded in the closing auction. The cause has not been verified yet.`;
+}
+function cardJson(s,e){return JSON.stringify({ticker:s.tk,isin:s.isin,date:e.date,event_type:e.kind,
+  returns:{stock:+(e.ret/100).toFixed(4),peers:+(e.peer/100).toFixed(4),market:+(e.mkt/100).toFixed(4),abnormal:+(e.abn/100).toFixed(4)},
+  volume:{ratio:e.vol,days_to_normal:e.dVol},liquidity:{xlm_25k_ratio:e.xlmX,days_to_normal:e.dSpr},
+  auctions:{closing_eur:e.auction*1e6,closing_share:e.auctionShare?e.auctionShare/100:null},
+  flows:{agent_imbalance:e.flows.agent/100,mm_imbalance:e.flows.mm/100,prop_imbalance:e.flows.prop/100},
+  intraday:{gap_open:e.gap/100,extreme_time:tm(e.lowMin),first_15min_share:e.first15/100,onset_time:e.onset>3?tm(e.onset):null},
+  magnitude:e.mag,cause:{status:"open",source:null}},null,2)}
+function noteBlock(s,e){
+  const nl=state.noteLang||state.lang;
+  const keys=["ret","peer","abn","vol","agent","gap","low","auction"],ok=keys.filter(k=>R(e,k)).length;
+  return `<div class="note">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2 class="h2" style="font-size:22px">${L("Note for the board","Notiz für den Vorstand")}</h2>
+    <div class="seg-t" id="nlseg"><span class="th"></span><button data-act="notelang" data-v="en" aria-pressed="${nl==="en"}">EN</button><button data-act="notelang" data-v="de" aria-pressed="${nl==="de"}">DE</button></div></div>
+    <p id="notetext">${noteText(s,e,nl)}</p>
+    <div class="note-foot">
+      <span class="check"><svg width="18" height="18" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 10.5l2.6 2.6L14 7.6" fill="none" stroke="currentColor" stroke-width="2"/></svg>${L(`${keys.length} of ${keys.length} figures match the impact card`,`${keys.length} von ${keys.length} Zahlen stimmen mit der Impact Card überein`)}${ok<keys.length?` <span style="font-weight:400;color:var(--mute)">(${keys.length-ok} ${L("placeholders","Platzhalter")})</span>`:""}</span>
+      <span class="btns"><button class="link" data-act="copy">${L("Copy","Kopieren")}</button><button class="link" data-act="json">${L("Source data","Quelldaten")}</button><button class="link" data-act="export">${L("Export","Export")} ${ARR}</button></span>
+    </div>
+    <pre id="json">${cardJson(s,e)}</pre>
+  </div>`;
+}
+
+/* ==================================================================
+   PAGE 3: COMPARE
+================================================================== */
+let _cmp=null;
+function cmpData(){
+  if(_cmp)return _cmp;
+  const r=rng(99),out=[],ids=["DAX","MDAX","SDAX"];
+  for(let i=0;i<96;i++){const idx=ids[i%3],kind=r()<.45?"results":"notable",dir=r()<.6?-1:1,abn=dir*(1.6+Math.abs(gauss(r))*4.6),vol=Math.max(1.4,Math.exp(.85+Math.abs(gauss(r))*.55+Math.abs(abn)*.035));
+    out.push({anon:i+1,idx,kind,abn,vol})}
+  Object.values(STOCKS).forEach(s=>s.events.forEach(e=>out.push({tk:s.tk,name:s.name,idx:s.idx,kind:e.kind,abn:e.abn,vol:e.vol,id:e.id,date:e.date,e})));
+  out.push({tk:"GXI",name:"Gerresheimer",idx:"SDAX",kind:"notable",abn:-30.5,vol:20,date:"2026-02-11",story:1});
+  return _cmp=out;
+}
+function cmpFilter(){const c=state.cmp;return cmpData().filter(d=>(c.kind==="all"||d.kind===c.kind)&&(c.idx==="all"||d.idx===c.idx)&&(c.dir==="both"||(c.dir==="down"?d.abn<0:d.abn>0)))}
+function pCompare(){
+  const c=state.cmp,set=cmpFilter(),e=E(),s=S();
+  const sel=(k,opts)=>`<select data-cmp="${k}" aria-label="${k}">${opts.map(([v,t])=>`<option value="${v}" ${c[k]===v?"selected":""}>${t}</option>`).join("")}</select>`;
+  const sent=L(`Show ${sel("kind",[["notable","notable days"],["results","results days"],["all","all events"]])} in ${sel("idx",[["all","DAX, MDAX and SDAX"],["DAX","the DAX"],["MDAX","the MDAX"],["SDAX","the SDAX"]])} where the share ${sel("dir",[["down","fell"],["up","rose"],["both","moved"]])} in 2026.`,
+    `Zeige ${sel("kind",[["notable","auffällige Tage"],["results","Ergebnistage"],["all","alle Ereignisse"]])} in ${sel("idx",[["all","DAX, MDAX und SDAX"],["DAX","im DAX"],["MDAX","im MDAX"],["SDAX","im SDAX"]])}, an denen die Aktie ${sel("dir",[["down","fiel"],["up","stieg"],["both","sich bewegte"]])}, 2026.`);
+  const sorted=[...set].sort((a,b)=>Math.abs(b.abn)-Math.abs(a.abn));
+  const nm=d=>d.anon?`${d.idx} ${L("share","Aktie")} #${d.anon}°`:`${d.name} · ${dS(d.date)}`;
+  const mine=sorted.findIndex(d=>d.id===e.id);
+  const rank=mine>=0?`<p class="verdict">${L(`${s.name} on ${dS(e.date)} ranks <b>#${mine+1} of ${sorted.length}</b> by size of the stock-specific move: larger than <b>${Math.round((1-(mine+1)/sorted.length)*100)}%</b> of them.`,`${s.name} am ${dS(e.date)} liegt auf <b>Rang ${mine+1} von ${sorted.length}</b> nach Größe der titelspezifischen Bewegung: größer als <b>${Math.round((1-(mine+1)/sorted.length)*100)} %</b> davon.`)}</p>`
+    :`<p class="verdict">${L(`${s.name} on ${dS(e.date)} is not in this selection. Change the filter to include it.`,`${s.name} am ${dS(e.date)} ist nicht in dieser Auswahl.`)}</p>`;
+  return `
+  <section class="sec wrap rv" style="padding-top:48px">
+    <p class="sentence">${sent}</p>
+    ${rank}
+  </section>
+  <section class="wrap">
+    <div class="cols-21">
+      <div class="rv"><div class="sec-head"><h2 class="h2">${L("Every event in one picture","Alle Ereignisse in einem Bild")}</h2><div class="legend"><span><i class="b" style="background:var(--navy);border-radius:50%;width:10px"></i>${s.name}</span><span><i class="b" style="background:var(--graphite);border-radius:50%;width:10px;opacity:.5"></i>${L("other shares","andere Aktien")}°</span></div></div>
+        <div class="chart" id="scatter">${scatter(set,e)}</div></div>
+      <div class="rv" style="--d:.1s"><div class="sec-head"><h2 class="h2">${L("Largest moves","Größte Bewegungen")}</h2></div>
+        <table class="tbl"><thead><tr><th>#</th><th>${L("Event","Ereignis")}</th><th class="r">${L("Abnormal","Abnormal")}</th><th class="r">${L("Turnover","Umsatz")}</th></tr></thead><tbody>
+        ${sorted.slice(0,9).map((d,i)=>`<tr class="${d.id===e.id?"me":""} ${d.id?"go":""}" ${d.id?`data-ev="${d.id}"`:""}><td class="m">${i+1}</td><td>${nm(d)}</td><td class="r">${d.e?val(d.e,"abn",pct(d.abn)):d.story?pct(d.abn):ph(pct(d.abn))}</td><td class="r">${d.e?val(d.e,"vol",times(d.vol)):d.story?times(d.vol,0):ph(times(d.vol))}</td></tr>`).join("")}
+        </tbody></table>
+        <p class="sec-note">${L("Gerresheimer, 11 Feb: −31.4% (peers −0.9%), 20× turnover. It left the SDAX on 9 April.","Gerresheimer, 11. Feb.: −31,4 % (Peers −0,9 %), 20× Umsatz. Am 9. April aus dem SDAX ausgeschieden.")}</p>
+      </div>
+    </div>
+  </section>`;
+}
+function scatter(set,cur){
+  const W=720,H=440,ml=52,mr=16,mt=16,mb=40,lx0=Math.log(1.2),lx1=Math.log(30);
+  const x=v=>ml+(Math.log(v)-lx0)/(lx1-lx0)*(W-ml-mr),dir=state.cmp.dir,y0=dir==="up"?-4:-34,y1=dir==="down"?4:dir==="up"?20:20,y=v=>mt+(y1-v)/(y1-y0)*(H-mt-mb);
+  let g="";[-30,-25,-20,-15,-10,-5,0,5,10,15,20].filter(v=>v>=y0&&v<=y1).forEach(v=>g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}" class="${v===0?"zero":"gl"}"/><text x="${ml-8}" y="${y(v)+4}" class="ax" text-anchor="end">${pct(v,0)}</text>`);
+  [1.5,2,5,10,20].forEach(v=>g+=`<line x1="${x(v)}" x2="${x(v)}" y1="${mt}" y2="${H-mb}" class="gl"/><text x="${x(v)}" y="${H-mb+18}" class="ax" text-anchor="middle">${times(v,v<2?1:0)}</text>`);
+  g+=`<text x="${W-mr}" y="${H-4}" class="ax" text-anchor="end">${L("turnover vs normal (log scale) →","Umsatz gegenüber normal (log) →")}</text><text x="${ml}" y="${mt-4}" class="ax">${L("↑ abnormal return","↑ abnormale Rendite")}</text>`;
+  g+=dir!=="up"?`<text x="${W-mr-6}" y="${H-mb-10}" class="quad" text-anchor="end">${L("large move, heavy trading","große Bewegung, hoher Umsatz")}</text>`:`<text x="${W-mr-6}" y="${mt+14}" class="quad" text-anchor="end">${L("large move, heavy trading","große Bewegung, hoher Umsatz")}</text>`;
+  const dots=[...set].sort((a,b)=>(a.anon?0:1)-(b.anon?0:1)).map((d,i)=>{
+    const me=d.id===cur.id,hero=!d.anon;
+    const tip=enc(`<span class="t">${d.anon?`${d.idx} ${L("share","Aktie")} #${d.anon}°`:`${d.name} · ${dS(d.date)}`}</span><br>${L("Abnormal","Abnormal")} ${pct(d.abn)} · ${L("turnover","Umsatz")} ${times(d.vol)}<br><span class="m">${kindL(d.kind)} · ${d.idx}</span>`);
+    const cx=f1(x(Math.min(d.vol,29))),cy=f1(y(Math.max(y0+.5,Math.min(y1-.5,d.abn))));
+    if(me)return`<g class="ann" style="--i:0"><circle cx="${cx}" cy="${cy}" r="7" fill="var(--navy)" class="pulse"/><circle cx="${cx}" cy="${cy}" r="18" fill="none" stroke="var(--sky)" stroke-width="1.5"/></g><circle class="dot" cx="${cx}" cy="${cy}" r="7" fill="var(--navy)" stroke="#fff" stroke-width="2" data-tip="${tip}" ${d.id?`data-ev="${d.id}"`:""} style="cursor:pointer"/><text x="${+cx-24}" y="${+cy+4}" class="axb" fill="var(--navy)" text-anchor="end" paint-order="stroke" stroke="#fff" stroke-width="4">${d.tk} ${dS(d.date)}</text>`;
+    if(hero)return`<circle class="dot" cx="${cx}" cy="${cy}" r="5" fill="#fff" stroke="var(--navy)" stroke-width="2" data-tip="${tip}" ${d.id?`data-ev="${d.id}" style="cursor:pointer"`:""}/><text x="${+cx+9}" y="${+cy-7}" class="ax" fill="var(--navy)">${d.tk}</text>`;
+    return`<circle class="dot" cx="${cx}" cy="${cy}" r="4" fill="var(--graphite)" fill-opacity=".45" data-tip="${tip}"/>`}).join("");
+  return `<svg viewBox="0 0 ${W} ${H}">${g}<g class="ann" style="--i:-4">${dots}</g></svg>`;
+}
+
+/* ==================================================================
+   PAGE 4: ASSISTANT
+================================================================== */
+const QS=()=>{const e=E();return[["what",L(`What happened on ${dS(e.date)}?`,`Was ist am ${dS(e.date)} passiert?`)],["split",L("Was it us or the market?","Waren wir es oder der Markt?")],["who",L("Who was selling?","Wer hat verkauft?")],["liq",L(`How liquid are we vs the ${S().idx}?`,`Wie liquide sind wir im ${S().idx}-Vergleich?`)]]};
+function answer(key){
+  const s=S(),e=E(),ix=IDX[s.idx];
+  const t1=`get_issuer(<b>"${s.tk}"</b>)`,t2=`get_impact_card(<b>"${s.tk}"</b>, <b>"${e.date}"</b>)`;
+  const A={
+    what:{tools:[t1,t2],text:L(`On ${dL(e.date)}, ${s.name} closed ${pct(e.ret)} while ${s.idx} peers moved ${pct(e.peer)}, a stock-specific move of ${pct(e.abn)}. Turnover was ${times(e.vol)} the normal level and ${eurm(e.auction)} traded in the closing auction. The data does not say why; the cause still has to be verified.`,
+      `Am ${dL(e.date)} schloss ${s.name} bei ${pct(e.ret)}, die ${s.idx}-Peers bei ${pct(e.peer)} – eine titelspezifische Bewegung von ${pct(e.abn)}. Der Umsatz lag beim ${times(e.vol)} des Normalniveaus, in der Schlussauktion wurden ${eurm(e.auction)} gehandelt. Warum, zeigen die Daten nicht; die Ursache muss noch verifiziert werden.`)},
+    split:{tools:[t2,`decompose_return(<b>market</b>, <b>peers</b>, <b>stock</b>)`],text:L(`Mostly you. The market contributed ${pct(e.mkt)}, the sector ${pct(e.peer-e.mkt)}, and ${pct(e.abn)} was specific to ${s.name}.`,`Überwiegend Sie. Der Markt trug ${pct(e.mkt)} bei, der Sektor ${pct(e.peer-e.mkt)}, und ${pct(e.abn)} waren spezifisch für ${s.name}.`)},
+    who:{tools:[t2,`get_flows(<b>"${s.tk}"</b>, <b>"${e.date}"</b>)`],text:L(`Client orders (agent flow) were net ${e.flows.agent<0?"sellers":"buyers"} at ${pct(e.flows.agent,0)} of their turnover. Market makers were net ${e.flows.mm>0?"buyers":"sellers"} (${pct(e.flows.mm,0)}), as they usually are when they absorb one-sided flow.`,`Kundenorders (Agent) waren per Saldo ${e.flows.agent<0?"Verkäufer":"Käufer"} mit ${pct(e.flows.agent,0)} ihres Umsatzes. Market Maker waren Netto-${e.flows.mm>0?"Käufer":"Verkäufer"} (${pct(e.flows.mm,0)}).`)},
+    liq:{tools:[t1,`get_baseline(<b>"${s.idx}"</b>)`,`liquidity_category(<b>"${s.tk}"</b>)`],text:L(`${s.name} trades ${eurm(s.facts.turn)} a day against an ${s.idx} median of ${eurm(ix.turn)}, and a €25k order costs about ${bps(s.facts.xlm)} versus ${bps(ix.xlm)}. On the Xetra rule that means ${s.facts.xlm<=100&&s.facts.turn>=2.5?"category A: no Designated Sponsor needed (estimate)":"a Designated Sponsor is needed (estimate)"}.`,`${s.name} handelt ${eurm(s.facts.turn)} pro Tag bei einem ${s.idx}-Median von ${eurm(ix.turn)}; eine 25-T€-Order kostet etwa ${bps(s.facts.xlm)} gegenüber ${bps(ix.xlm)}. Nach der Xetra-Regel heißt das: ${s.facts.xlm<=100&&s.facts.turn>=2.5?"Kategorie A, kein Designated Sponsor nötig (Schätzung)":"Designated Sponsor nötig (Schätzung)"}.`)}
+  };
+  return A[key]||A.what;
+}
+function pAsk(){
+  const hist=state.chat.map(m=>m.q?`<div class="msg q"><div class="who">${L("You","Sie")}</div><div class="txt">${m.q}</div></div>`:`<div class="msg a"><div class="who">${L("Assistant","Assistent")}</div><div class="trace">${m.tools.map((t,i)=>`<div style="--i:0">✓ ${t}</div>`).join("")}</div><div class="txt">${m.a}</div></div>`).join("");
+  return `
+  <section class="sec wrap"><div class="cols-21">
+    <div class="rv">
+      <div class="chips">${QS().map(([k,q])=>`<button class="pill pill--line pill--sm" style="text-transform:none;letter-spacing:0;font-size:14px" data-q="${k}">${q}</button>`).join("")}</div>
+      <div class="chat" id="chat">${hist||`<div class="msg"><div class="txt" style="color:var(--mute);font-size:18px">${L(`Ask about ${S().name}: an event, the liquidity, who trades. Answers cite the figures they use.`,`Fragen Sie zu ${S().name}: ein Ereignis, die Liquidität, wer handelt. Antworten nennen die verwendeten Zahlen.`)}</div></div>`}</div>
+      <form class="ask-in" id="askf"><input id="askq" placeholder="${L("Type a question…","Frage eingeben…")}" autocomplete="off"><button class="pill pill--sm" type="submit">${L("Ask","Fragen")} ${ARR}</button></form>
+      <p class="disc">${L("The assistant reads only the computed card. Every number in an answer is checked against it. It never states causes.","Der Assistent liest nur die berechnete Karte. Jede Zahl wird dagegen geprüft. Ursachen nennt er nie.")}</p>
+    </div>
+    <div class="rv" style="--d:.1s">
+      <h2 class="h2" style="margin-bottom:14px">${L("What it can see","Was er sieht")}</h2>
+      <ul class="side-list">
+        <li><code>get_issuer</code><span>${L("profile, index, normal-day baseline","Profil, Index, Normalwerte")}</span></li>
+        <li><code>get_impact_card</code><span>${L("all figures for one event","alle Zahlen zu einem Ereignis")}</span></li>
+        <li><code>get_flows</code><span>${L("who bought and sold","wer kaufte und verkaufte")}</span></li>
+        <li><code>get_baseline</code><span>${L("index and peer medians","Index- und Peer-Mediane")}</span></li>
+        <li><code>compare_events</code><span>${L("same-type events, ranks","gleichartige Ereignisse, Ränge")}</span></li>
+      </ul>
+      <p class="disc">${L("No key configured? The page falls back to template texts, so the demo never breaks.","Kein Schlüssel konfiguriert? Dann greifen Textvorlagen, die Demo bricht nie.")}</p>
+    </div>
+  </div></section>`;
+}
+let streamTok=0;
+function ask(key,qText){
+  const a=answer(key),q=qText||QS().find(x=>x[0]===key)?.[1]||qText;
+  const chat=$("#chat");if(!chat)return;
+  if(!state.chat.length)chat.innerHTML="";
+  const tok=++streamTok;
+  chat.insertAdjacentHTML("beforeend",`<div class="msg q"><div class="who">${L("You","Sie")}</div><div class="txt">${q}</div></div><div class="msg a"><div class="who">${L("Assistant","Assistent")}</div><div class="trace">${a.tools.map((t,i)=>`<div style="--i:${i}">→ ${t}</div>`).join("")}</div><div class="txt"><span class="caret"></span></div></div>`);
+  const box=chat.lastElementChild.querySelector(".txt");
+  const words=a.text.split(" ");let i=0;
+  const delay=a.tools.length*250+350;
+  setTimeout(function step(){
+    if(tok!==streamTok)return;
+    box.innerHTML=words.slice(0,++i).join(" ")+(i<words.length?'<span class="caret"></span>':"");
+    if(i<words.length)setTimeout(step,reduced?0:28+Math.random()*40);
+    else{chat.lastElementChild.querySelectorAll(".trace div").forEach(d=>d.innerHTML=d.innerHTML.replace("→","✓"));state.chat.push({q},{tools:a.tools,a:a.text})}
+  },reduced?0:delay);
+  chat.lastElementChild.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+/* ==================================================================
+   PAGE 5: IDEAS (DB "Aktuelle Themen" tiles)
+================================================================== */
+const ILL=[
+  `<svg viewBox="0 0 210 120"><g stroke="#bdbdbd" stroke-width="1">${[20,38,56,74,92].map(y=>`<line x1="20" x2="190" y1="${y}" y2="${y}"/>`).join("")}</g><line x1="20" x2="190" y1="65" y2="65" stroke="#000099" stroke-dasharray="4 3"/><text x="190" y="60" font-size="9" fill="#000099" text-anchor="end">SDAX cut-off</text><path class="hl" pathLength="1" d="M20 40 C60 42 80 50 110 58 S160 80 190 88" fill="none" stroke="#0099ff" stroke-width="2.5"/><circle cx="190" cy="88" r="4" fill="#0099ff"/></svg>`,
+  `<svg viewBox="0 0 210 120"><line x1="20" x2="190" y1="60" y2="60" stroke="#bdbdbd" stroke-width="4"/><line x1="130" x2="130" y1="44" y2="76" stroke="#181813" stroke-width="1.5"/><text x="130" y="38" font-size="9" fill="#404040" text-anchor="middle">100 bps</text><path class="hl" pathLength="1" d="M20 60 H112" stroke="#000099" stroke-width="4"/><circle cx="112" cy="60" r="7" fill="#fff" stroke="#000099" stroke-width="2.5"/><text x="112" y="90" font-size="9" fill="#000099" text-anchor="middle">90 bps</text></svg>`,
+  `<svg viewBox="0 0 210 120"><line x1="20" x2="190" y1="96" y2="96" stroke="#181813"/>${[7,8,9,10,11,12,13,14,15,16,17,18].map((h,i)=>{const v=[10,40,70,28,18,14,12,16,20,26,48,8][i];return`<rect x="${22+i*14}" y="${96-v}" width="9" height="${v}" fill="${i===2?"#000099":"#cfd3da"}"/>`}).join("")}<path class="hl" pathLength="1" d="M54 18 V96" stroke="#0099ff" stroke-width="1.5" stroke-dasharray="3 3"/><text x="60" y="20" font-size="9" fill="#0099ff">07:30?</text></svg>`,
+  `<svg viewBox="0 0 210 120"><line x1="20" x2="190" y1="96" y2="96" stroke="#181813"/>${Array.from({length:22},(_,i)=>{const v=i<14?8+((i*7)%5)*2:i<17?30+(i-14)*12:62-(i-17)*6;return`<rect x="${22+i*7.6}" y="${96-v}" width="5" height="${v}" fill="${i>=14&&i<17?"#0099ff":"#cfd3da"}"/>`}).join("")}<path class="hl" pathLength="1" d="M152 14 V96" stroke="#000099" stroke-width="1.5"/><text x="148" y="16" font-size="9" fill="#000099" text-anchor="end">news</text></svg>`,
+  `<svg viewBox="0 0 210 120">${[0,1,2,3,4].map(i=>`<rect x="${30+i*32}" y="30" width="24" height="66" fill="#cfd3da"/><rect class="hl" pathLength="1" x="${30+i*32}" y="${96-[12,18,9,22,15][i]}" width="24" height="${[12,18,9,22,15][i]}" fill="#000099" stroke="#000099"/>`).join("")}<line x1="20" x2="190" y1="96" y2="96" stroke="#181813"/></svg>`,
+  `<svg viewBox="0 0 210 120"><line x1="105" x2="105" y1="10" y2="110" stroke="#bdbdbd"/><line x1="20" x2="190" y1="60" y2="60" stroke="#bdbdbd"/>${[[40,90],[60,78],[80,70],[95,66],[120,52],[140,44],[160,36],[70,50],[150,70],[175,28]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3.5" fill="#8c9198" fill-opacity=".6"/>`).join("")}<path class="hl" pathLength="1" d="M30 98 L185 24" stroke="#0099ff" stroke-width="2"/><circle cx="160" cy="36" r="5" fill="#000099"/></svg>`
+];
+function pIdeas(){
+  const I=[
+    [L("Index watch","Index-Frühwarnung"),L("Gerresheimer left the SDAX on 9 April and lost its XLM coverage the same day. Track the share's rank against the index rules every day and warn months ahead.","Gerresheimer schied am 9. April aus dem SDAX aus und verlor damit die XLM-Daten. Den Rang täglich gegen die Indexregeln verfolgen und Monate vorher warnen."),L("index constituents, daily turnover","Indexlisten, Tagesumsatz"),L("free-float market cap, official rank lists","Free-Float-Marktkapitalisierung, Ranglisten")],
+    [L("Liquidity category monitor","Liquiditätskategorie-Monitor"),L("Heidelberger Druck sits close to the Designated Sponsor thresholds. Show the rolling 4-month position against both rules and the trend.","Heidelberger Druck liegt nah an den Designated-Sponsor-Schwellen. Rollierende 4-Monats-Position gegen beide Regeln samt Trend zeigen."),L("XLM, turnover","XLM, Umsatz"),L("official category list","offizielle Kategorieliste")],
+    [L("Announcement planner","Veröffentlichungsplaner"),L("Which time of day gives the market the cleanest reaction? Compare reactions by publication time across all events of the same type.","Welche Uhrzeit sorgt für die sauberste Marktreaktion? Reaktionen nach Veröffentlichungszeit über gleichartige Ereignisse vergleichen."),L("1-minute bars, event dates","1-Minuten-Balken, Ereignisdaten"),L("exact publication times","genaue Veröffentlichungszeiten")],
+    [L("Before-the-news monitor","Vor-der-Nachricht-Monitor"),L("Unusual volume or one-sided client flow in the days before an announcement is a question IR wants to ask first.","Auffälliger Umsatz oder einseitiger Kundenfluss vor einer Meldung ist eine Frage, die IR zuerst stellen will."),L("flows, 1-minute bars","Flows, 1-Minuten-Balken"),L("ad-hoc and news timestamps","Zeitstempel von Ad-hoc-Meldungen")],
+    [L("Buyback execution check","Rückkauf-Kontrolle"),L("How much of daily turnover was the company's own buyback, and did it trade in auctions or the continuous book?","Wie viel des Tagesumsatzes war der eigene Rückkauf, und lief er in Auktionen oder im fortlaufenden Handel?"),L("turnover, auctions","Umsatz, Auktionen"),L("buyback execution reports","Rückkaufmeldungen")],
+    [L("Surprise vs consensus","Überraschung vs. Konsens"),L("Put results-day reactions next to the earnings surprise so the board sees whether the market punished the number or the guidance.","Reaktionen am Ergebnistag neben die Gewinnüberraschung stellen: Bestrafte der Markt die Zahl oder den Ausblick?"),L("abnormal returns per event","abnormale Rendite je Ereignis"),L("consensus estimates","Konsensschätzungen")]
+  ];
+  return `<section class="sec wrap" style="padding-top:52px"><div class="sec-head"><h2 class="h2">${L("Ideas for the Issuer Services Hub","Ideen für den Issuer Services Hub")}</h2><p class="sec-note">${L("Have = already in the Xetra excerpt. Need = data we would add.","Vorhanden = bereits im Xetra-Auszug. Benötigt = zusätzliche Daten.")}</p></div>
+  <div class="tiles">${I.map((t,i)=>`<article class="tile rv" style="--d:${(i%3)*.08}s"><div class="ill">${ILL[i]}</div><div class="body"><h3>${t[0]}</h3><p>${t[1]}</p><div class="data"><div><b>${L("Have","Hat")}</b><span>${t[2]}</span></div><div class="need"><b>${L("Need","Fehlt")}</b><span>${t[3]}</span></div></div></div></article>`).join("")}</div></section>`;
+}
+
+/* ==================================================================
+   RENDER, TRANSITIONS, INTERACTIONS
+================================================================== */
+const PAGE={overview:pOverview,event:pEvent,compare:pCompare,ask:pAsk,ideas:pIdeas};
+let io;
+function render(){
+  chrome();
+  $("#app").innerHTML=band()+`<div class="content">${PAGE[state.page]()}</div>`;
+  after();
+}
+function after(){
+  io&&io.disconnect();
+  io=new IntersectionObserver(es=>es.forEach(en=>{if(en.isIntersecting){en.target.classList.add("in");counts(en.target);io.unobserve(en.target)}}),{threshold:.12,rootMargin:"0px 0px -6% 0px"});
+  $$("#app .rv:not(.in), #app .chart, #app .band, #app .tile").forEach(el=>io.observe(el));
+  $$("#app .band .rv").forEach((el,i)=>el.classList.add("in"));
+  bindYear();bindIntra();segThumb();
+}
+function transition(fn,{scroll=true}={}){
+  const run=()=>{fn();if(scroll)window.scrollTo({top:0,behavior:"instant"})};
+  if(document.startViewTransition&&!reduced)document.startViewTransition(run);
+  else{run();const c=$("#app .content");c&&c.classList.add("enter")}
+}
+function go(p){if(p===state.page&&p!=="event"){window.scrollTo({top:0,behavior:"smooth"});return}streamTok++;transition(()=>{state.page=p;render()})}
+function openEv(id){
+  const s=Object.values(STOCKS).find(x=>x.events.some(e=>e.id===id));if(!s)return;
+  const same=state.page==="event"&&state.stock===s.tk;
+  transition(()=>{state.stock=s.tk;state.ev=id;state.page="event";render()},{scroll:!same});
+}
+function counts(root){
+  $$(".count",root).forEach(el=>{
+    if(el.dataset.done)return;el.dataset.done=1;
+    const to=+el.dataset.to,f=el.dataset.f,isPh=el.dataset.ph,t0=performance.now(),D=1400;
+    const fmt=v=>{const s=f==="pct"?pct(v):nf(v);return isPh?ph(s):s};
+    if(reduced){el.innerHTML=fmt(to);return}
+    (function tick(t){const k=Math.min(1,(t-t0)/D),e=1-Math.pow(1-k,4);el.innerHTML=fmt(to*e);if(k<1)requestAnimationFrame(tick)})(t0);
+  });
+}
+function segThumb(){$$(".seg-t").forEach(g=>{const b=g.querySelector("[aria-pressed=true]"),th=g.querySelector(".th");if(b&&th){th.style.left=b.offsetLeft+"px";th.style.width=b.offsetWidth+"px"}})}
+
+/* tooltips */
+const tip=$("#tip");
+function showTip(html,x,y){tip.innerHTML=html;tip.classList.add("on");const w=tip.offsetWidth,h=tip.offsetHeight;tip.style.left=Math.min(innerWidth-w-12,x+14)+"px";tip.style.top=Math.max(8,y-h-12)+"px"}
+function hideTip(){tip.classList.remove("on")}
+document.addEventListener("mouseover",ev=>{const t=ev.target.closest("[data-tip]");if(t)showTip(decodeURIComponent(t.dataset.tip),ev.clientX,ev.clientY)});
+document.addEventListener("mousemove",ev=>{const t=ev.target.closest("[data-tip]");if(t)showTip(decodeURIComponent(t.dataset.tip),ev.clientX,ev.clientY)});
+document.addEventListener("mouseout",ev=>{if(ev.target.closest("[data-tip]"))hideTip()});
+
+function svgX(svg,ev){const r=svg.getBoundingClientRect(),vb=svg.viewBox.baseVal;return (ev.clientX-r.left)/r.width*vb.width}
+function bindYear(){
+  const svg=$("#ysvg");if(!svg)return;const s=S(),ys=year(s),hit=$("#yhit"),xh=$("#yxh");
+  const W=1120,ml=8,mr=56,cw=(W-ml-mr)/ys.length;
+  const at=ev=>Math.max(0,Math.min(ys.length-1,Math.floor((svgX(svg,ev)-ml)/cw)));
+  hit.addEventListener("mousemove",ev=>{const d=ys[at(ev)],x=ml+d.i*cw+cw/2;xh.setAttribute("transform",`translate(${x},0)`);xh.classList.add("on");
+    showTip(`<span class="t">${dL(d.d)}</span><br>${L("Return","Rendite")} <b>${pct(d.ret)}</b>${d.ev&&R(d.ev,"ret")?"":"°"}<br>${L("Turnover","Umsatz")} <b>${times(d.vol)}</b>${d.ev&&R(d.ev,"vol")?"":"°"} ${L("normal","normal")}<br><span class="m">${d.ev?L("Click to open the reading","Klicken, um die Analyse zu öffnen"):d.vol>=2.4?L("Unusual day, no reading yet","Auffälliger Tag, noch keine Analyse"):""}</span>`,ev.clientX,ev.clientY);
+    hit.style.cursor=d.ev?"pointer":"crosshair"});
+  hit.addEventListener("mouseleave",()=>{xh.classList.remove("on");hideTip()});
+  hit.addEventListener("click",ev=>{const d=ys[at(ev)];if(d.ev)openEv(d.ev.id)});
+}
+function bindIntra(){
+  const svg=$("#isvg");if(!svg)return;const s=S(),e=E(),{P,PE,V,N}=intraSeries(s,e),hit=$("#ihit"),xh=$("#ixh");
+  const W=1120,ml=56,mr=128,mt=30,PH=250,AU=N+16;
+  const xm=m=>ml+m/(AU+8)*(W-ml-mr);
+  const lo=Math.min(...P,e.ret,e.peer,0),hi=Math.max(...P,e.ret,e.peer,0),pad=(hi-lo)*.1+.6,y0=lo-pad,y1=hi+pad,y=v=>mt+(y1-v)/(y1-y0)*PH;
+  hit.addEventListener("mousemove",ev=>{const m=Math.max(0,Math.min(N,Math.round((svgX(svg,ev)-ml)/(W-ml-mr)*(AU+8))));
+    xh.querySelector("line").setAttribute("x1",xm(m));xh.querySelector("line").setAttribute("x2",xm(m));
+    const c=xh.querySelector("circle");c.setAttribute("cx",xm(m));c.setAttribute("cy",y(P[m]));xh.classList.add("on");
+    showTip(`<span class="t">${tm(m)}</span><br>${s.tk} <b>${pct(P[m])}</b>°<br>${L("Peers","Peers")} ${pct(PE[m])}°<br><span class="m">${L("1-min bar","1-Min.-Balken")}</span>`,ev.clientX,ev.clientY)});
+  hit.addEventListener("mouseleave",()=>{xh.classList.remove("on");hideTip()});
+}
+
+/* clicks (delegated) */
+document.addEventListener("click",ev=>{
+  const t=ev.target.closest("[data-go],[data-ev],[data-act],[data-stock],[data-q]");
+  const menu=$("#stockmenu");
+  if(menu&&!ev.target.closest(".menu,[data-act=stockmenu]")){menu.classList.remove("on");$("[data-act=stockmenu]")?.setAttribute("aria-expanded","false")}
+  if(!t)return;
+  if(t.tagName==="A")ev.preventDefault();
+  if(t.dataset.go){go(t.dataset.go);return}
+  if(t.dataset.ev){openEv(t.dataset.ev);return}
+  if(t.dataset.stock){const tk=t.dataset.stock;menu?.classList.remove("on");if(tk===state.stock)return;transition(()=>{state.stock=tk;state.ev=null;state.chat=[];render()},{scroll:false});return}
+  if(t.dataset.q){ask(t.dataset.q);return}
+  const a=t.dataset.act;
+  if(a==="lang"){state.lang=t.dataset.v;state.noteLang=null;transition(render,{scroll:false})}
+  else if(a==="stockmenu"){ev.stopPropagation();const on=!menu.classList.contains("on");menu.classList.toggle("on",on);t.setAttribute("aria-expanded",on)}
+  else if(a==="notelang"){state.noteLang=t.dataset.v;const p=$("#notetext");p.style.opacity=0;$$("#nlseg button").forEach(b=>b.setAttribute("aria-pressed",b===t));segThumb();setTimeout(()=>{p.innerHTML=noteText(S(),E(),state.noteLang);p.style.opacity=1},220)}
+  else if(a==="copy"){navigator.clipboard?.writeText($("#notetext").innerText.replace(/°/g,"")).then(()=>toast(L("Note copied","Notiz kopiert")),()=>toast(L("Copy not allowed here","Kopieren hier nicht erlaubt")))}
+  else if(a==="json"){$("#json").classList.toggle("on")}
+  else if(a==="export")openExport();
+  else if(a==="palette")openCmd();
+});
+document.addEventListener("change",ev=>{const k=ev.target.dataset.cmp;if(!k)return;state.cmp[k]=ev.target.value;transition(render,{scroll:false})});
+document.addEventListener("submit",ev=>{if(ev.target.id!=="askf")return;ev.preventDefault();const q=$("#askq").value.trim();if(!q)return;
+  const k=/who|sell|buy|wer|verkauf|kauf|flow/i.test(q)?"who":/liquid|spread|xlm|cost|kosten|sponsor/i.test(q)?"liq":/market|markt|peer|sector|sektor|us\b|wir/i.test(q)?"split":"what";
+  $("#askq").value="";ask(k,q.replace(/</g,"&lt;"))});
+
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),1800)}
+
+/* dialogs */
+function closeDlg(d){if(!d.open)return;d.classList.add("closing");setTimeout(()=>{d.classList.remove("closing");d.close()},reduced?0:240)}
+$$("dialog").forEach(d=>{d.addEventListener("click",ev=>{if(ev.target===d)closeDlg(d)});d.addEventListener("cancel",ev=>{ev.preventDefault();closeDlg(d)})});
+
+function openExport(){
+  const s=S(),e=E(),d=$("#xp");let lang=state.noteLang||state.lang;
+  const secs=[["kf",L("Key figures","Kennzahlen"),true],["ch",L("Intraday chart","Intraday-Chart"),true],["fl",L("Who traded","Wer handelte"),true],["nt",L("Note for the board","Notiz für den Vorstand"),true]];
+  const sheet=()=>{const P=intraSeries(s,e).P,lo=Math.min(...P,0),hi=Math.max(...P,0);
+    const sp=P.filter((_,i)=>i%3===0).map((v,i,a)=>`${i?"L":"M"}${f1(i/(a.length-1)*500)},${f1(6+(hi-v)/(hi-lo||1)*88)}`).join("");
+    const T=(en,dd)=>lang==="de"?dd:en;
+    return `<div class="sh-top"><div><div class="k">${T("IR snapshot","IR-Snapshot")} · ${s.tk} · ${s.isin}</div><h3>${s.name}<br>${dL(e.date,lang)}</h3></div><div class="k" style="text-align:right">Issuer Intelligence Hub<br>${T("Data","Daten")}: Xetra</div></div>
+      <div class="sec-x" data-s="kf"><table>${[[T("Share return","Rendite"),pct(e.ret,1,true,lang)],[T("Peers","Peers"),pct(e.peer,1,true,lang)],[T("Abnormal return","Abnormale Rendite"),pct(e.abn,1,true,lang)],[T("Turnover vs normal","Umsatz vs. normal"),times(e.vol,1,lang)],[T("Closing auction","Schlussauktion"),eurm(e.auction,1,lang)]].map(r=>`<tr><td>${r[0]}</td><td style="text-align:right;font-weight:700">${r[1]}</td></tr>`).join("")}</table></div>
+      <div class="sec-x" data-s="ch"><div class="k">${T("Intraday, vs previous close","Intraday, gegen Vortagesschluss")}</div><svg viewBox="0 0 500 100" style="width:100%;height:auto"><line x1="0" x2="500" y1="${6+hi/(hi-lo||1)*88}" y2="${6+hi/(hi-lo||1)*88}" stroke="#bdbdbd" stroke-dasharray="3 3"/><path d="${sp}" fill="none" stroke="#000099" stroke-width="1.5"/></svg></div>
+      <div class="sec-x" data-s="fl"><div class="k">${T("Net flow by participant","Nettofluss nach Teilnehmer")}</div><table>${[["Market makers","Market Maker","mm"],["Clients (agent)","Kunden (Agent)","agent"],["Proprietary","Eigenhandel","prop"]].map(([en,dd,k])=>`<tr><td>${T(en,dd)}</td><td style="text-align:right">${pct(e.flows[k],0,true,lang)}</td></tr>`).join("")}</table></div>
+      <div class="sec-x" data-s="nt"><div class="k">${T("Note for the board","Notiz für den Vorstand")}</div><p style="font-size:10.5px;line-height:1.55;margin:4px 0 0">${noteText(s,e,lang).replace(/data-tip="[^"]*"/g,"")}</p></div>
+      <div class="foot">${T("Source: Xetra (Deutsche Börse), 1-minute bars and daily features. Figures computed by the engine; text generated and checked against them. Cause not verified. Values marked ° are placeholders.","Quelle: Xetra (Deutsche Börse), 1-Minuten-Balken und Tageswerte. Zahlen vom Engine berechnet; Text generiert und geprüft. Ursache nicht verifiziert. Mit ° markierte Werte sind Platzhalter.")}</div>`};
+  d.innerHTML=`<div class="xp" style="position:relative">
+    <div class="xp-side"><h2>${L("IR snapshot","IR-Snapshot")}</h2>
+      <div><div class="lbl">${L("Sections","Abschnitte")}</div>${secs.map(([k,n])=>`<label><input type="checkbox" data-sec="${k}" checked> ${n}</label>`).join("")}</div>
+      <div><div class="lbl">${L("Language","Sprache")}</div><div class="seg-t" id="xlang"><span class="th"></span><button data-v="en" aria-pressed="${lang==="en"}">EN</button><button data-v="de" aria-pressed="${lang==="de"}">DE</button></div></div>
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px;align-items:flex-start"><button class="pill" id="xpdf">${L("Download PDF","PDF herunterladen")} ${ARR}</button><span class="sec-note">${L("A4, one page. Uses report.export.to_pdf in the app.","A4, eine Seite. In der App über report.export.to_pdf.")}</span></div>
+    </div>
+    <div class="xp-view"><div class="sheet" id="sheet">${sheet()}</div></div>
+    <button class="x-close" aria-label="${L("Close","Schließen")}" id="xclose"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2"/></svg></button></div>`;
+  d.showModal();segThumb();
+  const applySecs=()=>$$("#xp [data-sec]").forEach(c=>$(`#sheet [data-s=${c.dataset.sec}]`).classList.toggle("off",!c.checked));
+  d.querySelectorAll("[data-sec]").forEach(c=>c.addEventListener("change",applySecs));
+  d.querySelectorAll("#xlang button").forEach(b=>b.addEventListener("click",()=>{lang=b.dataset.v;$$("#xlang button").forEach(x=>x.setAttribute("aria-pressed",x===b));segThumb();const sh=$("#sheet");sh.style.opacity=0;setTimeout(()=>{sh.innerHTML=sheet();applySecs();sh.style.opacity=1},200)}));
+  $("#sheet").style.transition="opacity .25s";
+  $("#xclose").onclick=()=>closeDlg(d);
+  $("#xpdf").onclick=()=>window.print();
+}
+
+function openCmd(){
+  const d=$("#cmd");
+  const items=[];
+  PAGES.forEach((p,i)=>items.push({g:L("Pages","Seiten"),t:NAV[p][de()?1:0],h:String(i+1),run:()=>go(p)}));
+  Object.values(STOCKS).forEach(s=>items.push({g:L("Issuers","Emittenten"),t:`${s.name}`,h:`${s.tk} · ${s.idx}`,run:()=>transition(()=>{state.stock=s.tk;state.ev=null;state.page="overview";state.chat=[];render()})}));
+  Object.values(STOCKS).forEach(s=>s.events.forEach(e=>items.push({g:L("Events","Ereignisse"),t:`${s.name} · ${dL(e.date)}`,h:`${kindL(e.kind)} · ${pct(e.ret)}`,run:()=>openEv(e.id)})));
+  items.push({g:L("Actions","Aktionen"),t:L("Export IR snapshot","IR-Snapshot exportieren"),h:"E",run:openExport});
+  items.push({g:L("Actions","Aktionen"),t:L("Switch to German","Auf Englisch wechseln"),h:"DE/EN",run:()=>{state.lang=de()?"en":"de";transition(render,{scroll:false})}});
+  d.innerHTML=`<div class="cmd"><input id="cmdq" placeholder="${L("Search pages, issuers, events…","Seiten, Emittenten, Ereignisse suchen…")}" autocomplete="off"><ul id="cmdl" role="listbox"></ul><div class="foot"><span>↑↓ ${L("move","bewegen")}</span><span>↵ ${L("open","öffnen")}</span><span>esc ${L("close","schließen")}</span><span style="margin-left:auto">1–5 ${L("pages","Seiten")} · E ${L("export","Export")}</span></div></div>`;
+  let sel=0,list=items;
+  const draw=()=>{let g="";$("#cmdl").innerHTML=list.map((it,i)=>{const head=it.g!==g?`<li class="grp">${(g=it.g)}</li>`:"";return head+`<li role="option" data-i="${i}" aria-selected="${i===sel}"><span>${it.t}</span><small>${it.h}</small></li>`}).join("")||`<li class="grp">${L("Nothing found","Nichts gefunden")}</li>`;$("#cmdl [aria-selected=true]")?.scrollIntoView({block:"nearest"})};
+  const run=i=>{const it=list[i];if(!it)return;closeDlg(d);setTimeout(it.run,reduced?0:200)};
+  draw();d.showModal();
+  const q=$("#cmdq");q.focus();
+  q.addEventListener("input",()=>{const v=q.value.toLowerCase();list=items.filter(it=>(it.t+" "+it.h+" "+it.g).toLowerCase().includes(v));sel=0;draw()});
+  q.addEventListener("keydown",ev=>{if(ev.key==="ArrowDown"){sel=Math.min(list.length-1,sel+1);draw();ev.preventDefault()}else if(ev.key==="ArrowUp"){sel=Math.max(0,sel-1);draw();ev.preventDefault()}else if(ev.key==="Enter"){run(sel)}});
+  $("#cmdl").addEventListener("click",ev=>{const li=ev.target.closest("[data-i]");if(li)run(+li.dataset.i)});
+}
+
+/* keyboard */
+document.addEventListener("keydown",ev=>{
+  if((ev.metaKey||ev.ctrlKey)&&ev.key.toLowerCase()==="k"){ev.preventDefault();openCmd();return}
+  if(ev.target.closest?.("input,select,textarea")||$("dialog[open]"))return;
+  if(ev.key>="1"&&ev.key<="5"&&!ev.metaKey&&!ev.ctrlKey){go(PAGES[+ev.key-1])}
+  else if(ev.key==="/"){ev.preventDefault();openCmd()}
+  else if(ev.key.toLowerCase()==="e"&&!ev.metaKey&&!ev.ctrlKey){openExport()}
+});
+
+/* header + clock */
+addEventListener("scroll",()=>document.body.classList.toggle("scrolled",scrollY>30),{passive:true});
+addEventListener("resize",()=>{placeInd();segThumb()});
+function clock(){const t=new Intl.DateTimeFormat("de-DE",{timeZone:"Europe/Berlin",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date());$("#clock").textContent=`${t} ${L("CET","MEZ")}`}
+setInterval(clock,1000);
+
+render();clock();
+document.fonts&&document.fonts.ready.then(()=>{placeInd();segThumb()});
+</script>
+</body>
+</html>
