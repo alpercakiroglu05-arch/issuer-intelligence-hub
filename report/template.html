@@ -19,7 +19,7 @@
 </head>
 <body>
   <h1>{{ card.name }} ({{ card.ticker }}, {{ card.index }})</h1>
-  <div class="sub">{{ L.title }}: {{ card.event.title }} &middot; {{ L.day }} {{ card.event.reaction_day }}</div>
+  <div class="sub">{{ L.title }}: {{ card.event.title }} &middot; {{ L.day }} {{ card.event.reaction_day }}{% if card.event.datetime_local %}<br>{{ L.announced }} {{ card.event.datetime_local }}{% if card.event.source_url %} &middot; {{ L.source }}: <a href="{{ card.event.source_url }}">{{ card.event.source_url[:70] }}</a>{% endif %}{% endif %}</div>
 
   <table class="kpi"><tr>
     <td><div class="label">{{ L.abn }}</div><div class="value">{{ pct(card.price.abn_ret) }}</div>
@@ -45,8 +45,8 @@
 
   {% if card.comparison %}
   <div class="base">{{ L.cmp_pre }} {{ card.comparison.n }} {{ card.comparison.group }}:
-    {{ L.cmp_abn }} {{ pct0(card.comparison.abs_abn_ret_pctile) }},
-    {{ L.cmp_vol }} {{ pct0(card.comparison.vol_ratio_pctile) }}.</div>
+    {{ L.cmp_abn }} {{ pctile(card.comparison.abs_abn_ret_pctile) }},
+    {{ L.cmp_vol }} {{ pctile(card.comparison.vol_ratio_pctile) }}.</div>
   {% endif %}
 
   <div class="text">{{ narrative }}</div>

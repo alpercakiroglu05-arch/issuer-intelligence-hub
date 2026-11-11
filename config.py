@@ -33,9 +33,10 @@ RAW_DIR = Path(os.getenv("IIH_RAW_DIR", REPO_ROOT.parent))
 
 EVENTS_CSV = REPO_ROOT / "events" / "events.csv"
 SECTORS_CSV = REPO_ROOT / "events" / "sectors.csv"
+NAMES_CSV = REPO_ROOT / "events" / "names.csv"   # readable company names for the event stocks
 
 # Stocks we showcase (max 3 per the challenge). Proposed - team decides.
-#   EVD  CTS Eventim (MDAX): 27 Mar -23%, sell-off all day, 23% of turnover in the closing auction
+#   EVD  CTS Eventim (MDAX): 27 Mar -23% after FY results (26 Mar 17:45); priced from 09:03, closing auction 3.6x normal
 #   EVT  Evotec (SDAX):      14 Jul -24%, -22% gap at the open (news before the open)
 #   HDD  Heidelberger Druck (SDAX): small cap, ~EUR 1.3m/day, XLM ~90 bps -> liquidity story
 #   (GXI Gerresheimer: -31% on 11 Feb, left the SDAX on 9 Apr -> no XLM data afterwards; pitch story only)

@@ -112,11 +112,17 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [ ] Part A: auction share over time chart on the dashboard (brief point I)
 - [x] Dashboard: "has our liquidity improved?" (`liquidity_trend()`) and episodes linked to events (PR #19); "Compare with: Index / Sector / Size" (PR #21)
 
-### C4 · AI + report. Owner: ________
-- [ ] Get the JAIF / LLM endpoint working in `.env`
-- [ ] `narrate.py`: tune the prompt and add a numbers check (every number in the text must exist in the JSON)
+### C4 · AI + report. Owner: AskingAtlas
+Priorities from the demo dry run (Wed evening), in this order:
+- [ ] **Part A report** (brief: the dashboard result "can be exported as a short report"): a button on the dashboard, HTML/PDF, DE/EN, reusing `report/export.py`. Content: KPIs vs index/sector/size (`baseline.kpis()`), liquidity trend (`liquidity_trend()["summary"]`), episodes with linked events.
+- [ ] **Assistant without LLM:** today `ask()` answers with a raw JSON dump when no key is set. Add a deterministic fallback for the typical questions:
+  - liquidity → `liquidity_trend()` summary
+  - spreads and peers → `kpis()` vs index/sector/size
+  - most unusual day → top episode + linked event + card summary
+- [ ] **Numbers check** in `narrate.py`: every number in an LLM text must exist in the card JSON, else use the template. Do not claim it in the pitch before it is merged.
+- [ ] **German formatting** in the DE texts and snapshot: `−23,2 %` and `27.03.2026` instead of `-23.2%` and `2026-03-27`; the comparison group label is still English.
+- [ ] JAIF / LLM endpoint in `.env` (only if the organisers give us a key; without it the templates run)
 - [ ] `agent.py` v2: tool calling with `TOOLS` (kpis, anomalies, impact_card)
-- [ ] `report/`: PDF layout, a small chart, **Part A snapshot** (the brief asks for an exportable dashboard report). Auction and comparison rows are already in the event snapshot
 
 ### Non-code (research and pitch team)
 - **Please spot-check the hero rows of `events/events.csv`** (source link, time) before the pitch.

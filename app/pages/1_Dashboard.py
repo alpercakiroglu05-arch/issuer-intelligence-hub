@@ -39,7 +39,7 @@ def peer_median(isin: str, by: str, col: str) -> pd.Series:
     isins = compare.peer_group(isin, by)["isins"]
     d = data.daily()
     return d[d["isin"].isin(isins)].groupby("date")[col].median()
-st.title(f"{k['name'].title()} · how the share trades")
+st.title(f"{data.display_name(isin)} · how the share trades")
 
 # Peer benchmarking by index, sector or size (brief point II; engine.compare.peer_group, C2)
 PEERS = {"Index": "index", "Sector": "sector", "Size": "size"}

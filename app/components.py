@@ -63,7 +63,7 @@ def setup(title: str) -> str:
     st.set_page_config(page_title=f"Issuer Intelligence Hub · {title}", page_icon="📈", layout="wide")
     u = _universe().copy()
     ex = ~u["member_now"].astype(bool) if "member_now" in u else pd.Series(False, index=u.index)
-    u["label"] = (u["ticker"] + " · " + u["name"].str.title() + " (" + u["idx_latest"]
+    u["label"] = (u["ticker"] + " · " + u["isin"].map(data.display_name) + " (" + u["idx_latest"]
                   + ")" + ex.map({True: " · left index", False: ""}))
     u["order"] = (~u["ticker"].isin(HERO_TICKERS)).astype(int)
     u = u.sort_values(["order", "idx_latest", "ticker"])
@@ -78,12 +78,26 @@ def setup(title: str) -> str:
 
 
 # ---------- impact card ----------
+TIMING_WORDS = {"pre_open": "before the open", "intraday": "during trading", "post_close": "after the close",
+                "unknown": "time unknown"}
+
+
+def announced_line(ev: dict) -> str:
+    """'Announced 2026-03-26 17:45 (after the close) · reaction day 2026-03-27 · [source](url)'."""
+    when = TIMING_WORDS.get(ev.get("timing"), ev.get("timing") or "")
+    if ev.get("timing_source") == "inferred_from_trading":
+        when += ", inferred from trading"
+    out = (f"Announced {ev['datetime_local']} ({when}) · " if ev.get("datetime_local") else
+           f"No announcement linked ({when}) · ")
+    out += f"reaction day {ev['reaction_day']}"
+    if ev.get("source_url"):
+        out += f" · [source]({ev['source_url']})"
+    return out
 def render_card(card: dict) -> None:
     p, v, l, a, au = card["price"], card["volume"], card["liquidity"], card["participants"], card["auctions"]
     ev = card["event"]
-    st.subheader(f"{card['name'].title()} · {ev['title']}")
-    st.caption(f"Reaction day {ev['reaction_day']} · timing: {ev['timing']} · "
-               f"baseline {card['baseline']['window']} ({card['baseline']['days_used']} days)")
+    st.subheader(f"{card['name']} · {ev['title']}")
+    st.caption(announced_line(ev) + f" · baseline {card['baseline']['window']} ({card['baseline']['days_used']} days)")
     c = st.columns(5)
     c[0].metric("Stock-specific move", pct(p["abn_ret"]), f"stock {pct(p['ret'])} · peers {pct(p['peer_ret'])}",
                 delta_color="off")
@@ -108,7 +122,7 @@ def render_card(card: dict) -> None:
     c2[0].metric("Gap at open", pct(p["gap_open"]))
     c2[1].metric("Move during session", pct(p["ret_intraday"]))
     c2[2].metric("Abnormal return t0..t+5", pct(p["car_0_5"]))
-    c2[3].metric("Spread back to normal after", "n/a" if l["days_to_normal"] is None else f"{l['days_to_normal']} days")
+    c2[3].metric("Spread back to normal after", "n/a" if l["days_to_normal"] is None else f"{l['days_to_normal']} day{'s' if l['days_to_normal'] != 1 else ''}")
     c2[4].metric("Volume z-score", "n/a" if v["z"] is None else f"{v['z']:.1f}")
     st.markdown("**Opening and closing auction**")
     ca = st.columns(4)
