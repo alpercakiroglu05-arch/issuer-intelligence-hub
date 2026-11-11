@@ -2,14 +2,14 @@
 """
 build_intraday.py - 1-minute bars from every single Xetra trade.  OWNER: C1 (data).
 
-Reads XETRA_ONBOOK_TRADES (213 daily files, 1.7 GB gz) for a few stocks and writes
+Reads XETRA_ONBOOK_TRADES (213 daily files, 1.7 GB gz) for the event stocks and writes
 data/intraday_bars.parquet (schema: docs/API_CONTRACT.md -> intraday_bars).
 
 Resumable: each trading day is written to data/intraday_parts/<YYYYMMDD>.parquet and
 skipped on the next run, so a slow laptop can process the year in several runs.
 
 Usage:
-    python3 ingest/build_intraday.py                       # hero stocks from config
+    python3 ingest/build_intraday.py                       # every stock in events/events.csv + heroes (~160 s)
     python3 ingest/build_intraday.py GXI EVD               # explicit tickers
     python3 ingest/build_intraday.py --max-seconds 150     # stop after ~150 s, rerun to continue
     python3 ingest/build_intraday.py --rebuild             # ignore existing day parts
@@ -31,10 +31,15 @@ import duckdb
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from config import DATA_DIR, HERO_TICKERS, RAW_DIR, TZ  # noqa: E402
+from config import DATA_DIR, EVENTS_CSV, HERO_TICKERS, RAW_DIR, TZ  # noqa: E402
 
 PARTS = DATA_DIR / "intraday_parts"
 OUT = DATA_DIR / "intraday_bars.parquet"
+
+
+def default_tickers() -> list[str]:
+    """Every stock that has an event in events/events.csv, plus the hero stocks."""
+    return sorted(set(pd.read_csv(EVENTS_CSV, dtype=str)["ticker"].dropna()) | set(HERO_TICKERS))
 
 
 def isins_for(tickers: list[str]) -> dict[str, str]:
@@ -75,13 +80,13 @@ def bars_for_day(con: duckdb.DuckDBPyConnection, path: Path, isins: list[str]) -
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("tickers", nargs="*", default=HERO_TICKERS)
+    ap.add_argument("tickers", nargs="*", help="default: every stock in events/events.csv + the hero stocks")
     ap.add_argument("--raw", default=str(RAW_DIR))
     ap.add_argument("--max-seconds", type=float, default=None)
     ap.add_argument("--rebuild", action="store_true")
     args = ap.parse_args()
 
-    isin_map = isins_for(args.tickers)
+    isin_map = isins_for(args.tickers or default_tickers())
     files = sorted((Path(args.raw) / "XETRA" / "XETRA_ONBOOK_TRADES").glob("XETRA_ONBOOK_TRADES_*.csv.gz"))
     if not files:
         raise SystemExit(f"No trade files under {args.raw}/XETRA/XETRA_ONBOOK_TRADES")

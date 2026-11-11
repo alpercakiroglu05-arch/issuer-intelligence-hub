@@ -38,7 +38,7 @@ Rebuild the processed data. Only the data owner (C1) needs the 8.9 GB raw excerp
 ```bash
 python ingest/build_daily.py "<path to Futury MDS Data Excerpt>" data     # ~25 s → daily_features.parquet, universe.csv, hero_candidates.csv
 python ingest/build_events.py                    # events/events.csv → data/events.parquet
-python ingest/build_intraday.py EVD EVT HDD GXI  # ~2 min → data/intraday_bars.parquet (resumable: --max-seconds 150)
+python ingest/build_intraday.py                  # ~3 min, every stock in events.csv → data/intraday_bars.parquet (resumable: --max-seconds 150)
 ```
 
 ---

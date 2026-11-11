@@ -75,7 +75,7 @@ Each folder has a `NOTES.md` and a PDF data dictionary.
 
 Processed files in `data/`: `daily_features.parquet` (174 stocks × 213 days, 76 cols), `universe.csv`,
 `events.parquet`, `intraday_bars.parquet` (all 44 stocks in `events.csv`: heroes + DAX 40; 3.8M 1-min bars, ~170 MB; read one stock with `engine.data.intraday(isin)`, never the whole file in app code), `hero_candidates.csv`.
-Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `ingest/build_intraday.py <tickers>` (~160 s for 44 stocks; add `--rebuild` when the ticker list is unchanged but the code changed).
+Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `ingest/build_intraday.py` (no arguments = every stock in `events.csv`, ~160 s; add `--rebuild` when the ticker list is unchanged but the code changed).
 
 ### Pitfalls (all handled in ingest; keep them in mind for new code)
 - **Flows:**
