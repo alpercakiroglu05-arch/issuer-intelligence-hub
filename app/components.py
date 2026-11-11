@@ -88,6 +88,13 @@ def render_card(card: dict) -> None:
                 delta_color="off")
     c[4].metric("Agent order imbalance", pct(a["agent_aggr_imbalance"]), "+ net buying / − net selling",
                 delta_color="off")
+    cmp = card.get("comparison")
+    if cmp:
+        rank = f" (#{cmp['rank_abs_abn_ret']} of {cmp['n'] + 1})" if cmp.get("rank_abs_abn_ret") else ""
+        st.info(f"📐 **Compared with {cmp['n']} {cmp['group']}:** the stock-specific move was bigger than "
+                f"**{pct0(cmp['abs_abn_ret_pctile'])}** of them{rank}, turnover vs normal bigger than "
+                f"**{pct0(cmp['vol_ratio_pctile'])}**, trading cost vs normal higher than "
+                f"**{pct0(cmp['xlm_ratio_pctile'])}**.")
     c2 = st.columns(5)
     c2[0].metric("Gap at open", pct(p["gap_open"]))
     c2[1].metric("Move during session", pct(p["ret_intraday"]))

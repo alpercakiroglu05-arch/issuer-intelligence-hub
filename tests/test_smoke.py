@@ -128,3 +128,22 @@ def test_auction_volumes_match_flows():
         flow = s[[f"{x}_auct_buy" for x in ("mm", "agent", "prop")]].sum(axis=1)
         r = ((p["open_auction_eur"] + p["close_auction_eur"]) / flow.where(flow > 0)).median()
         assert 0.95 <= r <= 1.001, (isin, r)
+
+
+@needs_data
+def test_compare_matches_card_and_ranks_evd():
+    """The comparison table uses the card's own definitions; EVD 27 Mar is a top-3 MDAX move of 2026."""
+    from engine import compare
+    from engine.data import isin_of
+    from engine.impact import impact_card
+    card = impact_card(isin_of("EVD"), "2026-03-27")
+    m = compare.metrics_all()
+    row = m[(m["ticker"] == "EVD") & (m["date"] == "2026-03-27")].iloc[0]
+    assert row["vol_ratio"] == pytest.approx(card["volume"]["ratio"], abs=0.01)
+    assert row["xlm_ratio"] == pytest.approx(card["liquidity"]["ratio"], abs=0.01)
+    assert row["car_0_5"] == pytest.approx(card["price"]["car_0_5"], abs=1e-4)
+    c = card["comparison"]
+    assert c["group_type"] == "NOTABLE_DAY" and c["group_index"] == "MDAX" and c["n"] >= 100
+    assert c["abs_abn_ret_pctile"] >= 0.98 and c["rank_abs_abn_ret"] <= 3
+    typed = compare.same_type_events("TBD")
+    assert set(typed["ticker"]) >= {"EVD", "GXI"}

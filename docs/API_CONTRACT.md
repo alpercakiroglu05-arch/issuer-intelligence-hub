@@ -40,7 +40,7 @@ Types: `FY Q1 H1 Q3 DIVIDEND_EX AGM ADHOC GUIDANCE MA CMD`.
                    "close_auction_move", "close_auction_move_baseline_abs"},
   "participants": {"agent_share", "agent_share_baseline", "agent_aggr_imbalance", "agent_aggr_imbalance_baseline", "agent_aggr_net_eur", "prop_share", "mm_share"},
   "intraday":     {"volume_share_first_15min", "volume_share_first_60min", "open_auction_eur", "close_auction_eur", "intraday_low", "intraday_high", "time_of_low", "onset"} | null,
-  "comparison":   null,
+  "comparison":   {"group_type", "group_index", "group", "n", "abs_abn_ret_pctile", "abs_abn_ret_median", "vol_ratio_pctile", "vol_ratio_median", "xlm_ratio_pctile", "xlm_ratio_median", "rank_abs_abn_ret"} | null,
   "flags":        ["flow_censored", "short_baseline", …] }
 ```
 `auctions` (engine/auctions.py): volumes in EUR from the trade bars at the exact uncross minute (OHLC auction timestamps),
@@ -49,6 +49,12 @@ so pre-market, volatility-interruption and after-close trades are excluded. `*_b
 `close_auction_move` = closing auction price vs last continuous trade before 17:30; `*_move_baseline_abs` = median |move|.
 Volume fields are null for stocks without trade bars; `open_auction_move` comes from daily OHLC and exists for all.
 Check: open + close auction (bars) = 97.6–99.7 % of flow auction turnover (median, hero stocks).
+
+`comparison` (engine/compare.py): where this event sits among comparable events. Group = same `event.type` in the same
+index (from events.csv) if that has >= `config.COMPARE_MIN_GROUP` other events, else all indices, else `NOTABLE_DAY`
+(every unusual stock-day, same rules as the dashboard). `*_pctile` = share of the other events with a smaller value (0..1),
+`*_median` = group median, `rank_abs_abn_ret` = 1 for the biggest stock-specific move. The metrics are computed vectorised
+with the card's own definitions (baseline t-65..t-6), so the card and the comparison table agree.
 
 `event.timing_source`: `announcement` (from events.csv), `inferred_from_trading` (time unknown, filled from `intraday.onset`) or null.
 
@@ -72,7 +78,8 @@ in the direction of the day's move, still holding 5 minutes later. Thresholds in
 | `engine.impact.impact_card(isin, day, event=None)` | dict (schema above) | C2 |
 | `engine.onset.onset(isin, day, event_time=None)` | dict: news onset minute (see `intraday.onset`) | C1 |
 | `engine.auctions.auction_profile(isin)` | DataFrame per day: open/close auction EUR, close auction share and price move | C1 |
-| `engine.compare.same_type_events(type, index)` / `percentile(card, table)` | DataFrame / dict | C2 |
+| `engine.compare.event_types()` / `same_type_events(type, index=None)` / `percentile(card, table)` / `comparison_for(card)` | list / DataFrame / dict / dict | C2 (v1 by C1) |
+| `engine.compare.metrics_all()` | DataFrame: every stock-day with the card metrics + `notable`, `reason` | C2 (v1 by C1) |
 | `ai.narrate.narrate(card, lang)` | str (DE/EN), template fallback without LLM | C4 |
 | `ai.agent.ask(question, isin)` | str | C4 |
 | `report.export.to_html(card, text, lang)` / `to_pdf(html)` | str / bytes | C4 |

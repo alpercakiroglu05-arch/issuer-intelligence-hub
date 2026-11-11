@@ -18,7 +18,8 @@ Write 4-5 short sentences in {language}:
 2) how unusual the trading activity was (volume vs. normal),
 3) liquidity / spread and the opening/closing auctions (volume vs normal, auction price vs previous close / last trade),
 4) who traded (agent = client/institutional orders, prop, market makers), only if notable,
-5) if intraday.onset.time is set: when the market started pricing the news (that clock time).
+5) if intraday.onset.time is set: when the market started pricing the news (that clock time),
+6) if comparison is set: how this event ranks among comparable events (percentiles, group size).
 Rules: use ONLY numbers that appear in the JSON (rounded); never invent causes or numbers;
 no investment advice; no predictions; plain factual tone. Ratios: 'x times normal'."""
 
@@ -44,6 +45,7 @@ def template_narrative(card: dict, lang: str = "en") -> str:
     p, v, l, a = card["price"], card["volume"], card["liquidity"], card["participants"]
     o = (card.get("intraday") or {}).get("onset") or {}
     au = card.get("auctions") or {}
+    cmp = card.get("comparison") or {}
     if lang == "de":
         t = (f"{card['name']} veränderte sich am {card['event']['reaction_day']} um {_p(p['ret'])}, "
              f"die {card['index']}-Vergleichswerte um {_p(p['peer_ret'])} (unternehmensspezifisch: {_p(p['abn_ret'])}). "
@@ -58,6 +60,10 @@ def template_narrative(card: dict, lang: str = "en") -> str:
         if au.get("close_auction_ratio") is not None:
             t += (f" Die Schlussauktion war {au['close_auction_ratio']:.1f}-mal so groß wie normal und "
                   f"bewegte den Kurs um {_p(au['close_auction_move'])} gegenüber dem letzten Handel.")
+        if cmp and cmp.get("abs_abn_ret_pctile") is not None:
+            what = "ungewöhnlichen Handelstagen" if cmp["group_type"] == "NOTABLE_DAY" else f"{cmp['group_type']}-Ereignissen"
+            t += (f" Im Vergleich mit {cmp['n']} {what} ({cmp['group_index']}, 2026) war die unternehmensspezifische "
+                  f"Bewegung größer als bei {cmp['abs_abn_ret_pctile'] * 100:.0f}%.")
         return t
     t = (f"{card['name']} moved {_p(p['ret'])} on {card['event']['reaction_day']} while its {card['index']} peers "
          f"moved {_p(p['peer_ret'])} (stock-specific: {_p(p['abn_ret'])}). "
@@ -72,4 +78,7 @@ def template_narrative(card: dict, lang: str = "en") -> str:
     if au.get("close_auction_ratio") is not None:
         t += (f" The closing auction was {au['close_auction_ratio']:.1f}x its normal size and moved the price "
               f"{_p(au['close_auction_move'])} vs. the last trade.")
+    if cmp and cmp.get("abs_abn_ret_pctile") is not None:
+        t += (f" Compared with {cmp['n']} {cmp['group']}, the stock-specific move was bigger than "
+              f"{cmp['abs_abn_ret_pctile'] * 100:.0f}% of them.")
     return t
