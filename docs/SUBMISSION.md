@@ -58,6 +58,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 - **Headline numbers** are 60-day medians of turnover, XLM (EUR 25k), auction share and agent share, each against the median stock of the same index.
 - **Xetra liquidity category (estimate):** category A if XLM (EUR 25k) ≤ 100 bps and turnover ≥ EUR 2.5m/day over about 4 months (the Designated Sponsor thresholds in the Being Public Guide). Otherwise a Designated Sponsor is needed.
 - **Unusual days:** volume z ≥ 3, |abnormal return z| ≥ 3, or XLM ≥ 2× normal. Possible corporate actions (|return| > 40 %) are excluded. Consecutive unusual days are merged into one episode.
+- **Trading cost by order size:** XLM from €10k to €10m against the peer median, plus the largest order the Xetra book absorbed on most of the last 60 days. This is the live version of the XLM table in Deutsche Börse's monthly Stock Report.
 - **Liquidity trend** ("has our liquidity improved?"): the last 60 trading days against the 60 before, for the stock and for its index, with a ±10 % tolerance.
 
 ### Part B: the impact card
@@ -89,7 +90,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 - **Assistant (v1):** answers IR questions from the stock's KPIs and unusual days.
 - **IR snapshot:** the card plus the summary as HTML and PDF.
 
-## 3. Validation (all reproducible, 42 automated tests)
+## 3. Validation (all reproducible, 69 automated tests)
 
 | Check | Result |
 |---|---|
@@ -141,5 +142,5 @@ python ingest/build_daily.py <raw> data        # ~25 s
 python ingest/build_events.py
 python ingest/build_intraday.py                # ~3 min, every stock in events.csv
 streamlit run app/Home.py                      # http://localhost:8501
-pytest                                         # 42 tests
+pytest                                         # 69 tests
 ```

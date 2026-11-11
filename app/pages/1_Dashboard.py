@@ -17,7 +17,7 @@ from plotly.subplots import make_subplots  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from components import bps, eur, pct, pct0, setup  # noqa: E402
-from engine import baseline, compare, data  # noqa: E402
+from engine import baseline, compare, data, xlm  # noqa: E402
 
 isin = setup("Dashboard")
 
@@ -112,6 +112,34 @@ with right:
     f3.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), yaxis_tickformat=".0%",
                      legend=dict(orientation="h"))
     st.plotly_chart(f3, width="stretch")
+
+# Trading cost by order size (engine.xlm, C1): the on-demand version of the XLM table in DB's Stock Report
+st.markdown(f"**Trading cost by order size** · median of the last 60 trading days vs {peer} median")
+curve = xlm.cost_curve(isin, by)
+cs = xlm.curve_summary(curve)
+if cs["largest_absorbed_eur"] is None:
+    st.info("No XLM for this stock in the last 60 days. Deutsche Börse publishes XLM only for index members "
+            "(e.g. Gerresheimer after it left the SDAX).")
+else:
+    cl, cr = st.columns([2, 1])
+    with cl:
+        f4 = go.Figure()
+        f4.add_scatter(x=curve["label"], y=curve["stock_bps"], name=k["ticker"], mode="lines+markers")
+        f4.add_scatter(x=curve["label"], y=curve["peer_bps"], name=f"{peer} median", mode="lines+markers",
+                       line=dict(dash="dot"))
+        f4.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h"),
+                         yaxis=dict(title="bps (round trip)", type="log"), xaxis_title="order size")
+        st.plotly_chart(f4, width="stretch")
+    with cr:
+        peer_ok = curve[curve["peer_bps"].notna()]
+        cr.metric("Largest order the book absorbed on most days", cs["largest_absorbed_label"],
+                  f"{peer}: {peer_ok['label'].iloc[-1] if len(peer_ok) else 'n/a'}", delta_color="off",
+                  help="XLM is only published when the Xetra order book could fill an order of that size. "
+                       "'Absorbed on most days' = filled on at least half of the last 60 trading days.")
+        cr.metric("Cost of a €100k order", bps(cs["cost_100k_bps"]), f"{peer} {bps(cs['peer_cost_100k_bps'])}",
+                  delta_color="off", help="XLM = round-trip cost: buying and selling this amount at once on Xetra, in bps of the order value. Median of the last 60 trading days.")
+        cr.metric("Cost of a €1m order", "book too thin" if pd.isna(cs["cost_1m_bps"]) else bps(cs["cost_1m_bps"]),
+                  f"{peer} {bps(cs['peer_cost_1m_bps'])}", delta_color="off", help="XLM = round-trip cost: buying and selling this amount at once on Xetra, in bps of the order value. Median of the last 60 trading days.")
 
 st.markdown("### Unusual days")
 st.caption("Consecutive unusual days are merged into one episode. **Announcement** links each episode to a sourced "

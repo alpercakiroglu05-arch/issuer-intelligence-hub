@@ -93,6 +93,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] `events/events.csv`: 80 sourced events (the research team could not, so C1 took it over)
 - [x] `build_intraday.py` without arguments builds every stock in `events.csv` (PR #16)
 - [x] `docs/SUBMISSION.md`: submission text (data, model, logic, validation)
+- [x] Trading cost by order size (`engine/xlm.py`) on the dashboard: XLM €10k–€10m vs peers, largest order the book absorbs
 - [x] Eurex open interest checked and skipped: the participant split is censored for >90 % of small-cap series
 
 ### C2 · Engine. Owner: Kaan (ydnka)
