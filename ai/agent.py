@@ -32,6 +32,8 @@ from config import DATA_DIR
 from engine import baseline, compare, data, impact
 
 MAX_ROUNDS = 6
+# GLM-5.3-Flash reasons before it answers; a small budget can end with no visible answer (model handbook)
+MAX_TOKENS = 4096
 
 SYSTEM = """You are the IR analyst inside the Issuer Intelligence Hub, a Deutsche Boerse Issuer Services tool.
 You help the investor-relations team of a listed company understand how its share trades on Xetra.
@@ -332,7 +334,7 @@ def _run_llm(question, isin, history, context, lang):
     msgs.append({"role": "user", "content": question})
     steps, actions, outputs, text = [], [], [], ""
     for _ in range(MAX_ROUNDS):
-        msg = llm.chat(msgs, tools=TOOLS, tool_choice="auto", temperature=0.1)
+        msg = llm.chat(msgs, tools=TOOLS, tool_choice="auto", temperature=0.1, max_tokens=MAX_TOKENS)
         calls = getattr(msg, "tool_calls", None) or []
         if not calls:
             text = (msg.content or "").strip()
@@ -351,7 +353,8 @@ def _run_llm(question, isin, history, context, lang):
                 outputs.append(out)
             msgs.append({"role": "tool", "tool_call_id": t.id, "content": json.dumps(out, default=str)[:14000]})
     if not text:  # ran out of rounds: ask once more without tools
-        msg = llm.chat(msgs + [{"role": "user", "content": "Answer now with the data above."}], temperature=0.1)
+        msg = llm.chat(msgs + [{"role": "user", "content": "Answer now with the data above."}], temperature=0.1,
+                       max_tokens=MAX_TOKENS)
         text = (msg.content or "").strip()
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
     return {"text": text, "source": "llm", "model": llm.model_name(), "steps": steps, "actions": actions,
