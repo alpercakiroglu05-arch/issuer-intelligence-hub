@@ -33,6 +33,16 @@ their JSON and answers; `show` becomes a one-click button in the UI (open card, 
 checked against the tool outputs (`ai/checks.py`) and the result is shown under the answer. Causes come only from the event calendar.
 Answers are cached in `data/agent_cache.json` for the live demo (`LLM_CACHE`).
 
+## Offline copy to share
+
+```bash
+python web/snapshot.py          # -> ~/Desktop/Issuer-Intelligence-Hub.html (EVD, EVT, HDD; ~2.5 MB)
+```
+
+One HTML file that opens with a double click, without Python or `data/`. It contains the answers for the showcase shares
+(dashboards, every impact card, comparisons, AI summaries, the analyst's suggested questions). `--llm` writes the AI texts
+with the model in `.env`. It contains processed Deutsche Börse data: share it inside the team only, never commit it.
+
 ## Files
 
 | File | What |
@@ -40,7 +50,8 @@ Answers are cached in `data/agent_cache.json` for the live demo (`LLM_CACHE`).
 | `server.py` | static files + `/api/universe`, `/api/issuer`, `/api/card`, `/api/compare`, `/api/status`, `POST /api/calendar`, `POST /api/narrate`, `POST /api/agent`, `POST /api/ask` |
 | `index.html` | shell: ISIN entry (gate) and the company workspace |
 | `app.css` | DB tokens (navy `#000099`, sky `#0099ff`, News Gothic → Archivo), layout, transitions |
-| `app.js` | pages, charts (hand-written SVG), AI numbers check, report builder |
+| `app.js` | pages, charts (hand-written SVG), AI numbers check, report builder, analyst dock |
+| `snapshot.py` | builds the offline single-file copy |
 
 ## Demo path
 

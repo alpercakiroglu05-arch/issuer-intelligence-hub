@@ -26,3 +26,6 @@ Thumbs.db
 .vscode/
 .idea/
 .streamlit/secrets.toml
+
+# offline snapshot (web/snapshot.py) contains processed data
+Issuer-Intelligence-Hub*.html
