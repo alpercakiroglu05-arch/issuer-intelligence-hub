@@ -1,6 +1,38 @@
-# UI design: the market seismograph (C3)
+# UI design (C3)
 
-Mockup: open `docs/design/ui-mockup.html` in a browser. It has five tabs and works offline except for the web fonts.
+There are two mockups. Open either one in a browser; both work offline except for the web fonts.
+
+| File | Look | Use it for |
+|---|---|---|
+| `docs/design/ui-mockup-db.html` | **Deutsche Börse family look** (recommended for the demo) | It sits inside DB's web family, so the jury sees a module of the Issuer Services Hub, not a foreign tool. |
+| `docs/design/ui-mockup.html` | Market seismograph | The concept and the pitch line ("a seismograph for listed companies"). |
+
+## Variant B: Deutsche Börse family look (`ui-mockup-db.html`)
+
+Tokens were measured on deutsche-boerse.com (11 Nov 2026) so the module does not stand out on a DB page:
+
+| Token | Value | Where on DB's site |
+|---|---|---|
+| Navy | `#000099` | section headings (uppercase, bold) |
+| Sky | `#0099ff` | pill buttons with →, links, side dock |
+| Body text | `#404040`, 16–17 px | everywhere |
+| Tile | `#f5f5f5`, square corners | "Aktuelle Themen" tiles |
+| Font | News Gothic (fallback: Archivo at 88 % width) | everywhere |
+| Tables | thin grey rules, ↑ ↗ → ↘ ↓ arrows | "Marktindikatoren", "Gewinner/Verlierer" |
+
+Small upgrades on top of the DB look:
+
+- **Page transitions:** View Transitions API. The navy band morphs between the tall hero and the short page header, the title slides up, and the nav indicator glides to the new tab.
+- **One orchestrated moment per page:** lines draw in, turnover bars rise as a wave, the abnormal return and magnitude count up, and annotations appear in order (open → onset → low → closing auction → close).
+- **Header** shrinks on scroll. A live CET clock sits in the utility bar, as on DB's site.
+- **Side dock** (Export / Ask / Search) mirrors DB's Tools / Folgen / Kontakt dock.
+- **⌘K search** across pages, issuers and events. Keys `1`–`5` switch pages and `E` opens the export.
+- **Locale-aware numbers:** EN `−23.2%`, `€25.8m`; DE `−23,2 %`, `25,8 Mio. €`. There is also a separate DE/EN switch for the board note.
+- **Export dialog:** A4 IR snapshot with section toggles and DE/EN; it prints to PDF.
+
+Colour rule: green and red are used only for returns. Everything else uses navy and sky.
+
+## Variant A: the market seismograph (`ui-mockup.html`)
 Values marked with **°** in the mockup are placeholders until the engine provides them. All other numbers are real (EVD, 27 Mar 2026, see `CLAUDE.md`).
 
 ## Concept
