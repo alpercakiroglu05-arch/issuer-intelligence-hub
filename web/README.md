@@ -30,7 +30,8 @@ Without a key, the AI summary and the analyst use deterministic templates over t
 `ai/agent.py` gives the model nine tools over the engine (`company_overview`, `peer_benchmark`, `trading_cost_curve`,
 `unusual_days`, `event_calendar`, `impact_card`, `compare_events`, `find_company`, `show`). The model picks the tools, reads
 their JSON and answers; `show` becomes a one-click button in the UI (open card, compare, report). Every number in the answer is
-checked against the tool outputs (`ai/checks.py`) and the result is shown under the answer. Causes come only from the event calendar.
+checked against the tool outputs (`ai/checks.py`); an answer with an unverified figure is replaced by the deterministic
+answer from the same tools (the dock then says "template"). Causes come only from the event calendar.
 Answers are cached in `data/agent_cache.json` for the live demo (`LLM_CACHE`).
 
 ## Files

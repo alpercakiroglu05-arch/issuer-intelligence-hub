@@ -127,7 +127,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] `agent.py` v2 with tool calling over the engine (Alper, PR #36)
 - [x] **Meaning check** ("the share fell X %" must be the share's own move) and one rank text everywhere (Kaan, PR #38); German short dates and English thousands understood by the numbers check (PR #40)
 - [x] **Cache warm-up** `python web/warm_cache.py` (PR #37): summaries + assistant answers; run after any prompt, card or engine change
-- [ ] Decide: should an assistant answer that fails the numbers check fall back to the deterministic answer (like the card summary) instead of showing a warning?
+- [x] Assistant answers that fail the numbers check fall back to the deterministic answer, the same rule as the card summary
 
 ### Non-code (research and pitch team)
 - **Please spot-check the hero rows of `events/events.csv`** (source link, time) before the pitch.

@@ -9,12 +9,14 @@ prompt glossary from the v1 dry run with the live JAIF model).
         steps     [{"tool", "args"}]  engine functions that produced the numbers, in order
         actions   [{"view", "isin", "day", "event_id", "event_type", "index"}]  buttons the UI shows
         check     {"total", "unsupported": [...]}  numbers check of the answer against the tool outputs
+        rejected  figures of a model answer that failed the check (then text/source are the deterministic answer)
     ask(question, isin) -> str   v1 signature, kept for the Streamlit page
 
 How it works: the model gets the TOOLS below (OpenAI function calling, works with the JAIF / hessian.AI
 gateway). It decides which engine functions to call, reads their JSON and writes the answer. It never sees
 raw data and never computes figures itself: every number must come from a tool output, which ai/checks.py
-verifies after the fact. Causes come only from the event calendar (events.csv, with sources).
+verifies after the fact; an answer with an unverified figure is replaced by the deterministic answer (same rule
+as the card summary). Causes come only from the event calendar (events.csv, with sources).
 Without a key, or if the model fails, a deterministic router answers from the same tools, so the demo
 never breaks. Answers are cached in data/agent_cache.json (LLM_CACHE, same switch as ai/llm.py).
 """
@@ -368,6 +370,18 @@ def _run_llm(question, isin, history, context, lang):
             "check": _check(text, outputs, question, context)}
 
 
+def _checked(out: dict, question: str, isin: str, context, lang: str) -> dict:
+    """Same rule as the card summary: a model answer with a figure that is not in the tool outputs is not shown;
+    the deterministic answer from the same tools is shown instead, and `rejected` says which figures failed."""
+    bad = (out.get("check") or {}).get("unsupported") or []
+    if not bad:
+        return out
+    fb = fallback(question, isin, context, lang)
+    fb["rejected"] = bad
+    fb["note"] = f"model answer not shown: {len(bad)} figure(s) not in the engine output ({', '.join(bad[:3])})"
+    return fb
+
+
 def run(question: str, isin: str, history=(), context=None, lang: str = "en") -> dict:
     question = str(question or "").strip()[:1000]
     if not question:
@@ -376,13 +390,13 @@ def run(question: str, isin: str, history=(), context=None, lang: str = "en") ->
         key = hashlib.sha256(json.dumps([llm.model_name(), question, isin, context, lang, list(history or [])[-6:]],
                                         sort_keys=True, default=str).encode()).hexdigest()
         if _cache_on() and (hit := _cache(key)):
-            return hit
+            return _checked(hit, question, isin, context, lang)
         try:
             out = _run_llm(question, isin, history, context, lang)
             if out["text"]:
                 if _cache_on():
                     _cache(key, out)
-                return out
+                return _checked(out, question, isin, context, lang)
         except Exception as e:  # noqa: BLE001  network, quota, model without tool support -> template
             fb = fallback(question, isin, context, lang)
             fb["note"] = f"model error: {type(e).__name__}"
