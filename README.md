@@ -84,7 +84,7 @@ futury-build-days-2026/
 
 Everyone works on their own files, so merge conflicts are rare. Contracts between modules are fixed (see below).
 
-### C1 · Data. Owner: Oguzhan (`Bthn28`) + Claude
+### C1 · Data. Owner: Oguzhan
 - [x] `ingest/build_intraday.py`: 1-min bars for EVD, EVT, HDD, GXI (163k bars)
 - [x] Sanity check: daily sum of bars = `turnover_eur` (ratio 1.000 on all 213 days × 4 stocks)
 - [x] News onset (`engine/onset.py`, PR #5): "the market started pricing the news at HH:MM" on the card; infers the timing when the announcement time is unknown; lists volatility interruptions
