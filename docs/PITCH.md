@@ -41,4 +41,4 @@
 - **What exists already, and why is this better?** The monthly Stock Report (PDF/Excel) and terminals. One lags, the other needs licences and analysts. We are on demand, event-driven and explained.
 - **Where do the reasons come from?** Never from the model. Each event in `events.csv` has a source link, which is shown on the card and in the PDF. Days without company news say so, and the market-context column shows index days and expiries.
 - **How do you know the onset minute is right?** For all 7 releases published during trading hours, the detected onset comes after the release (e.g. 12:00:53 → 12:02). For 33 of 39 events with a published time, the timing inferred from trading matches the release time.
-- **Why not market cap for "size"?** It is not in the data excerpt. We use turnover terciles as a size proxy and say so on screen.
+- **Why not market cap for "size"?** It is not in the data excerpt. We use the 10 stocks closest in turnover as a size proxy and say so on screen.

@@ -76,7 +76,7 @@ def test_part_a_de_summary_uses_engine_numbers():
 def test_part_a_states_peer_group():
     from report.export import part_a_html
     h = part_a_html(_isin("HDD"), "en", peer_by="size")
-    assert "compared with Turnover cohort (size proxy)" in h
+    assert "compared with Similar size" in h
 
 
 @needs_data

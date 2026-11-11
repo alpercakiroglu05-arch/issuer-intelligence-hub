@@ -154,7 +154,7 @@ function resolveGate() {
 }
 async function openIsin(isin, {fromGate = true, then = null} = {}) {
   const u = U(isin); if (!u) return;
-  const steps = [L("Reading 213 trading days on Xetra", "213 Xetra-Handelstage werden gelesen"), L("Benchmarking against index, size cohort and sector", "Vergleich mit Index, Größenklasse und Sektor"),
+  const steps = [L("Reading 213 trading days on Xetra", "213 Xetra-Handelstage werden gelesen"), L("Benchmarking against index, similar-size stocks and sector", "Vergleich mit Index, ähnlich großen Aktien und Sektor"),
     L("Finding unusual days and matching the event calendar", "Auffällige Tage finden und mit dem Kalender abgleichen"), L("Preparing your dashboard", "Ihr Dashboard wird vorbereitet")];
   let timer;
   if (fromGate) {
@@ -396,7 +396,7 @@ function cardHTML(d) {
     : (String(row.verified) === "1" ? L("✓ Date and time verified against the source", "✓ Datum und Uhrzeit mit der Quelle geprüft") : L("Source not yet verified", "Quelle noch nicht geprüft"));
   const pct = (t, x, med) => `<div class="pct-row"><span>${t}</span><span class="trk"><i class="barx" style="width:${(x || 0) * 100}%"></i>${isN(med) ? "" : ""}</span><b class="nt">${isN(x) ? Math.floor(x * 100) + "%" : NA}</b></div>`;
   const cmpBlock = cm ? `<div><div class="big-cap">${L("How it ranks", "Einordnung")}</div>
-      <p style="margin:0 0 10px;font-size:15px">${L(`#${cm.rank_abs_abn_ret} of ${cm.n} ${cm.group_type === "NOTABLE_DAY" ? "unusual days" : TYPE(cm.group_type)} (${cm.group_index}). Bigger than:`, `Rang ${cm.rank_abs_abn_ret} von ${cm.n} ${cm.group_type === "NOTABLE_DAY" ? "auffälligen Tagen" : TYPE(cm.group_type)} (${cm.group_index}). Größer als:`)}</p>
+      <p style="margin:0 0 10px;font-size:15px">${L(`Rank ${cm.rank_abs_abn_ret} of ${cm.n + 1} ${cm.group_type === "NOTABLE_DAY" ? "unusual days" : TYPE(cm.group_type)} (${cm.group_index}, this day included). Bigger than:`, `Rang ${cm.rank_abs_abn_ret} von ${cm.n + 1} ${cm.group_type === "NOTABLE_DAY" ? "auffälligen Tagen" : TYPE(cm.group_type)} (${cm.group_index}, inkl. dieses Tages). Größer als:`)}</p>
       ${pct(L("Stock-specific move", "Titelspezifische Bewegung"), cm.abs_abn_ret_pctile)}${pct(L("Turnover vs normal", "Umsatz vs. normal"), cm.vol_ratio_pctile)}${pct(L("Trading cost vs normal", "Handelskosten vs. normal"), cm.xlm_ratio_pctile)}
       <button class="link" data-act="cmpthis" data-type="${esc(cm.group_type)}" data-index="${esc(cm.group_index)}" style="margin-top:8px">${L("See all of them", "Alle ansehen")} ${ARR}</button></div>` : `<div class="m">${L("No comparison group yet.", "Noch keine Vergleichsgruppe.")}</div>`;
   const mini = (val, base, max) => isN(val) && isN(base) ? `<div class="mini"><i class="barx" style="width:${Math.min(100, val / max * 100)}%"></i><em style="left:${Math.min(100, base / max * 100)}%" data-tip="${enc(L("normal", "normal"))}"></em></div>` : "";

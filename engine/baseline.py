@@ -9,7 +9,7 @@ Part A - the "normal state" of a stock.  OWNER: C2 (engine).  STATUS: v1 works.
     anomaly_episodes(isin)     consecutive unusual days merged into one episode
     market_context(isin, day)  index / calendar / market-wide flags of a day (CONTEXT_HELP explains them)
 
-Peer groups (index / sector / turnover cohort as size proxy) come from engine.compare.peer_group.
+Peer groups (index / sector / similar size) and their medians come from engine.compare.peer_medians.
 """
 from functools import lru_cache
 
@@ -18,7 +18,7 @@ import pandas as pd
 
 from config import (ANOMALY_Z, DS_LOOKBACK_DAYS, DS_TURNOVER_MIN_EUR, DS_XLM_MAX_BPS, LIQUIDITY_TREND_TOL,
                     MARKET_WIDE_SHARE, MARKET_WIDE_VOL_RATIO, MIN_PEER_GROUP)
-from engine.compare import peer_group
+from engine.compare import peer_group, peer_medians
 from engine.data import daily, events, stock
 
 PROFILE_COLS = [
@@ -137,33 +137,27 @@ def kpis(isin: str, days: int = 60) -> dict:
     s = stock(isin)
     idx = s["idx_latest"].iloc[-1]
     recent = s.tail(days)
-    d = daily()
-    peers = d[(d["idx_latest"] == idx) & (d["date"] >= recent["date"].min())]
-    peer_med = peers.groupby("isin")[["turnover_eur", "xlm_25k", "auction_share", "agent_share"]].median().median()
 
     lookback = s.tail(DS_LOOKBACK_DAYS)
     avg_turnover = float(lookback["turnover_eur"].mean())
     xlm = float(lookback["xlm_25k"].median())
     category = "A" if (xlm <= DS_XLM_MAX_BPS and avg_turnover >= DS_TURNOVER_MIN_EUR) else "B"
 
-    # Sector and turnover-cohort (size proxy) medians, computed like the index median (group incl. the stock)
-    kcols = ["turnover_eur", "xlm_25k", "auction_share", "agent_share"]
-    groups = {by: peer_group(isin, by) for by in ("index", "sector", "size")}
-    group_med = {}
-    for by in ("sector", "size"):
-        g = groups[by]
-        members = d[d["isin"].isin(g["isins"] + [isin]) & (d["date"] >= recent["date"].min())]
-        group_med[by] = members.groupby("isin")[kcols].median().median()
+    # Index, sector and size medians: the one peer benchmark (engine.compare.peer_medians), same as web and report
+    pm = peer_medians(isin, days)
+    groups = pm["groups"]
     flags = ["small_peer_group"] if any(g["n"] < MIN_PEER_GROUP for g in groups.values()) else []
     if groups["sector"]["fallback"]:
         flags.append("no_sector")  # sector unknown -> the sector median is the index median
 
-    def _num(v):
-        return None if pd.isna(v) else float(v)
+    def med(by, col):
+        v = groups[by]["values"]
+        return None if not v else v[col]
 
     def pair(col):
-        return {"stock": float(recent[col].median()), "index_median": float(peer_med[col]),
-                "sector_median": _num(group_med["sector"][col]), "size_median": _num(group_med["size"][col])}
+        stock_v = pm["stock"][col]
+        return {"stock": float(recent[col].median()) if stock_v is None else stock_v,
+                "index_median": med("index", col), "sector_median": med("sector", col), "size_median": med("size", col)}
 
     return {
         "isin": isin, "ticker": s["ticker"].iloc[-1], "name": s["name"].iloc[-1], "index": idx,

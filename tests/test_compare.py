@@ -180,14 +180,41 @@ def test_size_cohorts_are_terciles():
 
 
 @needs_data
-def test_size_peers_same_cohort():
-    from engine.compare import peer_group, size_cohort, size_peers
+def test_size_peers_are_the_closest_by_turnover():
+    import numpy as np
+    from config import SIZE_PEERS_N
+    from engine.compare import peer_group, size_peers, stock_medians
     from engine.data import isin_of
-    sap = isin_of("SAP")
-    assert size_cohort(sap) == "large"
-    assert sap not in size_peers(sap)
-    assert {size_cohort(p) for p in size_peers(sap)} == {"large"}
-    assert peer_group(sap, "size")["label"] == "Turnover cohort (size proxy): large"
+    evd = isin_of("EVD")
+    peers = size_peers(evd)
+    assert len(peers) == SIZE_PEERS_N and evd not in peers
+    assert peer_group(evd, "size")["label"] == f"Similar size: {SIZE_PEERS_N} closest by turnover"
+    to = stock_medians()["turnover_eur"]
+    dist = (np.log(to.drop(evd)[to.drop(evd) > 0]) - np.log(to[evd])).abs()
+    assert dist[peers].max() <= dist.drop(peers).min()   # nobody outside the group is closer
+
+
+@needs_data
+def test_one_peer_benchmark_for_web_streamlit_and_report():
+    """Web API, kpis() (Streamlit, assistant) and the Part A report read the same numbers (engine.peer_medians)."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "web"))
+    import server
+    from engine.baseline import kpis
+    from engine.compare import peer_medians
+    from engine.data import isin_of
+    for t in ("EVD", "HDD", "SAP"):
+        i = isin_of(t)
+        pm, k, web = peer_medians(i), kpis(i), server.peers(i)
+        webg = {g["key"]: g for g in web["groups"]}
+        for by in ("index", "sector", "size"):
+            assert k["peer_groups"][by]["n"] == pm["groups"][by]["n"] == webg[by]["n"]
+            for col, kcol in (("turnover_eur", "median_turnover_eur"), ("xlm_25k", "median_xlm_25k_bps")):
+                v = pm["groups"][by]["values"][col]
+                assert k[kcol][f"{by}_median"] == v
+                assert abs(webg[by]["values"][col] - v) <= 1e-3 * max(1.0, abs(v))
+        assert abs(web["stock"]["turnover_eur"] - k["median_turnover_eur"]["stock"]) <= 1
 
 
 @needs_data

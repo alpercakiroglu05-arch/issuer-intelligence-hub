@@ -116,9 +116,10 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 - **Causes:** the data shows *what* happened, not *why*. Reasons come only from the linked public sources. Some unusual days have no company news, and we say so.
 - **Intraday peers:** the onset uses the raw price move because there are no intraday peer prices. A market-wide move can also trigger it.
 - **Event times:** the 80 events were researched with AI-assisted web search, and every row has its source link. 17 have no published time, and 7 DAX times are pre-announced dpa-AFX slots (marked in the title).
-- **Peer groups:** the dashboard engine compares a stock with three groups: its index, its sector, and its turnover cohort.
+- **Peer groups:** the dashboard engine compares a stock with three groups: its index, its sector, and the stocks of similar size.
   - **Sector:** 11 groups built from Deutsche Börse's official Prime Standard sectors (`events/sectors.csv`, 173 of 174 stocks; the last one falls back to the index).
-  - **Turnover cohort:** a size proxy, the top, middle or bottom third by median turnover over the last 60 days.
+  - **Similar size:** the 10 stocks closest in median turnover over the last 60 days (a size proxy).
+  - Every screen, the report and the assistant use one peer benchmark (median over the peers of each peer's 60-day median).
   - Market capitalisation is not in the data, so the size groups are turnover-based, not market-cap-based.
   - The impact card's abnormal return still uses index peers.
 - **AI text:** the numbers check catches invented figures with decimals or large values; a small integer could match an unrelated value by chance. Without a model key the texts come from templates.
