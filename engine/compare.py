@@ -37,7 +37,7 @@ PCTILE_COLS = {"abs_abn_ret": "Stock-specific move (abs.)", "vol_ratio": "Turnov
                "xlm_ratio": "Trading cost vs normal"}
 TABLE_COLS = ["ticker", "name", "index", "type", "reaction_day", "title", "ret", "abn_ret", "abs_abn_ret",
               "abn_ret_z", "gap_open", "car_0_5", "vol_ratio", "xlm_ratio", "auction_share",
-              "auction_share_delta", "agent_aggr_imbalance", "isin", "event_id"]
+              "auction_share_delta", "agent_aggr_imbalance", "isin", "event_id", "context"]
 
 
 @lru_cache(maxsize=1)
@@ -91,6 +91,8 @@ def same_type_events(event_type: str, index: str | None = None) -> pd.DataFrame:
             left_on=["isin", "reaction_day"], right_on=["isin", "date"], how="inner")
     if index:
         t = t[t["index"] == index]
+    from engine.baseline import context_frame  # imported here, not at the top: baseline imports compare
+    t = t.assign(context=context_frame(t[["isin", "reaction_day"]].rename(columns={"reaction_day": "date"})))
     return t[TABLE_COLS].sort_values("reaction_day", ascending=False).reset_index(drop=True)
 
 

@@ -20,7 +20,7 @@ def test_anomalies_empty_for_quiet_stock():
     a = anomalies(isin_of(HERO_TICKERS[0]), z=1e9)     # threshold nothing can reach
     assert a.empty
     assert list(a.columns) == ["date", "ret", "abn_ret", "vol_ratio", "vol_z", "abn_ret_z",
-                               "xlm_25k_ratio", "reason", "severity"]
+                               "xlm_25k_ratio", "reason", "severity", "context"]
 
 
 @needs_data
@@ -181,3 +181,90 @@ def test_liquidity_trend_vs_sector_hdd():
     t = liquidity_trend(isin_of("HDD"))
     assert t["sector"] == "Industrials" and t["vs_sector"] == "stock-specific"
     assert t["sector_xlm_25k_change_pct"] is not None and t["sector_turnover_change_pct"] is not None
+
+
+# ---------- market context: index days, expiries, review dates, market-wide days ----------
+@needs_data
+def test_context_evd_msci_deletion_day():
+    """EVD 31 Aug 2026: MSCI Germany deletion (events.csv type INDEX), volume 19x, price only -1.8%."""
+    from engine.baseline import market_context
+    from engine.data import isin_of
+    c = market_context(isin_of("EVD"), "2026-08-31")
+    assert c[0] == "index_event"                                   # most reliable source first
+    assert "month_end_review" in c                                  # last trading day of August
+
+
+@needs_data
+@pytest.mark.parametrize("day", ["2026-03-20", "2026-06-19", "2026-09-18"])
+def test_context_quarterly_expiry(day):
+    from engine.baseline import market_context
+    from engine.data import isin_of
+    c = market_context(isin_of("EVD"), day)
+    assert "quarterly_expiry" in c and "monthly_expiry" not in c
+    assert "market_wide_volume" in c                                # these were the busiest days of 2026
+
+
+@needs_data
+def test_context_monthly_expiry_and_plain_days():
+    from engine.baseline import market_context
+    from engine.data import isin_of
+    evd = isin_of("EVD")
+    assert market_context(evd, "2026-04-17") == ["monthly_expiry"]
+    assert market_context(evd, "2026-04-16") == []
+
+
+@needs_data
+def test_context_real_news_day_has_no_calendar_flag():
+    """EVD 27 Mar 2026 (real company news, -23%): no index, calendar or market-wide flag."""
+    from engine.baseline import market_context
+    from engine.data import isin_of
+    assert market_context(isin_of("EVD"), "2026-03-27") == []
+
+
+@needs_data
+def test_context_index_change_gxi():
+    """Gerresheimer left the SDAX after 9 Apr: the daily index lists change on 10 Apr."""
+    from engine.baseline import market_context
+    from engine.data import isin_of
+    gxi = isin_of("GXI")
+    assert "index_change" in market_context(gxi, "2026-04-10")
+    assert "index_event" in market_context(gxi, "2026-04-08")      # STOXX announcement in events.csv
+
+
+@needs_data
+def test_anomalies_and_episodes_have_context_column():
+    from engine.baseline import CONTEXT_FLAGS, anomalies, anomaly_episodes
+    from engine.data import isin_of
+    evd = isin_of("EVD")
+    a = anomalies(evd)
+    assert list(a.columns)[-1] == "context" and list(a.columns)[-3:-1] == ["reason", "severity"]
+    day = a.set_index("date").loc[pd.Timestamp("2026-08-31")]
+    assert day["reason"] == "volume spike" and day["context"].startswith("index_event")
+    assert a.set_index("date").loc[pd.Timestamp("2026-03-27"), "context"] == ""
+    e = anomaly_episodes(evd)
+    assert list(e.columns)[-1] == "context"
+    flags = {f for c in e["context"] for f in c.split(", ") if f}
+    assert flags <= set(CONTEXT_FLAGS)
+
+
+def test_context_help_covers_every_flag():
+    from engine.baseline import CONTEXT_FLAGS, CONTEXT_HELP
+    assert set(CONTEXT_HELP) == set(CONTEXT_FLAGS)
+    assert "possible" in CONTEXT_HELP["month_end_review"]
+    assert all(len(v) > 30 for v in CONTEXT_HELP.values())
+
+
+def test_expiry_moves_to_previous_trading_day_on_holiday(monkeypatch):
+    """Synthetic calendar: if the third Friday is not a trading day, the expiry flag goes to the day before."""
+    import engine.baseline as b
+    days = pd.bdate_range("2027-03-01", "2027-04-30").drop(pd.Timestamp("2027-03-19"))  # 3rd Friday of March off
+    fake = pd.DataFrame({"date": days, "isin": "X", "vol_ratio": 1.0})
+    monkeypatch.setattr(b, "daily", lambda: fake)
+    b._calendar_context.cache_clear()
+    try:
+        cal = b._calendar_context()
+        assert cal[pd.Timestamp("2027-03-18")] == ["quarterly_expiry"]
+        assert cal[pd.Timestamp("2027-04-16")] == ["monthly_expiry"]
+        assert not any("month_end_review" in f for f in cal.values())   # no Feb/May/Aug/Nov in range
+    finally:
+        b._calendar_context.cache_clear()
