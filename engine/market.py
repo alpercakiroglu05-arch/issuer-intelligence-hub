@@ -158,7 +158,8 @@ def event_list(isin: str, period: str = "3m") -> list[dict]:
 
 
 def timeline(isin: str, period: str = "3m") -> dict:
-    """Daily turnover, trading cost (XLM 25k) and auction share (rolling median) with the index median."""
+    """Per day: price move since the start of the period (share and index, cumulative), turnover, trading cost
+    (XLM 25k) and auction share (rolling median), each with the index median."""
     dates = window(period)
     idx, _ = _members(isin)
     s = data.stock(isin).set_index("date")
@@ -169,7 +170,11 @@ def timeline(isin: str, period: str = "3m") -> dict:
     def col(series, nd):
         return [_f(series.get(d), nd) for d in dates]
 
+    w = s.reindex(dates)
+    rel = (1 + w["ret"].fillna(0)).cumprod() - 1          # share since the start of the period
+    irel = (1 + w["peer_ret"].fillna(0)).cumprod() - 1    # equal-weighted other index members, same start
     return {"date": [str(d.date()) for d in dates],
+            "price_rel": col(rel, 5), "index_rel": col(irel, 5),
             "turnover_eur": col(s["turnover_eur"], 0), "index_turnover_eur": col(bench["turnover_eur"], 0),
             "xlm_25k": col(s["xlm_25k"], 2), "index_xlm_25k": col(bench["xlm_25k"], 2),
             "auction_share": col(roll, 4), "index_auction_share": col(iroll, 4),

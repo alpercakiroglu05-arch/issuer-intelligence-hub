@@ -13,7 +13,7 @@ const Q = new URLSearchParams(location.search);
 const S = {
   lang: Q.get("lang") === "de" ? "de" : "en", isin: Q.get("isin"), period: ["3m", "6m", "all"].includes(Q.get("period")) ? Q.get("period") : "3m",
   view: ["card", "compare", "how"].includes(Q.get("view")) ? Q.get("view") : "dash", day: Q.get("day"), ev: Q.get("ev"),
-  metric: "turnover", cmp: {type: Q.get("type") || "NOTABLE_DAY", index: Q.get("index") || "ALL"},
+  metric: "price", cmp: {type: Q.get("type") || "NOTABLE_DAY", index: Q.get("index") || "ALL"},
   uni: [], status: {}, claim: null, more: false, chat: [], busy: false, addEv: false, calMsg: "",
 };
 const de = () => S.lang === "de";
@@ -118,57 +118,68 @@ function choose(isin) { S.isin = isin; S.view = "dash"; S.day = S.ev = null; S.c
 /* ---------- first visit ---------- */
 function firstVisit() {
   const ex = S.uni.filter(u => u.example !== null && u.example !== undefined).sort((a, b) => a.example - b.example);
-  return `<div class="wrap empty"><h1>${L("How does your share trade?", "Wie handelt Ihre Aktie?")}</h1>
+  return `<div class="hero tall"><div class="wrap empty"><h1>${L("How does your share trade?", "Wie handelt Ihre Aktie?")}</h1>
     <p class="sub" style="font-size:16px">${L("Pick your company. You get the normal state, the market comparison, and an impact card for every announcement.", "Wählen Sie Ihr Unternehmen. Sie sehen den Normalzustand, den Marktvergleich und eine Impact Card zu jeder Meldung.")}</p>
     <div class="chips">${ex.map(u => `<button class="chip" data-isin="${u.isin}">${esc(u.display)} · ${esc(u.index)}</button>`).join("")}</div>
-    <p class="note">${L(`${S.uni.length} DAX, MDAX and SDAX shares · Xetra data to ${F.day(S.status.last_date, true)}`, `${S.uni.length} Aktien aus DAX, MDAX und SDAX · Xetra-Daten bis ${F.day(S.status.last_date, true)}`)}</p></div>`;
+    <p class="note">${L(`${S.uni.length} DAX, MDAX and SDAX shares · Xetra data to ${F.day(S.status.last_date, true)}`, `${S.uni.length} Aktien aus DAX, MDAX und SDAX · Xetra-Daten bis ${F.day(S.status.last_date, true)}`)}</p></div></div>`;
 }
 
 /* ---------- dashboard ---------- */
+const FAM = t => ["FY", "Q1", "H1", "Q3"].includes(t) ? "#0a84ff" : ["ADHOC", "GUIDANCE"].includes(t) ? "#ff7a00" : t === "INDEX" ? "#8e5cf0" : t === "UNUSUAL_DAY" ? "#ff375f" : "#00a3a3";
+function spark(arr, color) {
+  const v = arr.filter(isN); if (v.length < 2) return ""; const lo = Math.min(...v), hi = Math.max(...v), W = 140, H = 36, n = arr.length;
+  const pts = arr.map((x, k) => isN(x) ? `${(k / (n - 1) * W).toFixed(1)},${(H - 3 - (x - lo) / (hi - lo || 1) * (H - 6)).toFixed(1)}` : null).filter(Boolean).join(" ");
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
+}
 function timelineSVG(d) {
-  const tl = d.timeline, n = tl.date.length, W = 1040, H = 300, ml = 56, mr = 12, mt = 72, mb = 24, pw = W - ml - mr, ph = H - mt - mb;
-  const M = {turnover: ["turnover_eur", "index_turnover_eur", v => F.eur(v)], cost: ["xlm_25k", "index_xlm_25k", v => F.bps(v)], auction: ["auction_share", "index_auction_share", v => F.share(v)]}[S.metric];
-  const a = tl[M[0]], b = tl[M[1]], max = Math.max(...a.filter(isN), ...b.filter(isN), 0) * 1.08 || 1;
-  const x = i => ml + (i + .5) * pw / n, y = v => mt + ph - v / max * ph, bw = Math.max(1.5, pw / n * .62);
+  const tl = d.timeline, n = tl.date.length, W = 1040, H = 340, ml = 56, mr = 14, mt = 78, mb = 26, pw = W - ml - mr, ph = H - mt - mb;
+  const M = {price: ["price_rel", "index_rel", v => F.pct(v, 0)], turnover: ["turnover_eur", "index_turnover_eur", v => F.eur(v)], cost: ["xlm_25k", "index_xlm_25k", v => F.bps(v)], auction: ["auction_share", "index_auction_share", v => F.share(v)]}[S.metric];
+  const a = tl[M[0]], b = tl[M[1]], all = a.concat(b).filter(isN), price = S.metric === "price";
+  let lo = price ? Math.min(0, ...all) : 0, hi = Math.max(0, ...all); const pad = (hi - lo) * .08 || 1; hi += pad; if (lo < 0) lo -= pad;
+  const x = i => ml + (i + .5) * pw / n, y = v => mt + ph - (v - lo) / (hi - lo) * ph, bw = Math.max(1.5, pw / n * .62);
   const path = arr => arr.map((v, i) => isN(v) ? `${i && isN(arr[i - 1]) ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}` : "").join("");
-  let g = [0, .5, 1].map(f => `<line x1="${ml}" x2="${W - mr}" y1="${y(max * f / 1.08)}" y2="${y(max * f / 1.08)}" stroke="#e8e8ed"/><text x="${ml - 8}" y="${y(max * f / 1.08) + 4}" text-anchor="end" font-size="11" fill="#86868b">${f ? M[2](max * f / 1.08) : "0"}</text>`).join("");
+  let g = `<defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a84ff" stop-opacity=".30"/><stop offset="1" stop-color="#0a84ff" stop-opacity="0"/></linearGradient><linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5e5ce6"/><stop offset="1" stop-color="#0a84ff"/></linearGradient></defs>`;
+  g += [0, .5, 1].map(f => { const val = lo + (hi - pad - lo) * f, Y = y(val); return `<line x1="${ml}" x2="${W - mr}" y1="${Y}" y2="${Y}" stroke="#ececf1"/><text x="${ml - 8}" y="${Y + 4}" text-anchor="end" font-size="11" fill="#86868b">${M[2](val)}</text>`; }).join("");
+  if (price) g += `<line x1="${ml}" x2="${W - mr}" y1="${y(0)}" y2="${y(0)}" stroke="#c7c7cc"/>`;
   const step = Math.max(1, Math.round(n / 6));
   g += tl.date.map((dt, i) => i % step === 0 ? `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#86868b">${F.day(dt)}</text>` : "").join("");
-  g += S.metric === "turnover" ? a.map((v, i) => isN(v) ? `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(mt + ph - y(v)).toFixed(1)}" rx="1.5" fill="#d2d2d7"><title>${F.day(tl.date[i], true)} · ${M[2](v)}</title></rect>` : "").join("")
-    : `<path d="${path(a)}" fill="none" stroke="#0071e3" stroke-width="1.8"/>`;
-  g += `<path d="${path(b)}" fill="none" stroke="#86868b" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+  if (S.metric === "turnover") g += a.map((v, i) => isN(v) ? `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(mt + ph - y(v)).toFixed(1)}" rx="1.5" fill="url(#gb)"><title>${F.day(tl.date[i], true)} · ${M[2](v)}</title></rect>` : "").join("");
+  else { const ok = a.map((v, i) => isN(v) ? i : -1).filter(i => i >= 0); if (ok.length > 1) g += `<path d="${path(a)}L${x(ok[ok.length - 1]).toFixed(1)},${y(lo).toFixed(1)}L${x(ok[0]).toFixed(1)},${y(lo).toFixed(1)}Z" fill="url(#ga)"/>`; g += `<path d="${path(a)}" fill="none" stroke="#0a84ff" stroke-width="2.4" stroke-linejoin="round"/>`; }
+  g += `<path d="${path(b)}" fill="none" stroke="#86868b" stroke-width="1.4" stroke-dasharray="4 4"/>`;
   const at = new Map(tl.date.map((dt, i) => [dt, i])), lanes = [-1e9, -1e9, -1e9];
-  g += d.events.concat(ownRows(d)).sort((p, q) => p.day.localeCompare(q.day)).map(e => { const i = at.get(e.day); if (i === undefined) return ""; const X = x(i), ev = e.type !== "UNUSUAL_DAY";
-    const label = (SHORT[e.type] || [e.type, e.type])[de() ? 1 : 0] + (isN(e.abn_ret) ? " " + F.pct(e.abn_ret, 0) : ""), w = label.length * 6.4 + 14;
-    let ln = lanes.findIndex(v => X - w / 2 > v + 4); if (ln < 0) ln = 0; lanes[ln] = X + w / 2; const Y = 4 + ln * 20;
-    return `<g class="mk" data-card="${e.day}" data-ev="${esc(e.event_id || "")}"><title>${F.day(e.day, true)} · ${esc(typeL(e.type))}${e.title ? " · " + esc(e.title) : ""}</title><line x1="${X}" x2="${X}" y1="${Y + 16}" y2="${mt + ph}" stroke="${ev ? "#1d1d1f" : "#bf4800"}" stroke-width="1" opacity=".35"/><rect x="${(X - w / 2).toFixed(1)}" y="${Y}" width="${w.toFixed(1)}" height="16" rx="8" fill="${ev ? "#1d1d1f" : "#fff1e6"}"/><text x="${X}" y="${Y + 11.5}" text-anchor="middle" font-size="10.5" font-weight="600" fill="${ev ? "#fff" : "#bf4800"}">${esc(label)}</text></g>`; }).join("");
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L("Trading over time", "Handel im Zeitverlauf")}">${g}</svg>`;
+  g += d.events.concat(ownRows(d)).sort((p, q) => p.day.localeCompare(q.day)).map(e => { const i = at.get(e.day); if (i === undefined) return ""; const X = x(i), col = FAM(e.type);
+    const label = (SHORT[e.type] || [e.type, e.type])[de() ? 1 : 0] + (isN(e.abn_ret) ? " " + F.pct(e.abn_ret, 0) : ""), w = label.length * 6.6 + 16;
+    let ln = lanes.findIndex(v => X - w / 2 > v + 4); if (ln < 0) ln = 0; lanes[ln] = X + w / 2; const Y = 4 + ln * 23;
+    return `<g class="mk" data-card="${e.day}" data-ev="${esc(e.event_id || "")}"><title>${F.day(e.day, true)} · ${esc(typeL(e.type))}${e.title ? " · " + esc(e.title) : ""}</title><line x1="${X}" x2="${X}" y1="${Y + 19}" y2="${mt + ph}" stroke="${col}" stroke-width="1.2" opacity=".45"/><rect x="${(X - w / 2).toFixed(1)}" y="${Y}" width="${w.toFixed(1)}" height="19" rx="9.5" fill="${col}"/><text x="${X}" y="${Y + 13.2}" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">${esc(label)}</text></g>`; }).join("");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L("The period at a glance", "Der Zeitraum auf einen Blick")}">${g}</svg>`;
 }
 const ownRows = d => ownEvents(S.isin).filter(e => e.reaction_day >= d.from && e.reaction_day <= d.to).map(e => ({day: e.reaction_day, published: e.date, time: e.time_local || null, timing: e.timing, event_id: e.event_id, type: e.type, title: e.title, own: true, context: []}));
 function dashboard(d) {
   const t = d.tiles, vm = d.versus_market, idx = d.index, cc = d.cost_curve;
   const cat = d.liquidity_category === "A" ? L("Liquidity category A: no Designated Sponsor needed (estimate)", "Liquiditätskategorie A: kein Designated Sponsor nötig (Schätzung)") : L("Liquidity category B: Designated Sponsor needed (estimate)", "Liquiditätskategorie B: Designated Sponsor nötig (Schätzung)");
   const per = {"3m": L("last 3 months", "letzte 3 Monate"), "6m": L("last 6 months", "letzte 6 Monate"), all: L("since 2 Jan 2026", "seit 2. Jan. 2026")}[d.period];
-  const tile = (k, v, s, c = "") => `<div class="tile"><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
-  const vrow = (name, sv, iv, r) => `<tr><td>${name}</td><td class="r"><b>${sv}</b></td><td class="r">${iv}</td><td class="r">${F.rank(r)}</td></tr>`;
+  const tile = (k, v, s, c = "", sp = "") => `<div class="tile"><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="s">${s}</div>${sp}</div>`, tl = d.timeline;
+  const track = (name, sv, iv, r, c) => `<div class="vs"><div class="k">${name}</div><div class="vs-v ${c}">${sv}</div><div class="s">${esc(idx)}* ${iv}</div><div class="trk"><i style="left:${r.rank && r.of > 1 ? ((r.rank - 1) / (r.of - 1) * 100).toFixed(1) : 50}%"></i></div><div class="trk-l"><span>1</span><b>${F.rank(r)}</b><span>${r.of}</span></div></div>`;
+  const mx = Math.max(.001, ...d.market_days.map(r => Math.abs(r.abn_ret || 0)));
   const grp = Object.values(vm.groups).map(g => `<tr><td>${g.name === "10 closest by turnover" || /closest/.test(g.name) ? L(`Similar size (${g.n} closest by turnover)`, `Ähnliche Größe (${g.n} nächste nach Umsatz)`) : esc(g.name) + ` (${g.n})`}</td><td class="r">${F.eur(g.turnover_eur)}</td><td class="r">${F.bps(g.xlm_25k)}</td></tr>`).join("");
   const rows = d.events.concat(ownRows(d)).sort((a, b) => b.day.localeCompare(a.day));
-  return `<div class="wrap stack">
+  return `<div class="hero"><div class="wrap">
   <section><div class="eyebrow">${esc(d.ticker)} · ${esc(idx)}${d.sector ? " · " + esc(d.sector) : ""} · ${per}</div><h1>${esc(d.name)}</h1>
     <p class="lede">${L(`How the share trades, how it compares with the ${idx}, and what happened around each announcement.`, `Wie die Aktie handelt, wie sie im ${idx}-Vergleich steht und was rund um jede Meldung geschah.`)}</p>
     <div class="meta"><span class="pill-soft">${cat}</span><span class="grey">${d.isin}</span></div>
     <div class="tiles bento">
-      ${tile(L("Turnover per day", "Umsatz pro Tag"), F.eur(t.turnover_eur.stock), L(`${idx} median ${F.eur(t.turnover_eur.index)} · ${F.rank(t.turnover_eur)}`, `${idx}-Median ${F.eur(t.turnover_eur.index)} · ${F.rank(t.turnover_eur)}`))}
-      ${tile(L("Trading cost, €25k order", "Handelskosten, 25-Tsd.-€-Order"), F.bps(t.xlm_25k.stock), L(`${idx} median ${F.bps(t.xlm_25k.index)} · ${F.rank(t.xlm_25k)}`, `${idx}-Median ${F.bps(t.xlm_25k.index)} · ${F.rank(t.xlm_25k)}`))}
-      ${tile(L("Price", "Kurs"), F.pct(t.price.stock), L(`${idx} ${F.pct(t.price.index)} · ${F.rank(t.price)}`, `${idx} ${F.pct(t.price.index)} · ${F.rank(t.price)}`), cls(t.price.stock))}
-      ${tile(L("Unusual days", "Auffällige Tage"), String(t.unusual_days), per)}
+      ${tile(L("Turnover per day", "Umsatz pro Tag"), F.eur(t.turnover_eur.stock), L(`${idx} median ${F.eur(t.turnover_eur.index)} · ${F.rank(t.turnover_eur)}`, `${idx}-Median ${F.eur(t.turnover_eur.index)} · ${F.rank(t.turnover_eur)}`), "", spark(tl.turnover_eur, "#9ecbff"))}
+      ${tile(L("Trading cost, €25k order", "Handelskosten, 25-Tsd.-€-Order"), F.bps(t.xlm_25k.stock), L(`${idx} median ${F.bps(t.xlm_25k.index)} · ${F.rank(t.xlm_25k)}`, `${idx}-Median ${F.bps(t.xlm_25k.index)} · ${F.rank(t.xlm_25k)}`), "", spark(tl.xlm_25k, "#c9b8ff"))}
+      ${tile(L("Price", "Kurs"), F.pct(t.price.stock), L(`${idx} ${F.pct(t.price.index)} · ${F.rank(t.price)}`, `${idx} ${F.pct(t.price.index)} · ${F.rank(t.price)}`), cls(t.price.stock), spark(tl.price_rel, t.price.stock < 0 ? "#ffb38a" : "#8ef0c0"))}
+      ${tile(L("Unusual days", "Auffällige Tage"), String(t.unusual_days), per, "", `<div class="dots">${d.events.filter(e => e.unusual).map(e => `<i style="background:${FAM(e.type)}"></i>`).join("")}</div>`)}
     </div>
-</section>
+</section></div></div>
+<div class="wrap stack">
 
   <section class="card"><div class="sec-h"><h2>${L("The period at a glance", "Der Zeitraum auf einen Blick")}</h2>
-      <div class="seg" role="group">${[["turnover", L("Turnover", "Umsatz")], ["cost", L("Trading cost", "Handelskosten")], ["auction", L("Auction share", "Auktionsanteil")]].map(([v, x]) => `<button data-metric="${v}" aria-pressed="${S.metric === v}">${x}</button>`).join("")}</div></div>
+      <div class="seg" role="group">${[["price", L("Price vs index", "Kurs vs. Index")], ["turnover", L("Turnover", "Umsatz")], ["cost", L("Trading cost", "Handelskosten")], ["auction", L("Auction share", "Auktionsanteil")]].map(([v, x]) => `<button data-metric="${v}" aria-pressed="${S.metric === v}">${x}</button>`).join("")}</div></div>
     <div id="tchart">${timelineSVG(d)}</div>
-    <p class="note">${L(`Every announcement and unusual day of the period, with its stock-specific move. Click one to open its impact card. Dashed: ${idx} median.`, `Jede Meldung und jeder auffällige Tag des Zeitraums mit der titelspezifischen Bewegung. Klick öffnet die Impact Card. Gestrichelt: ${idx}-Median.`)}${S.metric === "auction" ? " " + L("Auction share: 10-day rolling median.", "Auktionsanteil: gleitender 10-Tage-Median.") : ""}${S.metric === "cost" ? " " + L("Trading cost = XLM, the round-trip cost of a €25k order in basis points.", "Handelskosten = XLM, die Kosten für Kauf und Verkauf einer 25-Tsd.-€-Order in Basispunkten.") : ""}</p></section>
+    <p class="note">${L(`Every announcement and unusual day of the period, with its stock-specific move. Click one to open its impact card. Dashed: ${idx}${S.metric === "price" ? " (equal-weighted, not the official index level)" : " median"}.`, `Jede Meldung und jeder auffällige Tag des Zeitraums mit der titelspezifischen Bewegung. Klick öffnet die Impact Card. Gestrichelt: ${idx}${S.metric === "price" ? " (gleichgewichtet, nicht der offizielle Indexstand)" : "-Median"}.`)}${S.metric === "auction" ? " " + L("Auction share: 10-day rolling median.", "Auktionsanteil: gleitender 10-Tage-Median.") : ""}${S.metric === "cost" ? " " + L("Trading cost = XLM, the round-trip cost of a €25k order in basis points.", "Handelskosten = XLM, die Kosten für Kauf und Verkauf einer 25-Tsd.-€-Order in Basispunkten.") : ""}</p></section>
 
   <section class="card"><div class="sec-h"><h2>${L("Events & unusual days", "Ereignisse & auffällige Tage")}</h2>
       ${S.status.offline ? "" : `<button class="btn small" data-act="addev">${L("Add your calendar", "Eigenen Kalender ergänzen")}</button>`}</div>
@@ -178,18 +189,18 @@ function dashboard(d) {
     <div class="scroll"><table><thead><tr><th>${L("Published", "Veröffentlicht")}</th><th>${L("What", "Was")}</th><th class="r">${L("Stock-specific move", "Titelspezifische Bewegung")}</th><th class="r">${L("Turnover vs normal", "Umsatz vs. normal")}</th><th>${L("Market context", "Marktkontext")}</th><th></th></tr></thead><tbody>
     ${rows.length ? rows.map(e => { const ev = e.type !== "UNUSUAL_DAY", next = ev && e.published && e.published !== e.day;
       return `<tr class="go" data-card="${e.day}" data-ev="${esc(e.event_id || "")}"><td style="white-space:nowrap">${F.day(ev ? e.published : e.day)}${e.time ? " · " + esc(e.time) : ""}${next ? `<div class="grey">${L("reaction", "Reaktion")} ${F.day(e.day)}</div>` : ""}</td>
-        <td><span class="tag">${e.own ? L("Own · ", "Eigen · ") : ""}${esc(typeL(e.type))}</span>${e.unusual ? ` <span class="tag warn">${L("unusual", "auffällig")}</span>` : ""}<div>${ev ? esc(e.title) : `<span class="sub">${L("No announcement in the calendar; the data does not show why.", "Keine Meldung im Kalender; die Daten zeigen nicht, warum.")}</span>`}</div></td>
+        <td><span class="tag"><i class="dot" style="background:${FAM(e.type)}"></i>${e.own ? L("Own · ", "Eigen · ") : ""}${esc(typeL(e.type))}</span>${e.unusual ? ` <span class="tag warn">${L("unusual", "auffällig")}</span>` : ""}<div>${ev ? esc(e.title) : `<span class="sub">${L("No announcement in the calendar; the data does not show why.", "Keine Meldung im Kalender; die Daten zeigen nicht, warum.")}</span>`}</div></td>
         <td class="r ${cls(e.abn_ret)}"><b>${e.own ? "" : F.pct(e.abn_ret)}</b></td><td class="r">${e.own ? "" : F.x(e.vol_ratio)}</td><td class="sub">${ctxL(e.context)}</td><td class="r"><a href="#" tabindex="-1">${L("Impact card", "Impact Card")}</a></td></tr>`; }).join("")
       : `<tr><td colspan="6" class="sub">${L("No announcement or unusual day in this period. Choose a longer period.", "Keine Meldung und kein auffälliger Tag in diesem Zeitraum. Längeren Zeitraum wählen.")}</td></tr>`}
     </tbody></table></div>
     <p class="note">${L("Unusual = turnover or stock-specific move far outside the share's own normal, or trading cost at twice normal. Stock-specific move = share minus the other index members.", "Auffällig = Umsatz oder titelspezifische Bewegung weit außerhalb des eigenen Normalbereichs oder doppelte Handelskosten. Titelspezifische Bewegung = Aktie minus andere Indexmitglieder.")}</p></section>
 
   <section class="card"><div class="sec-h"><h2>${L("You vs market", "Sie und der Markt")}</h2><span class="sub">${per} · ${F.day(d.from)} – ${F.day(d.to, true)}</span></div>
-    <div class="scroll"><table><thead><tr><th></th><th class="r">${esc(d.ticker)}</th><th class="r">${esc(idx)}*</th><th class="r">${L(`Rank in ${idx}`, `Rang im ${idx}`)}</th></tr></thead><tbody>
-      ${vrow(L("Price performance", "Kursentwicklung"), `<span class="${cls(vm.price.stock)}">${F.pct(vm.price.stock)}</span>`, F.pct(vm.price.index), vm.price)}
-      ${vrow(L("Turnover per day (median)", "Umsatz pro Tag (Median)"), F.eur(vm.turnover_eur.stock), F.eur(vm.turnover_eur.index), vm.turnover_eur)}
-      ${vrow(L("Trading cost, €25k order (median)", "Handelskosten, 25-Tsd.-€-Order (Median)"), F.bps(vm.xlm_25k.stock), F.bps(vm.xlm_25k.index), vm.xlm_25k)}
-    </tbody></table></div>
+    <div class="vsgrid">
+      ${track(L("Price performance", "Kursentwicklung"), F.pct(vm.price.stock), F.pct(vm.price.index), vm.price, cls(vm.price.stock))}
+      ${track(L("Turnover per day", "Umsatz pro Tag"), F.eur(vm.turnover_eur.stock), F.eur(vm.turnover_eur.index), vm.turnover_eur, "")}
+      ${track(L("Trading cost, €25k order", "Handelskosten, 25-Tsd.-€-Order"), F.bps(vm.xlm_25k.stock), F.bps(vm.xlm_25k.index), vm.xlm_25k, "")}
+    </div>
     <p class="note">* ${L(`Equal-weighted move or median of the other ${idx} members; not the official index level. Rank 1 = best performance, highest turnover, lowest cost.`, `Gleichgewichtete Bewegung bzw. Median der anderen ${idx}-Mitglieder; nicht der offizielle Indexstand. Rang 1 = beste Kursentwicklung, höchster Umsatz, niedrigste Kosten.`)}</p>
     <details><summary>${L("Sector, similar size and cost of larger orders", "Sektor, ähnliche Größe und Kosten größerer Orders")}</summary>
       <div class="scroll"><table style="margin-top:8px"><thead><tr><th>${L("Peer group (median)", "Vergleichsgruppe (Median)")}</th><th class="r">${L("Turnover per day", "Umsatz pro Tag")}</th><th class="r">${L("Trading cost €25k", "Handelskosten 25 Tsd. €")}</th></tr></thead><tbody>${grp}</tbody></table></div>
@@ -198,7 +209,7 @@ function dashboard(d) {
 
   <section class="card"><div class="sec-h"><h2>${L("Big market days", "Große Markttage")}</h2><span class="sub">${L("How did your share move when the whole market moved?", "Wie bewegte sich Ihre Aktie, wenn sich der ganze Markt bewegte?")}</span></div>
     <div class="scroll"><table><thead><tr><th>${L("Day", "Tag")}</th><th class="r">${esc(idx)}*</th><th class="r">${esc(d.ticker)}</th><th class="r">${L("Difference", "Differenz")}</th><th class="r">${L("Turnover vs normal", "Umsatz vs. normal")}</th><th class="r">${L("Trading cost vs normal", "Handelskosten vs. normal")}</th><th></th></tr></thead><tbody>
-    ${d.market_days.map(r => `<tr class="go" data-card="${r.date}"><td>${F.day(r.date)}${r.why === "market_wide_volume" ? ` <span class="tag">${L("market-wide volume", "marktweit hoher Umsatz")}</span>` : ""}</td><td class="r">${F.pct(r.index_ret)}</td><td class="r">${F.pct(r.ret)}</td><td class="r ${cls(r.abn_ret)}"><b>${F.pct(r.abn_ret)}</b></td><td class="r">${F.x(r.vol_ratio)}</td><td class="r">${F.x(r.xlm_ratio)}</td><td class="r"><a href="#" tabindex="-1">${L("Impact card", "Impact Card")}</a></td></tr>`).join("")}
+    ${d.market_days.map(r => `<tr class="go" data-card="${r.date}"><td>${F.day(r.date)}${r.why === "market_wide_volume" ? ` <span class="tag">${L("market-wide volume", "marktweit hoher Umsatz")}</span>` : ""}</td><td class="r">${F.pct(r.index_ret)}</td><td class="r">${F.pct(r.ret)}</td><td class="r ${cls(r.abn_ret)}"><span class="dbar"><i style="width:${(Math.abs(r.abn_ret || 0) / mx * 100).toFixed(0)}%"></i></span><b>${F.pct(r.abn_ret)}</b></td><td class="r">${F.x(r.vol_ratio)}</td><td class="r">${F.x(r.xlm_ratio)}</td><td class="r"><a href="#" tabindex="-1">${L("Impact card", "Impact Card")}</a></td></tr>`).join("")}
     </tbody></table></div>
     <p class="note">${L(`The ${d.market_days.length} strongest ${idx} days of the period: largest index moves, plus days with market-wide high volume.`, `Die ${d.market_days.length} stärksten ${idx}-Tage des Zeitraums: größte Indexbewegungen sowie Tage mit marktweit hohem Umsatz.`)}</p></section>
   </div>`;
@@ -216,7 +227,9 @@ function intradaySVG(d) {
   ["09:00", "11:00", "13:00", "15:00", "17:00"].forEach(t => { g += `<text x="${x(t)}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#86868b">${t}</text>`; });
   g += b.t.map((t, i) => isN(b.eur[i]) && b.eur[i] > 0 ? `<rect x="${(x(t) - 1).toFixed(1)}" y="${(vy - b.eur[i] / vmax * vh).toFixed(1)}" width="2" height="${(b.eur[i] / vmax * vh).toFixed(1)}" fill="${b.auction[i] ? "#0071e3" : "#d2d2d7"}"/>` : "").join("");
   let p = "", pen = false; b.t.forEach((t, i) => { if (isN(b.ret[i]) && min(t) >= 0 && min(t) <= T) { p += `${pen ? "L" : "M"}${x(t).toFixed(1)},${y(b.ret[i]).toFixed(1)}`; pen = true; } });
-  g += `<path d="${p}" fill="none" stroke="#1d1d1f" stroke-width="1.6" stroke-linejoin="round"/>`;
+  const dn = (c.price.ret || 0) < 0, colr = dn ? "#ff5a3c" : "#0a84ff", fx = b.t.filter((t, i) => isN(b.ret[i]) && min(t) >= 0 && min(t) <= T);
+  if (fx.length > 1) g = `<defs><linearGradient id="gi" x1="0" y1="${dn ? 1 : 0}" x2="0" y2="${dn ? 0 : 1}"><stop offset="0" stop-color="${colr}" stop-opacity=".30"/><stop offset="1" stop-color="${colr}" stop-opacity="0"/></linearGradient></defs>` + g + `<path d="${p}L${x(fx[fx.length - 1]).toFixed(1)},${y(0).toFixed(1)}L${x(fx[0]).toFixed(1)},${y(0).toFixed(1)}Z" fill="url(#gi)"/>`;
+  g += `<path d="${p}" fill="none" stroke="${colr}" stroke-width="2.2" stroke-linejoin="round"/>`;
   const on = c.intraday && c.intraday.onset && c.intraday.onset.time;
   if (on) g += `<line x1="${x(on)}" x2="${x(on)}" y1="${mt}" y2="${vy}" stroke="#bf4800" stroke-width="1.4" stroke-dasharray="4 3"/><text x="${x(on) + 8}" y="${mt + 12}" font-size="12" font-weight="600" fill="#bf4800">${L("Reaction in trading from", "Reaktion im Handel ab")} ${on}</text>`;
   g += `<text x="${W - mr}" y="${vy - vh - 4}" text-anchor="end" font-size="11" fill="#86868b">${L("Turnover per minute · blue = auctions", "Umsatz pro Minute · blau = Auktionen")}</text>`;
@@ -231,7 +244,7 @@ function cardView(d, ev) {
   const all = b ? b.sections.map(s => `<p style="margin-top:10px"><b>${esc(s.title)}</b></p><ul style="margin:4px 0 0;padding-left:18px">${s.points.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`).join("") : "";
   const VL = {supported: L("Consistent with the data", "Mit den Daten vereinbar"), contradicted: L("Not supported by the data", "Von den Daten nicht gestützt"), partly: L("Partly", "Teilweise"), not_testable: L("The data cannot tell", "Aus den Daten nicht ablesbar")};
   const cl = b && S.claim && b.claims[S.claim];
-  return `<div class="wrap stack">
+  return `<div class="hero ${p.abn_ret < 0 ? "warm" : "cool"}"><div class="wrap">
   <a class="back" href="#" data-go="dash">← ${L("Dashboard", "Dashboard")} · ${esc(c.name)}</a>
   <section><div class="meta" style="margin:0 0 6px"><span class="tag">${esc(typeL(isEv ? e.type : "UNUSUAL_DAY"))}</span>
       ${isEv && pub ? `<span>${L("Published", "Veröffentlicht")} <b>${F.day(pub.slice(0, 10), true)}${pub.length > 10 ? ", " + pub.slice(11, 16) : ""}</b>${timingL(e.timing) ? " (" + timingL(e.timing) + ")" : ""}</span>` : ""}
@@ -245,8 +258,8 @@ function cardView(d, ev) {
       ${tile(L("Turnover", "Umsatz"), F.x(v.ratio), L(`${F.eur(v.turnover_eur)} · normal ${F.eur(v.baseline_eur)}`, `${F.eur(v.turnover_eur)} · normal ${F.eur(v.baseline_eur)}`))}
       ${tile(L("Trading cost, €25k order", "Handelskosten, 25-Tsd.-€-Order"), isN(l.ratio) ? F.x(l.ratio) : "–", isN(l.xlm_25k_bps) ? `${F.bps(l.xlm_25k_bps)} · normal ${F.bps(l.xlm_25k_baseline_bps)}` : L("no XLM for this day", "kein XLM für diesen Tag"))}
       ${tile(L("How it ranks", "Einordnung"), cm && cm.rank_abs_abn_ret ? L(`${cm.rank_abs_abn_ret} of ${cm.rank_of || cm.n + 1}`, `${cm.rank_abs_abn_ret} von ${cm.rank_of || cm.n + 1}`) : "–", rk ? esc(rk.group) + L(" · this day included", " · inkl. dieses Tages") + ` · <a href="#" data-act="cmp">${L("see all", "alle ansehen")}</a>` : L("no comparison group", "keine Vergleichsgruppe"))}
-    </div></section>
-
+    </div></section></div></div>
+<div class="wrap stack">
   <section class="card"><div class="sec-h"><h2>${L("The day, minute by minute", "Der Tag, Minute für Minute")}</h2><span class="sub">${L("price vs previous close", "Kurs gegenüber Vortagesschluss")}</span></div>${intradaySVG(d)}</section>
 
   <section class="card"><div class="sec-h"><h2>${L("Test an explanation", "Eine Erklärung prüfen")}</h2><span class="sub">${L("Fixed rules on the figures above; no language model.", "Feste Regeln auf den Zahlen oben; kein Sprachmodell.")}</span></div>
