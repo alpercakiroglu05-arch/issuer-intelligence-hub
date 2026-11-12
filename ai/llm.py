@@ -82,14 +82,20 @@ def _cache_put(k: str, content: str) -> None:
         pass
 
 
-def chat(messages: list[dict], temperature: float = 0.2, **kwargs):
-    """Returns an object with .content (str) and .tool_calls (OpenAI providers only).
-    Plain answers (no tools) are cached when LLM_CACHE is on."""
+# seconds per model call: the demo must never hang on a slow gateway (the SDK default is 600 s with 2 retries);
+# on a timeout the caller falls back to the deterministic template
+LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "45"))
+
+
+def chat(messages: list[dict], temperature: float = 0.2, cache: bool = True, **kwargs):
+    """Returns an object with .content (str), .tool_calls (OpenAI providers only) and .cached.
+    Plain answers (no tools) are cached when LLM_CACHE is on; cache=False asks the model again
+    (and stores the new answer)."""
     key, provider = _key(), _provider()
     model = os.getenv("LLM_MODEL")
     ck = _cache_key(messages, temperature) if _cache_on() and not kwargs else None
-    if ck and (hit := _cache_get(ck)) is not None:
-        return SimpleNamespace(content=hit, tool_calls=None)
+    if ck and cache and (hit := _cache_get(ck)) is not None:
+        return SimpleNamespace(content=hit, tool_calls=None, cached=True)
     msg = _call(provider, key, model, messages, temperature, **kwargs)
     if ck and getattr(msg, "content", None):
         _cache_put(ck, msg.content)
@@ -102,7 +108,7 @@ def _call(provider, key, model, messages, temperature, **kwargs):
         import anthropic
         system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
         rest = [m for m in messages if m["role"] != "system"]
-        r = anthropic.Anthropic(api_key=key).messages.create(
+        r = anthropic.Anthropic(api_key=key, timeout=LLM_TIMEOUT, max_retries=1).messages.create(
             model=model or "claude-sonnet-5-5", max_tokens=1000, system=system,
             messages=rest, temperature=temperature)
         return SimpleNamespace(content="".join(b.text for b in r.content if b.type == "text"), tool_calls=None)
@@ -110,10 +116,12 @@ def _call(provider, key, model, messages, temperature, **kwargs):
     if provider == "azure":
         from openai import AzureOpenAI
         client = AzureOpenAI(api_key=key, azure_endpoint=os.getenv("LLM_BASE_URL"),
-                             api_version=os.getenv("AZURE_API_VERSION", "2024-06-01"))
+                             api_version=os.getenv("AZURE_API_VERSION", "2024-06-01"),
+                             timeout=LLM_TIMEOUT, max_retries=1)
     else:
         from openai import OpenAI
-        client = OpenAI(api_key=key, base_url=os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or None)
+        client = OpenAI(api_key=key, base_url=os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or None,
+                        timeout=LLM_TIMEOUT, max_retries=1)
     resp = client.chat.completions.create(model=model or "gpt-4o-mini", messages=messages,
                                           temperature=temperature, **kwargs)
     return resp.choices[0].message

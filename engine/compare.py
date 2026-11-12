@@ -274,3 +274,16 @@ def sector_peers(isin: str) -> list[str]:
 def size_peers(isin: str) -> list[str]:
     """The SIZE_PEERS_N ISINs closest in median turnover (size proxy, not market cap)."""
     return peer_group(isin, "size")["isins"]
+
+
+def day_ratios(isin: str) -> pd.DataFrame:
+    """Turnover and trading cost vs normal for every day of one stock, with THE impact-card baseline
+    (median of t-65..t-6). Every "x normal" the product shows (dashboard, unusual days, card, assistant,
+    report) comes from here or from the card itself, so the same day never shows two different ratios.
+    (The anomaly screen in engine.baseline uses z-scores against the previous 60 days; that only decides
+    WHICH days are flagged, it is not shown as a ratio.)"""
+    m = metrics_all()
+    m = m[m["isin"] == isin]
+    out = m.set_index("date")[["vol_ratio", "xlm_ratio", "abn_ret"]].copy()
+    out[["vol_ratio", "xlm_ratio"]] = out[["vol_ratio", "xlm_ratio"]].round(2)  # the card's precision: 8.55 -> "8.6x" in both
+    return out

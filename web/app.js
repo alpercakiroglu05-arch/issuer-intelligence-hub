@@ -7,7 +7,7 @@
 
 /* ============================== helpers ============================== */
 const $ = s => document.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const S = {lang: "en", uni: [], status: null, isin: null, iss: null, page: "dashboard", sel: null, cards: {}, ai: {},
+const S = {lang: "en", uni: [], status: null, isin: null, iss: null, page: "dashboard", sel: null, cards: {}, ai: {}, ev: {}, tested: {}, briefOpen: false,
   cmp: {type: null, index: "ALL", data: null}, chat: [], metric: "turnover", dock: false, busy: false, addEv: false,
   rep: {a: true, peers: true, liq: true, anom: true, card: true, ai: true, key: null}};
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -91,7 +91,8 @@ function search(q, max = 7) {
   };
   return S.uni.map(u => [sc(u), u]).filter(x => x[0] > 0).sort((a, b) => b[0] - a[0] || b[1].avg_turnover_eur - a[1].avg_turnover_eur).slice(0, max).map(x => x[1]);
 }
-const suggRow = (u, i, sel) => `<li role="option" data-isin="${u.isin}" aria-selected="${i === sel}"><span class="tk">${esc(u.ticker)}</span><span class="nm"><b>${esc(nice(u))}</b><small>${u.isin}</small></span><span class="ix">${u.index}${u.member_now ? "" : "*"}</span></li>`;
+const COV = u => u.hero ? L("full: calendar + minutes", "voll: Kalender + Minuten") : u.intraday ? L("daily + minutes", "täglich + Minuten") : L("daily data", "Tagesdaten");
+const suggRow = (u, i, sel) => `<li role="option" id="opt-${u.isin}" data-isin="${u.isin}" aria-selected="${i === sel}"><span class="tk">${esc(u.ticker)}</span><span class="nm"><b>${esc(nice(u))}</b><small>${u.isin} · ${COV(u)}</small></span><span class="ix" title="${u.member_now ? "" : L("no longer an index member", "nicht mehr im Index")}">${u.index}${u.member_now ? "" : "*"}</span></li>`;
 
 /* ============================== gate (ISIN entry) ============================== */
 const G = {sel: 0, list: []};
@@ -99,13 +100,14 @@ function gateText() {
   $("#g-kicker").textContent = L("Issuer Intelligence Hub · Xetra 2026", "Issuer Intelligence Hub · Xetra 2026");
   const words = L("Decode your share.", "Verstehen Sie Ihre Aktie.").split(" ");
   $("#g-title").innerHTML = words.map((w, i) => `<span class="w"><span style="--i:${i}">${esc(w)}</span></span>`).join(" ");
-  const days = S.status ? 213 : 213;
-  $("#g-sub").textContent = L(`Enter your company's ISIN. The hub reads ${days} trading days of Xetra data for it: volume, spreads, auctions, who trades, and how the share reacted to every announcement.`,
-    `Geben Sie die ISIN Ihres Unternehmens ein. Der Hub liest dafür ${days} Handelstage an Xetra: Umsatz, Spreads, Auktionen, wer handelt, und wie die Aktie auf jede Meldung reagiert hat.`);
+  $("#g-sub").textContent = L("How your share trades on Xetra, and what changed around each announcement: measured against its own normal and its peers, with the evidence to brief management.",
+    "Wie Ihre Aktie an Xetra gehandelt wird und was sich rund um jede Meldung verändert hat: gemessen an ihrem Normalzustand und ihren Peers, mit den Belegen für den Vorstand.");
   $("#g-in").placeholder = L("e.g. DE0005470306, EVD or CTS Eventim", "z. B. DE0005470306, EVD oder CTS Eventim");
   $("#g-go-t").textContent = L("Open panel", "Panel öffnen");
   const heroes = S.uni.filter(u => u.hero);
-  $("#g-picks").innerHTML = `<span>${L("Showcase shares:", "Beispielaktien:")}</span>` + heroes.map(u => `<button type="button" data-pick="${u.isin}"><b>${u.ticker}</b>${esc(nice(u))}</button>`).join("");
+  const st = S.status || {}, nIn = S.uni.filter(u => u.intraday).length;
+  $("#g-picks").innerHTML = `<span>${L("Showcase companies:", "Beispielunternehmen:")}</span>` + heroes.map(u => `<button type="button" data-pick="${u.isin}"><b>${u.ticker}</b>${esc(nice(u))} <small>${u.index}</small></button>`).join("") +
+    (S.uni.length ? `<p class="g-cov">${L(`Coverage: all ${S.uni.length} DAX, MDAX and SDAX shares, Xetra data ${st.first_date ? dS(st.first_date) : "2 Jan"} – ${st.last_date ? dL(st.last_date) : ""} (dashboard, peers, unusual days, impact cards, your own calendar). Minute-level detail for ${nIn} shares. Researched announcement calendars with sources for the three showcase companies and one result per DAX member.`, `Abdeckung: alle ${S.uni.length} DAX-, MDAX- und SDAX-Aktien, Xetra-Daten ${st.first_date ? dS(st.first_date) : "2. Jan."} – ${st.last_date ? dL(st.last_date) : ""} (Dashboard, Peers, auffällige Tage, Impact Cards, eigener Kalender). Minutendaten für ${nIn} Aktien. Recherchierte Meldungskalender mit Quellen für die drei Beispielunternehmen und je ein Ergebnis pro DAX-Wert.`)}${st.offline ? " " + L("This offline copy contains only the showcase companies.", "Diese Offline-Kopie enthält nur die Beispielunternehmen.") : ""}</p>` : "");
   $$(".lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.lang));
   anatomy($("#g-in").value);
 }
@@ -160,29 +162,25 @@ function resolveGate() {
 }
 async function openIsin(isin, {fromGate = true, then = null} = {}) {
   const u = U(isin); if (!u) return;
-  const steps = [L("Reading 213 trading days on Xetra", "213 Xetra-Handelstage werden gelesen"), L("Benchmarking against index, similar-size stocks and sector", "Vergleich mit Index, ähnlich großen Aktien und Sektor"),
-    L("Finding unusual days and matching the event calendar", "Auffällige Tage finden und mit dem Kalender abgleichen"), L("Preparing your dashboard", "Ihr Dashboard wird vorbereitet")];
+  /* one honest status for one real request: the server computes the profile, peers and unusual days */
   let timer;
   if (fromGate) {
     $("#gl-nm").textContent = nice(u);
-    $("#gl-steps").innerHTML = steps.map(s => `<li><i></i>${esc(s)}</li>`).join("");
-    $("#g-load").classList.add("on");
-    let k = 0; const tick = () => { $$("#gl-steps li").forEach((li, i) => { li.classList.toggle("on", i === k); li.classList.toggle("done", i < k); }); $("#gl-bar").style.width = Math.min(92, (k + 1) * 23) + "%"; k = Math.min(steps.length - 1, k + 1); };
-    tick(); timer = setInterval(tick, reduced ? 50 : 420);
+    $("#gl-steps").innerHTML = `<li class="on"><i></i>${L(`Computing the trading profile, peers and unusual days from Xetra data (${u.index}, ${u.isin})`, `Handelsprofil, Peers und auffällige Tage aus Xetra-Daten werden berechnet (${u.index}, ${u.isin})`)}</li>`;
+    $("#gl-bar").style.width = "0"; $("#g-load").classList.add("on");
+    timer = setTimeout(() => { $("#gl-bar").style.width = "70%"; }, 30);
   }
   try {
-    const t0 = performance.now();
     const iss = await api(`/api/issuer?isin=${isin}`);
-    if (fromGate) { const wait = Math.max(0, (reduced ? 0 : 1500) - (performance.now() - t0)); await new Promise(r => setTimeout(r, wait)); }
-    clearInterval(timer);
-    if (fromGate) { $$("#gl-steps li").forEach(li => { li.classList.remove("on"); li.classList.add("done"); }); $("#gl-bar").style.width = "100%"; await new Promise(r => setTimeout(r, reduced ? 0 : 250)); }
+    clearTimeout(timer);
+    if (fromGate) { $$("#gl-steps li").forEach(li => { li.classList.remove("on"); li.classList.add("done"); }); $("#gl-bar").style.width = "100%"; }
     const changed = S.isin !== isin;
     S.isin = isin; S.iss = iss; mergeUserEvents(); if (changed) { S.sel = null; S.chat = []; S.rep.key = null; }
     if (then) then();
     vt(() => { $("#gate").classList.add("hidden"); $("#g-load").classList.remove("on"); $("#ws").classList.remove("hidden"); render(); window.scrollTo(0, 0); });
   } catch (e) {
-    clearInterval(timer); $("#g-load").classList.remove("on");
-    $("#g-err").textContent = L("Could not load this share: ", "Laden fehlgeschlagen: ") + e.message;
+    clearTimeout(timer); $("#g-load").classList.remove("on");
+    $("#g-err").innerHTML = `${L("Could not load this share: ", "Laden fehlgeschlagen: ")}${esc(e.message)} <button type="button" class="g-retry" data-pick="${isin}">${L("Try again", "Erneut versuchen")}</button>`;
     if (!fromGate) toast(e.message);
   }
 }
@@ -203,7 +201,7 @@ function chrome() {
   placeInd();
   $$(".lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.lang));
   const m = S.iss.meta;
-  $("#stamp").innerHTML = L(`Xetra data as of the close on <b>${dL(m.last_date)}</b> · ${m.days} trading days since ${dS(m.first_date)} · ${S.uni.length} shares`, `Xetra-Daten bis Handelsschluss <b>${dL(m.last_date)}</b> · ${m.days} Handelstage seit ${dS(m.first_date)} · ${S.uni.length} Aktien`);
+  $("#stamp").innerHTML = (S.status && S.status.offline ? `<span class="offl">${L("Offline copy: showcase companies, saved answers, no calendar import", "Offline-Kopie: Beispielunternehmen, gespeicherte Antworten, kein Kalenderimport")}</span> ` : "") + L(`Xetra data as of the close on <b>${dL(m.last_date)}</b> · ${m.days} trading days since ${dS(m.first_date)} · ${S.uni.length} shares`, `Xetra-Daten bis Handelsschluss <b>${dL(m.last_date)}</b> · ${m.days} Handelstage seit ${dS(m.first_date)} · ${S.uni.length} Aktien`);
   const live = S.status && S.status.llm;
   $("#ai-dot").classList.toggle("on", !!live);
   $("#ai-dot span").textContent = live ? L(`AI: ${S.status.model}`, `KI: ${S.status.model}`) : L("AI: template mode", "KI: Vorlagenmodus");
@@ -244,14 +242,21 @@ function dashBand(u, name) {
   return `<section class="band"><div class="wrap band-in">
     <div class="kicker">${u.index} · ISIN <b>${u.isin}</b> · Xetra${u.sector ? " · " + esc(u.sector) : ""}</div>
     <h1>${esc(name)}</h1><p class="lede">${lede}</p>
-    <p class="band-acts"><a class="pill" href="/api/export?isin=${u.isin}&lang=${S.lang}" download>${L("Export IR report (PDF)", "IR-Report exportieren (PDF)")} ↓</a></p>
+    <p class="band-acts">${exportBtn(`/api/export?isin=${u.isin}&lang=${S.lang}`, "pill")}</p>
     <dl class="facts">
       <div><dt>${L("Closing auction", "Schlussauktion")} · ${dL(S.iss.meta.last_date)}</dt><dd>${PX(last)}</dd></div>
       <div><dt>${L("Since 2 Jan", "Seit 2. Jan.")}</dt><dd>${P(last / first - 1)}</dd></div>
       <div><dt>${L("Liquidity trend", "Liquiditätstrend")}</dt><dd>${vw.charAt(0).toUpperCase() + vw.slice(1)}</dd></div>
       <div><dt>${L("Xetra category (est.)", "Xetra-Kategorie (Schätz.)")}</dt><dd>${cat}<small>${cat === "A" ? L("no Designated Sponsor needed", "kein Designated Sponsor nötig") : L("Designated Sponsor needed", "Designated Sponsor nötig")}</small></dd></div>
       <div><dt>${L("Unusual days in 2026", "Auffällige Tage 2026")}</dt><dd>${S.iss.anomalies.length}</dd></div>
-    </dl></div></section>`;
+    </dl>${leadHTML()}</div></section>`;
+}
+/* the obvious next step after landing: the most unusual day of the year, with its calendar entry if any */
+function leadHTML() {
+  const a = [...S.iss.anomalies].sort((p, q) => q.severity - p.severity)[0]; if (!a) return "";
+  const what = a.event ? `${esc(a.event.type)} · ${esc(String(a.event.title).slice(0, 70))}${a.event.title.length > 70 ? "…" : ""}` : L("no calendar entry, cause open", "kein Kalendereintrag, Ursache offen");
+  return `<div class="lead"><span class="lead-k">${L("Most unusual day this year", "Auffälligster Tag des Jahres")}</span><span class="lead-t"><b>${dL(a.peak_date)}</b> · ${L("stock-specific", "titelspezifisch")} <b>${P(a.peak_abn_ret)}</b> · ${X(a.peak_vol_ratio)} ${L("turnover", "Umsatz")} · ${what}</span>
+    <button class="pill" data-card="${a.peak_date}" ${a.event ? `data-ev="${esc(a.event.event_id)}"` : ""}>${L("Open its impact card", "Impact Card öffnen")} ${ARR}</button></div>`;
 }
 
 /* ============================== 1 dashboard: trading profile ============================== */
@@ -309,7 +314,7 @@ function timeChart() {
   let marks = "";
   const SHORT = {DIVIDEND_EX: "DIV", GUIDANCE: "GUID"}; let lastX = -1e9, lane = 0;
   [...S.iss.events].sort((a, b) => String(a.reaction_day).localeCompare(String(b.reaction_day))).forEach((e, k) => { const i = di.get(String(e.reaction_day).slice(0, 10)); if (i === undefined) return; lane = x(i) - lastX < 46 ? (lane + 1) % 3 : 0; lastX = x(i); const ly = mt - 26 - lane * 13; marks += `<g class="ann" style="--i:${k % 6}" data-card="${s.date[i]}" data-ev="${esc(e.event_id)}" data-tip="${enc(`<span class="t">${esc(e.type)} · ${dL(s.date[i])}</span><br>${esc(e.title)}`)}" cursor="pointer"><line x1="${f1(x(i))}" x2="${f1(x(i))}" y1="${mt - 18}" y2="${mt + PH}" stroke="var(--navy)" stroke-width="1" stroke-dasharray="2 3" opacity=".45"/><rect x="${f1(x(i) - 4)}" y="${ly}" width="8" height="8" fill="var(--navy)"/><text x="${f1(x(i) + 7)}" y="${ly + 8}" class="axb" fill="var(--navy)" font-size="11">${esc(SHORT[e.type] || e.type)}</text></g>`; });
-  S.iss.anomalies.forEach((a, k) => { const i = di.get(a.peak_date); if (i === undefined || evDays.has(a.peak_date)) return; marks += `<g class="ann" style="--i:${k % 6}" data-card="${a.peak_date}" data-tip="${enc(`<span class="t">${dL(a.peak_date)}</span><br>${esc(reasonL(a.reason))}<br>${L("abnormal", "abnormal")} ${P(a.peak_abn_ret)} · ${X(a.max_vol_ratio)} ${L("turnover", "Umsatz")}`)}" cursor="pointer"><path d="M${f1(x(i))},${mt + PH - 9} l5,9 h-10z" fill="var(--sky)"/></g>`; });
+  S.iss.anomalies.forEach((a, k) => { const i = di.get(a.peak_date); if (i === undefined || evDays.has(a.peak_date)) return; marks += `<g class="ann" style="--i:${k % 6}" data-card="${a.peak_date}" data-tip="${enc(`<span class="t">${dL(a.peak_date)}</span><br>${esc(reasonL(a.reason))}<br>${L("abnormal", "abnormal")} ${P(a.peak_abn_ret)} · ${X(a.peak_vol_ratio)} ${L("turnover", "Umsatz")}`)}" cursor="pointer"><path d="M${f1(x(i))},${mt + PH - 9} l5,9 h-10z" fill="var(--sky)"/></g>`; });
   const legend = kind === "stack" ? `<g transform="translate(${ml},${H + 10})">${area.map(([, c, t], k) => `<rect x="${k * 150}" y="0" width="10" height="10" fill="${c}"/><text x="${k * 150 + 16}" y="9" class="ax">${t}</text>`).join("")}</g>` : "";
   return `<svg viewBox="0 0 ${W} ${H + (legend ? 26 : 0)}" id="tsvg">${g}${body}${marks}${legend}<g class="xh" id="txh"><line y1="${mt}" y2="${mt + PH}" stroke="var(--ink)"/></g><rect class="hit" id="thit" x="${ml}" y="${mt}" width="${W - ml - mr}" height="${PH - 12}"/></svg>`;
 }
@@ -326,7 +331,7 @@ function peersBlock() {
   return `<div class="sec-head"><div><h2 class="h2">${L("Peer benchmark", "Peer-Vergleich")}</h2><p class="sec-note">${L("Medians of the last 60 trading days, per peer group: index, sector, and size. Arrows compare you with the index median.", "Mediane der letzten 60 Handelstage je Vergleichsgruppe: Index, Sektor und Größe. Pfeile vergleichen mit dem Indexmedian.")}</p></div></div>
   <table class="tbl"><thead><tr><th></th><th class="r">${S.iss.meta.ticker}</th>${g.map(x => `<th class="r">${lab(x)} <span style="font-weight:400">(${x.n})</span></th>`).join("")}<th class="ic"></th></tr></thead>
   <tbody>${rows.map(([k, t, f]) => `<tr><td>${t}</td><td class="r"><b>${f(p.stock[k])}</b></td>${g.map(x => `<td class="r m">${f(x.values[k])}</td>`).join("")}<td class="ic">${arrRel(p.stock[k], g[0] && g[0].values[k])}</td></tr>`).join("")}</tbody></table>
-  <p class="sec-note">${members}${L("Size = turnover tercile of all 174 shares (market capitalisation is not in the Xetra data).", "Größe = Umsatz-Terzil aller 174 Aktien (Marktkapitalisierung ist nicht in den Xetra-Daten).")}</p>`;
+  <p class="sec-note">${members}${L("Similar size = the 10 shares closest in median turnover. This is a proxy: market capitalisation is not in the Xetra data. Sector groups follow Deutsche Börse Prime Standard sectors; index groups use today's membership.", "Ähnliche Größe = die 10 Aktien mit dem nächsten Medianumsatz. Das ist ein Ersatzmaß: Die Marktkapitalisierung ist nicht in den Xetra-Daten. Sektoren nach Deutsche-Börse-Prime-Standard; Indexgruppen nach heutiger Zugehörigkeit.")}</p>`;
 }
 /* trading cost by order size (engine/xlm.py): the on-demand version of the Stock Report's XLM table */
 function curveBlock() {
@@ -373,9 +378,9 @@ function liqBlock() {
 function anomBlock() {
   const a = S.iss.anomalies;
   if (!a.length) return `<h2 class="h2">${L("Unusual days", "Auffällige Tage")}</h2><p class="empty">${L("No unusual days in 2026.", "Keine auffälligen Tage in 2026.")}</p>`;
-  return `<div class="sec-head"><div><h2 class="h2">${L("Unusual days", "Auffällige Tage")}</h2><p class="sec-note">${L("Turnover z ≥ 3, stock-specific move z ≥ 3 or spread ≥ 2× normal. Consecutive days are merged. The data shows that something happened, not why: causes come from the calendar; market mechanics (index changes, expiries, market-wide days) are flagged so they are not mistaken for company news.", "Umsatz-z ≥ 3, titelspezifische Bewegung z ≥ 3 oder Spread ≥ 2× normal. Aufeinanderfolgende Tage werden zusammengefasst. Die Daten zeigen, dass etwas passiert ist, nicht warum: Ursachen kommen aus dem Kalender; Marktmechanik (Indexänderungen, Verfallstage, marktweite Tage) wird markiert, damit sie nicht als Unternehmensnachricht gilt.")}</p></div></div>
-  <table class="tbl"><thead><tr><th>${L("Date", "Datum")}</th><th>${L("What was unusual", "Was auffiel")}</th><th class="r">${L("Abnormal", "Abnormal")}</th><th class="ic"></th><th class="r">${L("Turnover", "Umsatz")}</th><th>${L("Calendar · market context", "Kalender · Marktkontext")}</th><th></th></tr></thead><tbody>
-  ${a.map(x => `<tr class="go" data-card="${x.peak_date}" ${x.event ? `data-ev="${esc(x.event.event_id)}"` : ""}><td><b>${dS(x.start)}${x.days > 1 ? " – " + dS(x.end) : ""}</b></td><td class="m">${esc(reasonL(x.reason))}</td><td class="r"><b>${P(x.peak_abn_ret)}</b></td><td class="ic">${arrRet(x.peak_abn_ret)}</td><td class="r">${X(x.max_vol_ratio)}</td>
+  return `<div class="sec-head"><div><h2 class="h2">${L("Unusual days", "Auffällige Tage")}</h2><p class="sec-note">${L("Flagged when turnover or the stock-specific move is 3 standard deviations from the previous 60 days, or trading cost is 2× normal. Consecutive days are merged; figures are for the peak day, against the same normal as the impact card. The data shows that something happened, not why: causes come from the calendar; market mechanics (index changes, expiries, market-wide days) are flagged so they are not mistaken for company news.", "Markiert, wenn Umsatz oder titelspezifische Bewegung 3 Standardabweichungen von den letzten 60 Tagen abweichen oder die Handelskosten doppelt so hoch sind. Aufeinanderfolgende Tage werden zusammengefasst; Werte gelten für den Spitzentag, gegen dasselbe Normal wie die Impact Card. Die Daten zeigen, dass etwas passiert ist, nicht warum: Ursachen kommen aus dem Kalender; Marktmechanik (Indexänderungen, Verfallstage, marktweite Tage) wird markiert, damit sie nicht als Unternehmensnachricht gilt.")}</p></div></div>
+  <table class="tbl"><thead><tr><th>${L("Date", "Datum")}</th><th>${L("What was unusual", "Was auffiel")}</th><th class="r">${L("Abnormal", "Abnormal")}</th><th class="ic"></th><th class="r" title="${L("Peak day vs normal (median of trading days t-65 to t-6), same as the impact card", "Spitzentag vs. normal (Median t-65 bis t-6), wie in der Impact Card")}">${L("Turnover vs normal", "Umsatz vs. normal")}</th><th>${L("Calendar · market context", "Kalender · Marktkontext")}</th><th></th></tr></thead><tbody>
+  ${a.map(x => `<tr class="go" data-card="${x.peak_date}" ${x.event ? `data-ev="${esc(x.event.event_id)}"` : ""}><td><b>${dS(x.start)}${x.days > 1 ? " – " + dS(x.end) : ""}</b></td><td class="m">${esc(reasonL(x.reason))}</td><td class="r"><b>${P(x.peak_abn_ret)}</b></td><td class="ic">${arrRet(x.peak_abn_ret)}</td><td class="r">${X(x.peak_vol_ratio)}</td>
     <td>${x.event ? `<span class="tag">${esc(x.event.type)}</span> <span class="m" style="font-size:13px">${esc(x.event.title.slice(0, 60))}${x.event.title.length > 60 ? "…" : ""}</span>` : x.context ? `<span class="tag g">${L("MARKET", "MARKT")}</span> <span class="m" style="font-size:13px">${esc(CTX(x.context))}</span>` : `<span class="m" style="font-size:13px">${L("no entry, cause open", "kein Eintrag, Ursache offen")}</span>`}${x.event && x.context ? `<div class="m" style="font-size:12px;margin-top:2px">${L("also", "auch")}: ${esc(CTX(x.context))}</div>` : ""}</td>
     <td class="r"><span class="link" style="white-space:nowrap">${L("Impact card", "Impact Card")} ${ARR}</span></td></tr>`).join("")}</tbody></table>`;
 }
@@ -399,8 +404,8 @@ function pCard() {
   const cur = (day, id) => sel.day === day && (sel.event_id || null) === (id || null);
   const list = `<aside class="evlist rv" aria-label="${L("Events", "Ereignisse")}">
     <h4>${L("Announcements (calendar)", "Meldungen (Kalender)")}</h4>
-    <div class="ev-tools"><button class="link" data-act="addev">+ ${L("Add event", "Ereignis hinzufügen")}</button><label class="link">${L("Import calendar", "Kalender importieren")}<input type="file" id="evfile" accept=".csv,.ics,.txt" hidden></label></div>
-    ${S.addEv ? evForm() : ""}
+    ${S.status && S.status.offline ? `<p class="m" style="font-size:13px">${L("Adding or importing your own calendar needs the live site.", "Eigenen Kalender ergänzen oder importieren geht nur auf der Live-Seite.")}</p>` : `<div class="ev-tools"><button class="link" data-act="addev">+ ${L("Add event", "Ereignis hinzufügen")}</button><label class="link" tabindex="0">${L("Import calendar (CSV / ICS)", "Kalender importieren (CSV / ICS)")}<input type="file" id="evfile" accept=".csv,.ics,.txt" hidden></label></div>`}
+    ${S.addEv ? evForm() : ""}${calPreviewHTML()}
     ${evs.length ? evs.map(e => { const d = String(e.reaction_day).slice(0, 10); return `<button data-card="${d}" data-ev="${esc(e.event_id)}" aria-current="${cur(d, e.event_id)}"><span class="d"><span>${dS(d)} ${e.time_local ? `<span class="m" style="font-weight:400">· ${esc(e.time_local)}</span>` : ""}</span><span class="tag ${e.user ? "s" : ""}">${e.user ? L("OWN", "EIGEN") + " · " : ""}${esc(e.type)}</span></span><span class="t">${String(e.verified) === "1" ? "✓ " : ""}${esc(e.title)}</span></button>`; }).join("") : `<p class="m" style="font-size:14px">${L("No calendar entries for this share yet.", "Noch keine Kalendereinträge für diese Aktie.")}</p>`}
     <h4>${L("Unusual days without an entry", "Auffällige Tage ohne Eintrag")}</h4>
     ${un.length ? un.map(a => `<button data-card="${a.peak_date}" aria-current="${cur(a.peak_date, null)}"><span class="d"><span>${dS(a.peak_date)}</span><span class="tag s">${P(a.peak_abn_ret)}</span></span><span class="t">${esc(reasonL(a.reason))}</span></button>`).join("") : `<p class="m" style="font-size:14px">${L("None.", "Keine.")}</p>`}
@@ -408,8 +413,18 @@ function pCard() {
   const k = keyOf(sel), d = S.cards[k];
   return `<div class="wrap"><div class="ic-layout">${list}<div id="cardslot">${d ? cardHTML(d) : `<div class="card"><div class="card-head"><span class="ttl">${L("Impact card", "Impact Card")}</span><span class="id">${L("computing…", "wird berechnet…")}</span></div><div class="card-sec"><div class="skel"></div></div><div class="card-sec"><div class="skel" style="min-height:300px"></div></div></div>`}</div></div></div>`;
 }
+async function loadEvidence(k) {
+  if (S.ev[k]) return S.ev[k];
+  const [isin, day, ev] = k.split("|");
+  try { S.ev[k] = await api(cardURL(isin, day, ev).replace("/api/card?", "/api/evidence?")); }
+  catch (e) { S.ev[k] = {error: e.message}; }
+  const slot = $("#briefslot"); if (slot && S.page === "card" && keyOf(S.sel || {}) === k) { slot.innerHTML = briefHTML(k); }
+  if (S.page === "report" && $("#sheet")) $("#sheet").innerHTML = sheetHTML();
+  return S.ev[k];
+}
 async function loadCard() {
   const sel = S.sel, k = keyOf(sel);
+  loadEvidence(k);
   if (!S.cards[k]) {
     try { S.cards[k] = await api(cardURL(S.isin, sel.day, sel.event_id)); }
     catch (e) { $("#cardslot") && ($("#cardslot").innerHTML = `<p class="empty">${L("Could not build the card: ", "Karte konnte nicht berechnet werden: ")}${esc(e.message)}</p>`); return; }
@@ -434,6 +449,7 @@ function cardHTML(d) {
   const rankOf = cm ? (Number.isInteger(cm.rank_of) ? cm.rank_of : cm.n + 1) : null;
   const cmpBlock = cm ? `<div><div class="big-cap">${L("How it ranks", "Einordnung")}</div>
       <p style="margin:0 0 10px;font-size:15px">${L(`Rank ${cm.rank_abs_abn_ret} of ${rankOf} (incl. this day) among ${cm.group_type === "NOTABLE_DAY" ? "unusual days" : TYPE(cm.group_type)} (${cm.group_index}). Bigger than:`, `Rang ${cm.rank_abs_abn_ret} von ${rankOf} (inkl. dieses Tages) unter ${cm.group_type === "NOTABLE_DAY" ? "auffälligen Tagen" : TYPE(cm.group_type)} (${cm.group_index}). Größer als:`)}</p>
+      ${cm.group_type !== e.type && !notable ? `<p class="m" style="margin:-4px 0 10px;font-size:13px">${L(`Fewer than 5 ${TYPE(e.type)} with data in reach, so this ranks among unusual trading days: a broader group, not like-for-like.`, `Weniger als 5 ${TYPE(e.type)} mit Daten, daher Einordnung unter auffälligen Handelstagen: eine breitere Gruppe, kein direkter Vergleich.`)}</p>` : ""}
       ${pct(L("Stock-specific move", "Titelspezifische Bewegung"), cm.abs_abn_ret_pctile)}${pct(L("Turnover vs normal", "Umsatz vs. normal"), cm.vol_ratio_pctile)}${pct(L("Trading cost vs normal", "Handelskosten vs. normal"), cm.xlm_ratio_pctile)}
       <button class="link" data-act="cmpthis" data-type="${esc(cm.group_type)}" data-index="${esc(cm.group_index)}" style="margin-top:8px">${L("See all of them", "Alle ansehen")} ${ARR}</button></div>` : `<div class="m">${L("No comparison group yet.", "Noch keine Vergleichsgruppe.")}</div>`;
   const mini = (val, base, max) => isN(val) && isN(base) ? `<div class="mini"><i class="barx" style="width:${Math.min(100, val / max * 100)}%"></i><em style="left:${Math.min(100, base / max * 100)}%" data-tip="${enc(L("normal", "normal"))}"></em></div>` : "";
@@ -456,18 +472,19 @@ function cardHTML(d) {
     <div class="card-head"><div><div class="ttl">${L("Impact card", "Impact Card")}</div><div class="id">${esc(id)}</div></div><div class="timing">${timing}</div></div>
     <div class="card-title"><div><span class="tag">${esc(e.type)}</span><h2 style="margin-top:8px">${esc(notable ? L("Unusual trading day", "Auffälliger Handelstag") : e.title)}</h2>
       <div class="src"><span>${ver}</span>${e.source_url ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">${L("Source", "Quelle")} ↗</a>` : ""}</div></div>
-      <a class="pill pill--sm" href="${exportURL(c.isin, e.reaction_day, e.event_id)}" download>${L("Export IR report (PDF)", "IR-Report exportieren (PDF)")} ↓</a></div>
+      ${exportBtn(exportURL(c.isin, e.reaction_day, e.event_id), "pill pill--sm")}</div>
     <div class="card-sec card-top">
       <div><div class="big-cap">${L("Stock-specific move (abnormal return)", "Titelspezifische Bewegung (abnormale Rendite)")}</div>
         <div class="big" style="color:${col}"><span class="count" data-to="${p.abn_ret}">${P(p.abn_ret)}</span></div>
         <p class="big-sub">${esc(nice(U(c.isin)))} <b>${P(p.ret)}</b> · ${c.index} ${L("peers", "Peers")} <b>${P(p.peer_ret)}</b> · ${isN(p.abn_ret_z) ? `<span data-tip="${enc(L("How many times the share's normal daily stock-specific move", "Vielfaches der normalen täglichen titelspezifischen Bewegung"))}">${nf(Math.abs(p.abn_ret_z), 1)}× ${L("its normal daily move", "die normale Tagesbewegung")}</span>` : ""} · ${L("day 0 to +5", "Tag 0 bis +5")} <b>${P(p.car_0_5)}</b></p></div>
       ${cmpBlock}</div>
     <div class="card-sec" style="padding-top:0;padding-bottom:0">${inst}</div>
+    <div class="card-sec brief" id="briefslot">${briefHTML(keyOf(S.sel))}</div>
     <div class="card-sec"><div class="sec-head" style="margin-bottom:10px"><h3 class="h3">${L("The day, minute by minute", "Der Tag, Minute für Minute")}</h3>
       <div class="legend"><span><i></i>${L("price vs prev. close", "Kurs vs. Vortag")}</span><span><i class="b" style="background:var(--bar)"></i>${L("turnover (5 min)", "Umsatz (5 Min.)")}</span><span><i class="b" style="background:var(--navy)"></i>${L("auctions", "Auktionen")}</span><span><i class="b" style="background:var(--sky-soft)"></i>${L("first 15 min", "erste 15 Min.")}</span></div></div>
       <div class="chart" id="ichart">${d.bars ? intraChart(d) : `<p class="empty">${L("No 1-minute bars for this share yet. The daily figures above are complete.", "Für diese Aktie gibt es noch keine 1-Minuten-Balken. Die Tageswerte oben sind vollständig.")}</p>`}</div></div>
     <div class="card-sec cols" style="gap:48px"><div><h3 class="h3">${L("Who traded", "Wer gehandelt hat")}</h3>${flows}</div><div><h3 class="h3">${L("Aftershocks", "Nachwirkung")}</h3>${afterChart(d)}</div></div>
-    <div class="card-sec" style="font-size:12.5px;color:var(--mute);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between"><span>${L(`Normal = median of ${c.baseline.days_used} trading days ending a week before the event (${esc(c.baseline.window)}). Abnormal return = return minus the median return of the other ${c.index} members. Prices = closing auction.`, `Normal = Median aus ${c.baseline.days_used} Handelstagen bis eine Woche vor dem Ereignis (${esc(c.baseline.window)}). Abnormale Rendite = Rendite minus Medianrendite der übrigen ${c.index}-Werte. Kurse = Schlussauktion.`)}</span>${flags}</div>
+    <div class="card-sec" style="font-size:12.5px;color:var(--mute);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between"><span><b>${L("Method", "Methode")}.</b> ${L(`Normal = median of ${c.baseline.days_used} trading days ending a week before the event (${esc(c.baseline.window)}). Abnormal return = return minus the median return of the other ${c.index} members (equal weight). Prices = closing auction. The reaction time is inferred from trades (price beyond 2σ and turnover 3× normal for the time of day); it is not the publication time. Rule for the reaction day: after the 17:35 closing auction or on a non-trading day, the next trading day.`, `Normal = Median aus ${c.baseline.days_used} Handelstagen bis eine Woche vor dem Ereignis (${esc(c.baseline.window)}). Abnormale Rendite = Rendite minus Medianrendite der übrigen ${c.index}-Werte (gleichgewichtet). Kurse = Schlussauktion. Der Reaktionszeitpunkt ist aus den Trades abgeleitet (Kurs jenseits 2σ, Umsatz 3× normal für die Tageszeit), nicht die Veröffentlichungszeit. Reaktionstag: nach der Schlussauktion um 17:35 oder an handelsfreien Tagen der nächste Handelstag.`)}</span>${flags}</div>
   </article>
   <section class="ai-box rv in" id="aibox">${aiBoxHTML(keyOf(S.sel))}</section>`;
 }
@@ -495,7 +512,7 @@ function intraChart(d) {
   const intr = c.intraday || {}, on = intr.onset || {};
   let ann = "";
   if (cont.length) ann += `<g class="ann" style="--i:0"><circle cx="${f1(xm(cont[0].m))}" cy="${f1(y(c.price.gap_open))}" r="4.5" fill="#fff" stroke="var(--navy)" stroke-width="2"/><text x="${f1(xm(cont[0].m) + 10)}" y="${f1(y(c.price.gap_open) + (neg ? -12 : 20))}" class="axb" paint-order="stroke" stroke="#fff" stroke-width="4">${L("Open", "Eröffnung")} ${P(c.price.gap_open)}</text></g>`;
-  if (on.time) { const m = minOf(on.time); if (m >= 0 && m <= 515) ann += `<g class="ann" style="--i:1"><line x1="${f1(xm(m))}" x2="${f1(xm(m))}" y1="${mt - 14}" y2="${vy}" stroke="var(--sky)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${f1(xm(m) + 7)}" y="${mt - 4}" class="axb" fill="var(--sky)">${L("Market starts pricing it", "Markt preist ein ab")} ${on.time}</text></g>`; }
+  if (on.time) { const m = minOf(on.time); if (m >= 0 && m <= 515) ann += `<g class="ann" style="--i:1"><line x1="${f1(xm(m))}" x2="${f1(xm(m))}" y1="${mt - 14}" y2="${vy}" stroke="var(--sky)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${f1(xm(m) + 7)}" y="${mt - 4}" class="axb" fill="var(--sky)">${L("Reaction detected in trading", "Reaktion im Handel erkannt")} ${on.time}</text></g>`; }
   const evT = (d.event_row || {}).time_local; if (evT) { const m = minOf(evT); if (m > 0 && m < 510) ann += `<g class="ann" style="--i:1"><line x1="${f1(xm(m))}" x2="${f1(xm(m))}" y1="${mt - 14}" y2="${vy}" stroke="var(--navy)" stroke-width="1.5"/><text x="${f1(xm(m) - 7)}" y="${mt + 12}" class="axb" fill="var(--navy)" text-anchor="end">${L("Announcement", "Meldung")} ${evT}</text></g>`; }
   (on.volatility_interruptions || []).forEach((t, k) => { const m = minOf(t); if (m < 0 || m > 515) return; ann += `<g class="ann" style="--i:${2 + k * .3}" data-tip="${enc(`<span class="t">${L("Volatility interruption", "Volatilitätsunterbrechung")}</span><br>${t}`)}"><path d="M${f1(xm(m))},${mt + PH} l4,-8 h-8z" fill="var(--down)"/></g>`; });
   if (intr.time_of_low && isN(intr.intraday_low)) { const m = minOf(intr.time_of_low), lv = intr.intraday_low / pc - 1, right = xm(m) > W * .6; ann += `<g class="ann" style="--i:2"><circle cx="${f1(xm(m))}" cy="${f1(y(lv))}" r="4.5" fill="#fff" stroke="${col}" stroke-width="2"/><text x="${f1(right ? xm(m) - 9 : xm(m) + 9)}" y="${f1(y(lv) + 20)}" class="axb" text-anchor="${right ? "end" : "start"}" paint-order="stroke" stroke="#fff" stroke-width="4">${L("Low", "Tief")} ${intr.time_of_low} · ${PX(intr.intraday_low)}</text></g>`; }
@@ -522,18 +539,60 @@ function afterChart(d) {
   ${a.map((x, i) => x.t % 5 === 0 ? `<text x="${f1(i * bw + bw / 2)}" y="${H + 16}" class="ax" text-anchor="middle">${x.t === 0 ? L("day 0", "Tag 0") : (x.t > 0 ? "+" : "") + x.t}</text>` : "").join("")}</svg></div>`;
 }
 
+/* ---------- evidence brief + explanation check (engine/evidence.py): deterministic, works offline ---------- */
+const VERD = v => ({supported: [L("Supported by the data", "Von den Daten gestützt"), "ok", "✓"], contradicted: [L("Contradicted by the data", "Von den Daten widerlegt"), "no", "✕"],
+  partly: [L("Partly supported", "Teilweise gestützt"), "part", "◐"], not_testable: [L("Not testable with this data", "Mit diesen Daten nicht prüfbar"), "na", "?"]}[v] || [v, "na", "?"]);
+/* which checks a free-text explanation touches (EN/DE keywords); the checks themselves run on the engine's figures */
+const CLAIM_RX = {
+  market: /\b(whole|overall|broad|general|entire) market|market[- ](sell-?off|fell|fall|drop|decline|weak|was down|rout|turmoil)|it was the market|was (this|it) (just )?the market|war das (nur )?der markt|sector|industry|macro|interest rate|peers (fell|dropped|were down)|everyone|all stocks|gesamtmarkt|marktschwäche|markt (fiel|brach|war schwach)|sektor|branche|konjunktur|zinsen|lag am markt/i,
+  announcement: /result|earning|announc|guidance|ad.?hoc|dividend|figures|numbers|outlook|quarterly|report|ergebnis|zahlen|meldung|prognose|dividende|ausblick|quartal|bericht/i,
+  thin: /thin|illiquid|low (volume|liquidity|turnover)|lack of liquidity|few trades|dünn|illiquid|geringe[rn]? (umsatz|liquidität)|wenig umsatz|mangelnde liquidität/i,
+  technical: /rebalanc|index (inclusion|deletion|change|review|fund|trade)|expir|witching|msci|stoxx|ftse|verfall|indexänderung|indexaufnahme|indexstreichung|indexfonds|option|future|derivat/i,
+  investors: /fund|institution|hedge|short|investor|retail|block (sale|trade)|placement|fonds|leerverk|anleger|privat|institutionell|platzierung/i,
+  overreaction: /overreact|over-react|recover|bounce|revers|rebound|übertr|erhol|gegenbewegung|korrektur/i,
+  leak: /leak|before the (news|announcement|release)|insider|front.?run|in advance|ahead of the|vorab|vor der (meldung|nachricht|veröffentlichung)|durchgestochen/i};
+function classifyClaim(t) { return Object.keys(CLAIM_RX).filter(k => CLAIM_RX[k].test(t)); }
+function briefHTML(k) {
+  const ev = S.ev[k];
+  if (!ev) return `<div class="skel" style="min-height:200px"></div>`;
+  if (ev.error) return `<p class="m">${L("The evidence brief could not be built: ", "Die Evidenz-Übersicht konnte nicht erstellt werden: ")}${esc(ev.error)}</p>`;
+  const b = ev[S.lang] || ev.en, open = S.briefOpen;
+  const secs = b.sections.map((s, i) => `<section class="bf-sec bf-${s.key}"><h4><span class="n">0${i + 1}</span>${esc(s.title)}</h4><ul>${s.points.map((p, j) => `<li ${j && !open ? "hidden" : ""}>${esc(p)}</li>`).join("")}</ul>${s.points.length > 1 && !open ? `<button class="bf-more" data-act="brieftoggle">+ ${s.points.length - 1} ${L("more", "weitere")}</button>` : ""}</section>`).join("");
+  const tested = (S.tested[k] || []);
+  return `<div class="bf-head"><div><div class="big-cap">${L("Evidence brief", "Evidenz-Übersicht")}</div><p class="bf-hl">${esc(b.headline)}</p></div>
+      <button class="link" data-act="brieftoggle" aria-expanded="${!!open}">${open ? L("Show less", "Weniger zeigen") : L("Show every point", "Alle Punkte zeigen")}</button></div>
+    <div class="bf-grid">${secs}</div>
+    <div class="claim" id="claim">
+      <div class="claim-in"><div><h3 class="h3">${L("Test an explanation", "Erklärung prüfen")}</h3><p class="sec-note" style="margin:0 0 10px">${L("Before you tell the board why the share moved, check the explanation against the figures above. Nothing is sent to a language model: fixed rules on the engine's numbers.", "Bevor Sie dem Vorstand erklären, warum sich die Aktie bewegt hat: Erklärung gegen die Zahlen oben prüfen. Kein Sprachmodell: feste Regeln auf den Zahlen der Engine.")}</p>
+        <form id="claimf" class="claim-f" autocomplete="off"><input id="claimq" maxlength="300" aria-label="${L("Explanation to test", "Zu prüfende Erklärung")}" placeholder="${L("e.g. “The whole market sold off that day”", "z. B. „Der Gesamtmarkt ist an dem Tag eingebrochen“")}"><button class="pill pill--sm" type="submit">${L("Check", "Prüfen")}</button></form>
+        <div class="claim-chips">${Object.keys(b.claims).map(id => `<button type="button" data-claim="${id}">${esc(b.claims[id].label)}</button>`).join("")}</div></div>
+      <div class="claim-out" id="claimout" aria-live="polite">${tested.length ? claimResults(k) : ""}</div></div>`;
+}
+function claimResults(k) {
+  const ev = S.ev[k], b = ev && (ev[S.lang] || ev.en); if (!b) return "";
+  return (S.tested[k] || []).map(t => {
+    if (!t.ids.length) return `<div class="cr"><p class="cr-q">${esc(t.q)}</p><p class="m" style="margin:4px 0 0">${L("This explanation does not match a check the data can run. The checks cover: the market, the announcement, thin trading, index trades or expiry, investor types, a reversal, and trading before the news. Pick one below the box.", "Diese Erklärung passt zu keiner Prüfung, die die Daten erlauben. Geprüft werden: Markt, Meldung, dünner Handel, Indextrades oder Verfall, Investorentypen, Umkehr und Handel vor der Nachricht. Bitte unten auswählen.")}</p></div>`;
+    return `<div class="cr">${t.q ? `<p class="cr-q">${esc(t.q)}</p>` : ""}${t.ids.map(id => { const c = b.claims[id], [vt, cls, ic] = VERD(c.verdict);
+      return `<div class="cr-row"><span class="verd ${cls}"><i aria-hidden="true">${ic}</i>${vt}</span><div><b>${esc(c.label)}</b><p>${esc(c.text)}</p>${c.better ? `<p class="better"><span>${L("Say instead", "Besser so")}:</span> ${esc(c.better)} <button class="link" data-act="copyclaim" data-txt="${enc(c.better)}">${L("Copy", "Kopieren")}</button></p>` : ""}</div></div>`; }).join("")}</div>`;
+  }).reverse().join("");
+}
+function testClaim(q, ids) {
+  const k = keyOf(S.sel); S.tested[k] = (S.tested[k] || []).filter(t => t.q !== q || q === "").concat([{q, ids}]).slice(-4);
+  const out = $("#claimout"); if (out) out.innerHTML = claimResults(k);
+}
+
 /* ---------- AI summary (on the card) ---------- */
 function aiBoxHTML(k) {
   const lang = S.aiLang || S.lang, r = S.ai[k + "|" + lang], live = r ? r.source === "llm" : S.status && S.status.llm;
   const chk = r ? numbersCheck(r.text, S.cards[k] && S.cards[k].card) : null;
   return `<div class="head"><h2 class="h2">${L("AI summary", "KI-Zusammenfassung")}</h2>
-    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><span class="badge ${live ? "on" : ""}"><i></i>${live ? L(`Written by ${esc((r && r.model) || S.status.model || "the language model")}`, `Geschrieben von ${esc((r && r.model) || S.status.model || "dem Sprachmodell")}`) : r && r.rejected && r.rejected.length ? L("Template text (the model's draft had figures not in the card)", "Vorlagentext (Entwurf des Modells hatte Zahlen, die nicht in der Karte stehen)") : L("Template text (no language model connected)", "Vorlagentext (kein Sprachmodell verbunden)")}</span>${seg("ailang", [["en", "EN"], ["de", "DE"]], lang)}</div></div>
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><span class="badge ${live ? "on" : ""}"><i></i>${live ? (r && r.cached ? L(`Saved answer from ${esc(r.model)} (not re-generated)`, `Gespeicherte Antwort von ${esc(r.model)} (nicht neu erzeugt)`) : L(`Written by ${esc((r && r.model) || S.status.model || "the language model")}`, `Geschrieben von ${esc((r && r.model) || S.status.model || "dem Sprachmodell")}`)) : r && r.rejected && r.rejected.length ? L("Template text (the model's draft had figures not in the card)", "Vorlagentext (Entwurf des Modells hatte Zahlen, die nicht in der Karte stehen)") : L("Template text (no language model connected)", "Vorlagentext (kein Sprachmodell verbunden)")}</span>${seg("ailang", [["en", "EN"], ["de", "DE"]], lang)}</div></div>
     <p class="ai-text ${r ? "" : "wait"}" id="aitext">${r ? esc(r.text) : L("Writing the summary from the card…", "Die Zusammenfassung wird aus der Karte geschrieben…") + '<span class="caret"></span>'}</p>
     <div class="ai-foot"><span class="check ${chk && chk.bad ? "warn" : ""}" id="aichk">${chk ? checkHTML(chk) : ""}</span>
-      <span style="display:flex;gap:18px;flex-wrap:wrap"><button class="link" data-act="regen">${L("Regenerate", "Neu schreiben")}</button><button class="link" data-act="copy">${L("Copy", "Kopieren")}</button><button class="link" data-act="toreport">${L("Put in report", "In den Report")} ${ARR}</button></span></div>`;
+      <span style="display:flex;gap:18px;flex-wrap:wrap">${S.status && S.status.llm && !S.status.offline ? `<button class="link" data-act="regen">${L("Ask the model again", "Modell neu fragen")}</button>` : ""}<button class="link" data-act="copy">${L("Copy", "Kopieren")}</button><button class="link" data-act="toreport">${L("Put in report", "In den Report")} ${ARR}</button></span></div>`;
 }
 const checkHTML = c => `<svg width="18" height="18" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/>${c.bad ? '<path d="M10 5v6M10 14v1" stroke="currentColor" stroke-width="2"/>' : '<path d="M6 10.5l2.6 2.6L14 7.6" fill="none" stroke="currentColor" stroke-width="2"/>'}</svg>` +
-  (c.bad ? L(`${c.bad} of ${c.total} figures not found in the card: ${c.miss.slice(0, 3).join(", ")}`, `${c.bad} von ${c.total} Zahlen nicht in der Karte: ${c.miss.slice(0, 3).join(", ")}`) : L(`All ${c.total} figures match the impact card`, `Alle ${c.total} Zahlen stimmen mit der Impact Card überein`));
+  (c.bad ? L(`${c.bad} of ${c.total} figures not found in the card: ${c.miss.slice(0, 3).join(", ")}`, `${c.bad} von ${c.total} Zahlen nicht in der Karte: ${c.miss.slice(0, 3).join(", ")}`) : L(`All ${c.total} figures found in the impact card (a numbers check, not a meaning check)`, `Alle ${c.total} Zahlen in der Impact Card gefunden (Zahlenprüfung, keine Sinnprüfung)`));
 /* every number in the AI text must exist in the card JSON (rounded); dates and clock times must match exactly */
 function numbersCheck(text, card) {
   if (!text || !card) return null;
@@ -559,9 +618,9 @@ async function runAI(k, lang, force = false) {
   const [isin, day, ev] = k.split("|");
   updateAIBox(k, true);
   try {
-    const r = await post("/api/narrate", {isin, day, event_id: ev || null, lang});
+    const r = await post("/api/narrate", {isin, day, event_id: ev || null, lang, fresh: force});
     S.ai[id] = r;
-    if (keyOf(S.sel || {}) === k && S.page === "card") streamAI(k, r.text);
+    if (keyOf(S.sel || {}) === k && S.page === "card") updateAIBox(k);
   } catch (e) { const el = $("#aitext"); if (el) el.textContent = L("The summary could not be generated: ", "Zusammenfassung fehlgeschlagen: ") + e.message; }
 }
 function updateAIBox(k, waiting = false) {
@@ -570,12 +629,6 @@ function updateAIBox(k, waiting = false) {
   box.innerHTML = aiBoxHTML(k); segThumb();
 }
 let streamTok = 0;
-function streamAI(k, text) {
-  const el = $("#aitext"); if (!el) return; const tok = ++streamTok; el.classList.remove("wait");
-  const w = text.split(" "); let i = 0;
-  (function step() { if (tok !== streamTok || !document.body.contains(el)) return; el.innerHTML = esc(w.slice(0, ++i).join(" ")) + (i < w.length ? '<span class="caret"></span>' : "");
-    if (i < w.length) setTimeout(step, reduced ? 0 : 18 + Math.random() * 30); else updateAIBox(k); })();
-}
 
 /* ============================== 3 compare ============================== */
 function pCompare() {
@@ -643,14 +696,15 @@ function pReport() {
       ${box("a", L("Trading profile (60 days)", "Handelsprofil (60 Tage)"))}${box("peers", L("Peer benchmark", "Peer-Vergleich"))}${box("liq", L("Liquidity verdict", "Liquiditätsbewertung"))}${box("anom", L("Unusual days", "Auffällige Tage"))}${box("card", L("Impact card", "Impact Card"))}${box("ai", L("AI summary of the card", "KI-Zusammenfassung der Karte"))}</div>
       <div><div class="lbl">${L("Event for the impact card", "Ereignis für die Impact Card")}</div><select data-rep="key">${repOptions().map(([v, t]) => `<option value="${esc(v)}" ${v === r.key ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
       <div><div class="lbl">${L("Language", "Sprache")}</div>${seg("replang", [["en", "EN"], ["de", "DE"]], S.lang)}</div>
-      <div><button class="pill" data-act="print">${L("Download PDF", "PDF herunterladen")} ${ARR}</button><p class="sec-note">${L("A4 layout. Choose “Save as PDF” in the print dialog.", "A4-Layout. Im Druckdialog „Als PDF sichern“ wählen.")}</p></div></div>
+      <div><button class="pill" data-act="print">${L("Print / save as PDF", "Drucken / als PDF sichern")} ${ARR}</button><p class="sec-note">${L("Opens the browser's print dialog in A4 layout: choose “Save as PDF”.", "Öffnet den Druckdialog des Browsers im A4-Layout: „Als PDF sichern“ wählen.")}</p></div></div>
     <div class="rep-view rv" style="--d:.1s"><div class="sheet" id="sheet">${sheetHTML()}</div></div></div></section>`;
 }
 function sheetHTML() {
   const r = S.rep, u = U(S.isin), iss = S.iss, k = iss.kpis, lt = iss.liquidity, [day, ev] = (r.key || "|").split("|");
   const ck = `${S.isin}|${day}|${ev || ""}`, d = S.cards[ck], ai = S.ai[ck + "|" + S.lang];
   const prices = iss.series.price.filter(isN);
-  let h = `<div class="sh-top"><div><div class="k">${L("IR snapshot", "IR-Snapshot")} · ${u.ticker} · ${u.isin} · ${u.index}</div><h3>${esc(nice(u))}</h3></div><div class="k" style="text-align:right">Issuer Intelligence Hub<br>${L("Xetra data as of the close on", "Xetra-Daten bis Handelsschluss")} ${dL(iss.meta.last_date)}</div></div>`;
+  let h = `<div class="sh-top"><div><div class="k">${L("IR snapshot", "IR-Snapshot")} · ${u.ticker} · ${u.isin} · ${u.index}</div><h3>${esc(nice(u))}</h3></div><div class="k" style="text-align:right">Issuer Intelligence Hub<br>${L("Xetra data as of the close on", "Xetra-Daten bis Handelsschluss")} ${dL(iss.meta.last_date)}</div></div><!--FIND-->`;
+  let findHTML = "";
   if (r.a) h += `<section><h4>${L("Normal state, last 60 trading days", "Normalzustand, letzte 60 Handelstage")}</h4><table><tr><th></th><th class="r">${u.ticker}</th><th class="r">${u.index} ${L("median", "Median")}</th></tr>
     <tr><td>${L("Turnover per day", "Umsatz pro Tag")}</td><td class="r"><b>${EUR(k.median_turnover_eur.stock)}</b></td><td class="r">${EUR(k.median_turnover_eur.index_median)}</td></tr>
     <tr><td>${L("Trading cost €25k (XLM)", "Handelskosten 25 T€ (XLM)")}</td><td class="r"><b>${BPS(k.median_xlm_25k_bps.stock)}</b></td><td class="r">${BPS(k.median_xlm_25k_bps.index_median)}</td></tr>
@@ -660,15 +714,23 @@ function sheetHTML() {
   if (r.peers) { const p = iss.peers, g = p.groups.filter(x => x.values && x.n); h += `<section><h4>${L("Peer benchmark", "Peer-Vergleich")}</h4><table><tr><th></th><th class="r">${u.ticker}</th>${g.map(x => `<th class="r">${x.key === "index" ? u.index : x.key === "size" ? L("Similar size", "Ähnl. Größe") : esc(x.label)}</th>`).join("")}</tr>
     ${[["turnover_eur", L("Turnover", "Umsatz"), EUR], ["xlm_25k", "XLM 25k", BPS], ["volatility", L("Volatility", "Volatilität"), v => P(v, 0, false)]].map(([kk, t, f]) => `<tr><td>${t}</td><td class="r"><b>${f(p.stock[kk])}</b></td>${g.map(x => `<td class="r">${f(x.values[kk])}</td>`).join("")}</tr>`).join("")}</table></section>`; }
   if (r.liq) h += `<section><h4>${L("Liquidity", "Liquidität")}</h4><p style="margin:0">${L(`Trading cost ${P(lt.xlm_25k_change_pct, 0)} and turnover ${P(lt.turnover_change_pct, 0)} (last 60 vs previous 60 trading days; ${u.index}: ${P(lt.index_xlm_25k_change_pct, 0)} / ${P(lt.index_turnover_change_pct, 0)}). Xetra liquidity category (estimate): ${k.liquidity_check.category_estimate}.`, `Handelskosten ${P(lt.xlm_25k_change_pct, 0)} und Umsatz ${P(lt.turnover_change_pct, 0)} (letzte 60 vs. vorherige 60 Handelstage; ${u.index}: ${P(lt.index_xlm_25k_change_pct, 0)} / ${P(lt.index_turnover_change_pct, 0)}). Xetra-Liquiditätskategorie (Schätzung): ${k.liquidity_check.category_estimate}.`)}</p></section>`;
-  if (r.anom && iss.anomalies.length) h += `<section><h4>${L("Unusual days", "Auffällige Tage")}</h4><table><tr><th>${L("Date", "Datum")}</th><th class="r">${L("Abnormal", "Abnormal")}</th><th class="r">${L("Turnover", "Umsatz")}</th><th>${L("Calendar", "Kalender")}</th></tr>${iss.anomalies.slice(0, 6).map(a => `<tr><td>${dS(a.peak_date)}</td><td class="r">${P(a.peak_abn_ret)}</td><td class="r">${X(a.max_vol_ratio)}</td><td>${a.event ? esc(a.event.type) : L("cause open", "Ursache offen")}</td></tr>`).join("")}</table></section>`;
+  if (r.anom && iss.anomalies.length) h += `<section><h4>${L("Unusual days", "Auffällige Tage")}</h4><table><tr><th>${L("Date", "Datum")}</th><th class="r">${L("Abnormal", "Abnormal")}</th><th class="r">${L("Turnover", "Umsatz")}</th><th>${L("Calendar", "Kalender")}</th></tr>${iss.anomalies.slice(0, 6).map(a => `<tr><td>${dS(a.peak_date)}</td><td class="r">${P(a.peak_abn_ret)}</td><td class="r">${X(a.peak_vol_ratio)}</td><td>${a.event ? esc(a.event.type) : L("cause open", "Ursache offen")}</td></tr>`).join("")}</table></section>`;
   if (r.card) {
     if (!d) h += `<section><h4>${L("Impact card", "Impact Card")}</h4><p class="m">${L("Loading…", "Wird geladen…")}</p></section>`;
-    else { const c = d.card; h += `<section><h4>${L("Impact card", "Impact Card")} · ${dL(c.event.reaction_day)} · ${esc(c.event.type)}</h4>${c.event.type !== "NOTABLE_DAY" ? `<p style="margin:0 0 6px">${esc(c.event.title)}</p>` : ""}<table>
+    else { const c = d.card, evb = S.ev[ck], b = evb && !evb.error ? (evb[S.lang] || evb.en) : null, sec = key => b ? (b.sections.find(x => x.key === key) || {points: []}).points : [];
+      const own = String(c.event.event_id || "").startsWith("USR_");
+      const verif = c.event.type === "NOTABLE_DAY" ? L("Detected from trading; no calendar entry, cause not verified.", "Aus dem Handel erkannt; kein Kalendereintrag, Ursache nicht geprüft.") : own ? L("From the company's own calendar; not checked against a source.", "Aus dem eigenen Kalender; nicht mit einer Quelle geprüft.") : String(d.event_row && d.event_row.verified) === "1" ? L("Date and time verified against the source.", "Datum und Uhrzeit mit der Quelle geprüft.") : L("Source not yet verified.", "Quelle noch nicht geprüft.");
+      if (b) findHTML = `<section class="sh-find"><h4>${L("Main finding", "Kernaussage")}</h4><p style="margin:0;font-size:14px;font-weight:600;color:#181813">${esc(b.headline)}</p><p style="margin:4px 0 0">${esc(sec("market")[0] || "")}</p></section>`;
+      h += `<section><h4>${L("Impact card", "Impact Card")} · ${dL(c.event.reaction_day)} · ${esc(c.event.type)}</h4>${c.event.type !== "NOTABLE_DAY" ? `<p style="margin:0 0 2px">${esc(c.event.title)}</p>` : ""}<p class="m" style="margin:0 0 6px;font-size:11px">${verif}${c.event.source_url ? ` ${L("Source", "Quelle")}: ${esc(c.event.source_url.replace(/^https?:\/\//, "").slice(0, 70))}` : ""} · ${L("Normal = median of trading days t-65 to t-6", "Normal = Median der Handelstage t-65 bis t-6")}</p><table>
       ${[[L("Share return", "Rendite"), P(c.price.ret)], [L("Peers", "Peers"), P(c.price.peer_ret)], [L("Stock-specific move", "Titelspezifische Bewegung"), P(c.price.abn_ret)], [L("Turnover vs normal", "Umsatz vs. normal"), X(c.volume.ratio)], [L("Trading cost vs normal", "Handelskosten vs. normal"), X(c.liquidity.ratio)],
          [L("Opening auction vs normal", "Eröffnungsauktion vs. normal"), X(c.auctions.open_auction_ratio)], [L("Closing auction", "Schlussauktion"), `${EUR(c.auctions.close_auction_eur)} (${X(c.auctions.close_auction_ratio)})`], [L("Client net flow", "Kunden-Nettofluss"), P(c.participants.agent_aggr_imbalance, 0)]].map(([a, b]) => `<tr><td>${a}</td><td class="r"><b>${b}</b></td></tr>`).join("")}</table>
-      ${d.bars ? `<div style="margin-top:8px">${sparkIntra(d)}</div>` : ""}</section>`; }
+      ${d.bars ? `<div style="margin-top:8px">${sparkIntra(d)}</div>` : ""}</section>`;
+      if (b) { const tested = (S.tested[ck] || []).flatMap(t => t.ids); const uniq = [...new Set(tested)];
+        h += `<section class="sh-cols"><div><h4>${L("What the data cannot tell", "Was die Daten nicht sagen")}</h4><ul>${sec("unknown").slice(0, 3).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div><div><h4>${L("Next step", "Nächster Schritt")}</h4><ul>${sec("next").slice(0, 2).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div></section>`;
+        if (uniq.length) h += `<section><h4>${L("Explanations checked", "Geprüfte Erklärungen")}</h4><table>${uniq.map(id => { const cl = b.claims[id]; return `<tr><td>${esc(cl.label)}</td><td><b>${VERD(cl.verdict)[0]}</b>. ${esc(cl.text)}</td></tr>`; }).join("")}</table></section>`; } }
   }
   if (r.ai) h += `<section><h4>${L("Summary", "Zusammenfassung")}</h4><p style="margin:0;font-size:13px;line-height:1.55">${ai ? esc(ai.text) : `<span class="m">${L("Writing…", "Wird geschrieben…")}</span>`}</p></section>`;
+  h = h.replace("<!--FIND-->", findHTML);
   h += `<div class="foot">${L("Source: Deutsche Börse Xetra data (OHLC, flow dynamics, XLM, on-book trades), events/events.csv. Figures computed by the engine; text generated from them and checked. Peers = equal-weighted index members. Causes are not in the data. Not investment advice.", "Quelle: Deutsche Börse Xetra-Daten (OHLC, Flow Dynamics, XLM, On-Book-Trades), events/events.csv. Zahlen von der Engine berechnet; Text daraus generiert und geprüft. Peers = gleichgewichtete Indexmitglieder. Ursachen sind nicht in den Daten. Keine Anlageberatung.")}</div>`;
   return h;
 }
@@ -680,7 +742,8 @@ function sparkIntra(d) {
 async function loadReport() {
   const [day, ev] = (S.rep.key || "|").split("|"); if (!day) return;
   const ck = `${S.isin}|${day}|${ev || ""}`;
-  if (!S.cards[ck]) { try { S.cards[ck] = await api(cardURL(S.isin, day, ev)); } catch (e) { return; } }
+  loadEvidence(ck);
+  if (!S.cards[ck]) { try { S.cards[ck] = await api(cardURL(S.isin, day, ev)); } catch (e) { $("#sheet") && ($("#sheet").innerHTML = sheetHTML() + `<p class="dn">${L("The impact card could not be built: ", "Die Impact Card konnte nicht berechnet werden: ")}${esc(e.message)}</p>`); return; } }
   if (!S.ai[ck + "|" + S.lang]) { try { S.ai[ck + "|" + S.lang] = await post("/api/narrate", {isin: S.isin, day, event_id: ev || null, lang: S.lang}); } catch (e) { /* keep placeholder */ } }
   if (S.page === "report") $("#sheet") && ($("#sheet").innerHTML = sheetHTML());
 }
@@ -707,8 +770,8 @@ function pIdeas() {
 
 /* ============================== own event calendar (VI: ingest a corporate event calendar) ============================== */
 const UEV_KEY = "iih.userEvents";
-function userEvents(isin) { try { return (JSON.parse(localStorage.getItem(UEV_KEY) || "{}")[isin]) || []; } catch (e) { return S._uev && S._uev[isin] || []; } }
-function saveUserEvents(isin, list) { S._uev = S._uev || {}; S._uev[isin] = list; try { const all = JSON.parse(localStorage.getItem(UEV_KEY) || "{}"); all[isin] = list; localStorage.setItem(UEV_KEY, JSON.stringify(all)); } catch (e) { /* private mode: keep in memory */ } }
+function userEvents(isin) { if (S._uev && S._uev[isin]) return S._uev[isin]; try { return (JSON.parse(localStorage.getItem(UEV_KEY) || "{}")[isin]) || []; } catch (e) { return []; } }
+function saveUserEvents(isin, list) { S._uev = S._uev || {}; S._uev[isin] = list; try { const all = JSON.parse(localStorage.getItem(UEV_KEY) || "{}"); all[isin] = list; localStorage.setItem(UEV_KEY, JSON.stringify(all)); return true; } catch (e) { return false; /* private mode: kept in memory for this session */ } }
 function mergeUserEvents() { const own = userEvents(S.isin), ids = new Set(S.iss.events.map(e => e.event_id)); S.iss.events = S.iss.events.filter(e => !e.user).concat(own.filter(e => !ids.has(e.event_id))); }
 function cardURL(isin, day, ev) {
   let u = `/api/card?isin=${isin}&day=${day}${ev ? `&event_id=${enc(ev)}` : ""}`;
@@ -717,6 +780,11 @@ function cardURL(isin, day, ev) {
   return u;
 }
 // one-click IR report (PDF) for this card: same event parameters as the card itself
+/* the PDF is rendered by the server; the offline copy prints the IR snapshot page instead */
+function exportBtn(href, cls) {
+  return S.status && S.status.offline ? `<button class="${cls}" data-go="report">${L("IR snapshot (print to PDF)", "IR-Snapshot (als PDF drucken)")} ${ARR}</button>`
+    : `<a class="${cls}" href="${href}" download>${L("Export IR report (PDF)", "IR-Report exportieren (PDF)")} ↓</a>`;
+}
 function exportURL(isin, day, ev) { return cardURL(isin, day, ev).replace("/api/card?", "/api/export?") + `&lang=${S.lang}`; }
 const EVTYPES = ["FY", "Q1", "H1", "Q3", "ADHOC", "GUIDANCE", "DIVIDEND_EX", "AGM", "CMD", "MA", "OTHER"];
 function evForm() {
@@ -724,42 +792,104 @@ function evForm() {
     <select id="ev-y" aria-label="${L("Type", "Typ")}">${EVTYPES.map(t => `<option value="${t}">${TYPE(t)}</option>`).join("")}</select>
     <input id="ev-n" placeholder="${L("Title, e.g. Q3 trading statement", "Titel, z. B. Q3-Mitteilung")}" maxlength="160">
     <button class="pill pill--sm" type="submit">${L("Build impact card", "Impact Card erstellen")} ${ARR}</button>
-    <p class="m">${L("Time decides the reaction day: after the 17:35 closing auction it is the next trading day. CSV import: date,time,type,title. ICS from Outlook or Google also works.", "Die Uhrzeit bestimmt den Reaktionstag: nach der Schlussauktion um 17:35 ist es der nächste Handelstag. CSV-Import: date,time,type,title. ICS aus Outlook oder Google geht auch.")}</p></form>`;
+    <p class="m">${L("Time decides the reaction day: after the 17:35 closing auction it is the next trading day. CSV import: date,time,type,title (header optional, date YYYY-MM-DD or DD.MM.YYYY, time in Berlin time). ICS from Outlook or Google, with its time zone, also works.", "Die Uhrzeit bestimmt den Reaktionstag: nach der Schlussauktion um 17:35 ist es der nächste Handelstag. CSV-Import: date,time,type,title (Kopfzeile optional, Datum JJJJ-MM-TT oder TT.MM.JJJJ, Zeit Berliner Zeit). ICS aus Outlook oder Google mit Zeitzone geht auch.")}</p></form>`;
 }
 const guessType = t => { t = String(t).toLowerCase(); return /hauptversammlung|agm|annual general/.test(t) ? "AGM" : /dividend|ex-tag/.test(t) ? "DIVIDEND_EX" : /\bq1\b|first quarter|1\. quartal/.test(t) ? "Q1" : /\bh1\b|half|halbjahr/.test(t) ? "H1" : /\bq3\b|third quarter|9m|nine months|9 monate/.test(t) ? "Q3" : /annual|full.year|geschäftsjahr|fy\b|jahresergebnis/.test(t) ? "FY" : /ad.hoc/.test(t) ? "ADHOC" : /guidance|prognose|outlook/.test(t) ? "GUIDANCE" : /capital markets day|kapitalmarkttag|cmd\b/.test(t) ? "CMD" : "OTHER"; };
+/* CSV with quoted fields ("a, b"), ; , or tab separators; EN/DE headers; YYYY-MM-DD or DD.MM.YYYY */
+function csvRows(text) {
+  const first = text.split(/\r?\n/)[0] || "", sep = [";", "\t", ","].sort((a, b) => first.split(b).length - first.split(a).length)[0];
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') q = false; else cell += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === sep) { row.push(cell.trim()); cell = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell.trim()); cell = ""; if (row.some(c => c)) rows.push(row); row = []; }
+    else cell += ch;
+  }
+  row.push(cell.trim()); if (row.some(c => c)) rows.push(row);
+  return rows;
+}
+/* wall-clock time in an IANA zone -> Europe/Berlin (ICS TZID); two passes settle DST edges */
+function zoneToBerlin(date, time, tz) {
+  const fmt = (z, ms) => { const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {timeZone: z, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"}).formatToParts(new Date(ms)).map(x => [x.type, x.value])); return p; };
+  const want = Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10), +time.slice(0, 2), +time.slice(3, 5));
+  let ms = want;
+  for (let k = 0; k < 2; k++) { const p = fmt(tz, ms), seen = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute); ms += want - seen; }
+  const b = fmt("Europe/Berlin", ms); return [`${b.year}-${b.month}-${b.day}`, `${b.hour}:${b.minute}`];
+}
 function parseCalendar(text) {
   const out = [];
   if (/BEGIN:VEVENT/.test(text)) {
     text.replace(/\r?\n[ \t]/g, "").split("BEGIN:VEVENT").slice(1).forEach(b => {
-      const st = (b.match(/DTSTART[^:]*:(\d{8})(?:T(\d{2})(\d{2})\d{0,2}(Z)?)?/) || []), sum = ((b.match(/SUMMARY[^:]*:(.*)/) || [])[1] || "").trim();
-      if (!st[1]) return; let date = `${st[1].slice(0, 4)}-${st[1].slice(4, 6)}-${st[1].slice(6, 8)}`, time = st[2] ? `${st[2]}:${st[3]}` : "";
-      if (st[4] && time) { const d = new Date(`${date}T${time}:00Z`), f = new Intl.DateTimeFormat("sv-SE", {timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"}).format(d).split(" "); date = f[0]; time = f[1]; }
-      out.push({date, time, type: guessType(sum), title: sum.replace(/\\,/g, ",")});
+      const line = (b.match(/^DTSTART([^:\r\n]*):([^\r\n]+)/m) || []), sum = ((b.match(/^SUMMARY[^:]*:(.*)$/m) || [])[1] || "").trim().replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\n/gi, " ");
+      const v = (line[2] || "").trim(), params = line[1] || "", m = v.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})\d{0,2}(Z)?)?$/);
+      if (!m) { out.push({date: "", time: "", type: guessType(sum), title: sum, issue: L("no readable DTSTART", "kein lesbares DTSTART")}); return; }
+      let date = `${m[1]}-${m[2]}-${m[3]}`, time = m[4] ? `${m[4]}:${m[5]}` : "", note = "";
+      const tz = (params.match(/TZID=([^;:]+)/) || [])[1];
+      try {
+        if (time && m[6]) [date, time] = zoneToBerlin(date, time, "UTC");
+        else if (time && tz && tz !== "Europe/Berlin") { [date, time] = zoneToBerlin(date, time, tz.replace(/"/g, "")); note = L(`converted from ${tz}`, `umgerechnet aus ${tz}`); }
+        else if (time && !tz) note = L("no time zone in the file: read as Berlin time", "keine Zeitzone in der Datei: als Berliner Zeit gelesen");
+      } catch (e) { note = L(`unknown time zone ${tz}: read as Berlin time`, `unbekannte Zeitzone ${tz}: als Berliner Zeit gelesen`); }
+      out.push({date, time, type: guessType(sum), title: sum, note});
     });
     return out;
   }
-  const lines = text.split(/\r?\n/).filter(l => l.trim()), sep = (lines[0] || "").includes(";") ? ";" : ",";
-  const head = lines[0].toLowerCase().split(sep).map(h => h.trim().replace(/"/g, "")), has = head.includes("date") || head.includes("datum");
-  const ix = k => head.findIndex(h => k.includes(h));
-  const iD = has ? ix(["date", "datum"]) : 0, iT = has ? ix(["time", "zeit", "uhrzeit"]) : 1, iY = has ? ix(["type", "typ"]) : 2, iN = has ? ix(["title", "titel", "event", "name"]) : 3;
-  lines.slice(has ? 1 : 0).forEach(l => { const c = l.split(sep).map(x => x.trim().replace(/^"|"$/g, "")); let d = c[iD] || ""; const m = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/); if (m) d = `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`; if (!/^\d{4}-\d{2}-\d{2}/.test(d)) return;
-    const title = iN >= 0 ? c[iN] || "" : ""; out.push({date: d.slice(0, 10), time: iT >= 0 ? c[iT] || "" : "", type: (iY >= 0 && EVTYPES.includes((c[iY] || "").toUpperCase())) ? c[iY].toUpperCase() : guessType(title), title}); });
+  const rows = csvRows(text); if (!rows.length) return out;
+  const head = rows[0].map(h => h.toLowerCase()), has = head.some(h => ["date", "datum"].includes(h));
+  const ix = ks => head.findIndex(h => ks.includes(h));
+  const iD = has ? ix(["date", "datum"]) : 0, iT = has ? ix(["time", "zeit", "uhrzeit"]) : 1, iY = has ? ix(["type", "typ", "art"]) : 2, iN = has ? ix(["title", "titel", "event", "name", "ereignis", "beschreibung"]) : 3;
+  rows.slice(has ? 1 : 0).forEach(c => {
+    let d = c[iD] || ""; const de = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/); if (de) d = `${de[3]}-${de[2].padStart(2, "0")}-${de[1].padStart(2, "0")}`;
+    const title = iN >= 0 ? c[iN] || "" : "", ty = iY >= 0 ? (c[iY] || "").toUpperCase() : "";
+    let time = iT >= 0 ? (c[iT] || "").replace(".", ":") : ""; if (/^\d:\d\d$/.test(time)) time = "0" + time;
+    const row = {date: d.slice(0, 10), time: /^\d\d:\d\d/.test(time) ? time.slice(0, 5) : "", type: EVTYPES.includes(ty) ? ty : guessType(title), title};
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date) || isNaN(Date.parse(row.date))) row.issue = L(`date “${c[iD] || ""}” not readable: use YYYY-MM-DD or DD.MM.YYYY`, `Datum „${c[iD] || ""}“ nicht lesbar: JJJJ-MM-TT oder TT.MM.JJJJ verwenden`);
+    else if (time && !row.time) row.note = L(`time “${time}” ignored`, `Uhrzeit „${time}“ ignoriert`);
+    out.push(row);
+  });
   return out;
 }
 async function importCalendar(file) {
-  const evs = parseCalendar(await file.text());
-  if (!evs.length) { toast(L("No events found in this file", "Keine Ereignisse in der Datei gefunden")); return; }
-  addEvents(evs, true);
+  let evs;
+  try { evs = parseCalendar(await file.text()); } catch (e) { evs = []; }
+  if (!evs.length) { S.calPrev = {file: file.name, error: L("No events found. Expected a CSV with the columns date,time,type,title (header optional) or an .ics calendar.", "Keine Ereignisse gefunden. Erwartet: CSV mit den Spalten date,time,type,title (Kopfzeile optional) oder eine .ics-Datei."), rows: []}; render(); return; }
+  const ok = evs.filter(e => !e.issue);
+  let matched = [];
+  if (ok.length) {
+    if (S.status && S.status.offline) { S.calPrev = {file: file.name, error: L("Matching a calendar to trading days needs the live site. This offline copy cannot import.", "Den Kalender Handelstagen zuzuordnen braucht die Live-Seite. Diese Offline-Kopie kann nicht importieren."), rows: []}; render(); return; }
+    try { matched = (await post("/api/calendar", {isin: S.isin, events: ok})).events; }
+    catch (e) { S.calPrev = {file: file.name, error: L("Matching failed: ", "Zuordnung fehlgeschlagen: ") + e.message, rows: []}; render(); return; }
+  }
+  let k = 0;
+  const rows = evs.map(e => e.issue ? {...e, status: "invalid", note: e.issue} : {...matched[k++], note: [e.note, matched[k - 1] && matched[k - 1].note].filter(Boolean).join("; ")});
+  S.calPrev = {file: file.name, rows}; S.addEv = false; render();
 }
-async function addEvents(evs, bulk = false) {
+const CALST = st => ({matched: L("matched", "zugeordnet"), before_data: L("before the data", "vor Datenbeginn"), after_data: L("after the data", "nach Datenende"), invalid: L("skipped", "übersprungen")}[st] || st);
+function calPreviewHTML() {
+  const c = S.calPrev; if (!c) return "";
+  if (c.error) return `<div class="ev-form cal-prev"><b>${esc(c.file)}</b><p class="dn">${esc(c.error)}</p><button class="link" data-act="calcancel">${L("Close", "Schließen")}</button></div>`;
+  const ok = c.rows.filter(r => r.status === "matched");
+  return `<div class="ev-form cal-prev"><b>${L("Preview", "Vorschau")}: ${esc(c.file)}</b>
+    <p>${L(`${ok.length} of ${c.rows.length} entries match a trading day. Nothing is saved until you confirm.`, `${ok.length} von ${c.rows.length} Einträgen passen zu einem Handelstag. Gespeichert wird erst nach Bestätigung.`)}</p>
+    <ol class="cal-rows">${c.rows.map(r => `<li class="${r.status}"><span class="tag ${r.status === "matched" ? "" : "s"}">${CALST(r.status)}</span> <b>${/^\d{4}-\d{2}-\d{2}$/.test(r.date || "") ? dL(r.date) : esc(r.date || "?")}${r.time_local || r.time ? " " + esc(r.time_local || r.time) : ""}</b> ${esc(String(r.title || "").slice(0, 60))}
+      ${r.status === "matched" ? `<small>→ ${L("reaction", "Reaktion")} ${dS(r.reaction_day)} (${esc(r.rule || "")})${r.note ? " · " + esc(r.note) : ""}</small>` : r.note ? `<small>${esc(r.note)}</small>` : ""}</li>`).join("")}</ol>
+    <div style="display:flex;gap:14px;align-items:center">${ok.length ? `<button class="pill pill--sm" data-act="calok">${L(`Add ${ok.length} events`, `${ok.length} Ereignisse hinzufügen`)}</button>` : ""}<button class="link" data-act="calcancel">${L("Cancel", "Abbrechen")}</button></div></div>`;
+}
+function commitEvents(ok) {
+  const persisted = saveUserEvents(S.isin, userEvents(S.isin).filter(e => !ok.some(n => n.event_id === e.event_id)).concat(ok));
+  mergeUserEvents(); S.calPrev = null; S.addEv = false;
+  toast(L(`${ok.length} event(s) added${persisted ? "" : " for this session only (browser storage is blocked)"}`, `${ok.length} Ereignis(se) hinzugefügt${persisted ? "" : " nur für diese Sitzung (Browser-Speicher gesperrt)"}`));
+  if (ok.length) openCard(ok[ok.length - 1].reaction_day, ok[ok.length - 1].event_id); else render();
+}
+async function addEvents(evs) {
+  if (S.status && S.status.offline) { toast(L("Adding events needs the live site.", "Ereignisse hinzufügen braucht die Live-Seite.")); return; }
   try {
-    const r = await post("/api/calendar", {isin: S.isin, events: evs});
-    const ok = r.events.filter(e => e.reaction_day), old = userEvents(S.isin).filter(e => !ok.some(n => n.event_id === e.event_id));
-    saveUserEvents(S.isin, old.concat(ok)); mergeUserEvents(); S.addEv = false;
-    const inRange = ok.length, skipped = r.events.length - ok.length;
-    toast(bulk ? L(`${inRange} events matched to trading days${skipped ? `, ${skipped} after the data` : ""}`, `${inRange} Ereignisse Handelstagen zugeordnet${skipped ? `, ${skipped} nach Datenende` : ""}`) : L("Event added", "Ereignis hinzugefügt"));
-    if (ok.length) openCard(ok[ok.length - 1].reaction_day, ok[ok.length - 1].event_id); else render();
-  } catch (e) { toast(e.message); }
+    const r = await post("/api/calendar", {isin: S.isin, events: evs}), e = r.events[0];
+    if (!e || e.status !== "matched") { toast(e ? `${CALST(e.status)}: ${e.note || ""}` : L("Not added", "Nicht hinzugefügt")); return; }
+    commitEvents([e]);
+  } catch (err) { toast(err.message); }
 }
 
 /* ============================== IR analyst (agent dock, on every page) ============================== */
@@ -777,7 +907,7 @@ function doAction(a) {
 function dockCtx() { const c = {page: S.page}; if (S.page === "card" && S.sel) { c.day = S.sel.day; c.event_id = S.sel.event_id; } if (S.page === "report" && S.rep.key) { const [d, e] = S.rep.key.split("|"); c.day = d; c.event_id = e || null; } if (S.page === "compare") { c.event_type = S.cmp.type; c.index = S.cmp.index; } return c; }
 function dockSugg() {
   const q = {
-    card: [L("Explain this card in two sentences", "Erklären Sie diese Karte in zwei Sätzen"), L("How does this rank against similar events?", "Wie ordnet sich das gegenüber ähnlichen Ereignissen ein?"), L("Put this card in a report", "Diese Karte in einen Report")],
+    card: [L("Was this the market, or company-specific?", "War das der Markt oder unternehmensspezifisch?"), L("Explain this card in two sentences", "Erklären Sie diese Karte in zwei Sätzen"), L("How does this rank against similar events?", "Wie ordnet sich das gegenüber ähnlichen Ereignissen ein?"), L("Put this card in a report", "Diese Karte in einen Report")],
     compare: [L("Where do we rank among these events?", "Auf welchem Rang liegen wir bei diesen Ereignissen?"), L("How did the market react to our results?", "Wie hat der Markt auf unsere Ergebnisse reagiert?")],
     report: [L("Summarise our liquidity for the board", "Fassen Sie unsere Liquidität für den Vorstand zusammen"), L("What were our biggest moves this year?", "Was waren unsere größten Bewegungen dieses Jahr?")]
   }[S.page] || [L("Has our liquidity improved?", "Hat sich unsere Liquidität verbessert?"), L("How do our spreads compare with our sector?", "Wie sind unsere Spreads im Sektorvergleich?"), L("What were our biggest moves this year?", "Was waren unsere größten Bewegungen dieses Jahr?"), L("How large an order can the book absorb?", "Wie große Orders nimmt das Orderbuch auf?")];
@@ -786,12 +916,12 @@ function dockSugg() {
 function dockMsg(m) {
   if (m.role === "user") return `<div class="dm q"><span class="who">${L("You", "Sie")}</span><p>${esc(m.content)}</p></div>`;
   const chk = m.check, bad = chk && chk.unsupported && chk.unsupported.length;
-  const src = m.source === "llm" ? esc(m.model || "LLM") : L("template", "Vorlage");
+  const src = m.source === "llm" ? esc(m.model || "LLM") + (m.cached ? L(" · saved answer", " · gespeicherte Antwort") : "") : m.source === "error" ? L("error", "Fehler") : L("fixed rules, no model", "feste Regeln, kein Modell") + (m.note ? L(" (model answer not used)", " (Modellantwort nicht verwendet)") : "");
   return `<div class="dm a"><span class="who">${L("Analyst", "Analyst")} · ${src}</span>
     ${m.steps && m.steps.length ? `<ol class="steps">${m.steps.filter(s => s.tool !== "show").map(s => `<li>${esc(stepL(s))}</li>`).join("")}</ol>` : ""}
     <p>${esc(m.content)}</p>
     ${m.actions && m.actions.length ? `<div class="acts">${m.actions.map(a => `<button class="pill pill--sm" data-do="${enc(JSON.stringify(a))}">${esc(actL(a))} ${ARR}</button>`).join("")}</div>` : ""}
-    ${chk && chk.total ? `<div class="chk ${bad ? "warn" : ""}">${bad ? L(`${chk.unsupported.length} figure(s) not found in the engine output: ${chk.unsupported.slice(0, 3).join(", ")}`, `${chk.unsupported.length} Zahl(en) nicht in den Engine-Ergebnissen: ${chk.unsupported.slice(0, 3).join(", ")}`) : L(`✓ Every figure traced to engine output`, `✓ Jede Zahl aus den Engine-Ergebnissen`)}</div>` : ""}</div>`;
+    ${chk && chk.total ? `<div class="chk ${bad ? "warn" : ""}">${bad ? L(`${chk.unsupported.length} figure(s) not found in the engine output: ${chk.unsupported.slice(0, 3).join(", ")}`, `${chk.unsupported.length} Zahl(en) nicht in den Engine-Ergebnissen: ${chk.unsupported.slice(0, 3).join(", ")}`) : L(`✓ All ${chk.total} figures found in the engine output (a numbers check, not a meaning check)`, `✓ Alle ${chk.total} Zahlen in den Engine-Ergebnissen gefunden (Zahlenprüfung, keine Sinnprüfung)`)}</div>` : ""}</div>`;
 }
 function dockRender() {
   const d = $("#dock"); if (!d || !S.iss) return;
@@ -799,15 +929,17 @@ function dockRender() {
   const u = U(S.isin), c = dockCtx(), live = S.status && S.status.llm;
   const where = c.day ? `${NAV[S.page] ? nav(S.page) : ""} · ${dS(c.day)}` : (NAV[S.page] ? nav(S.page) : "");
   $("#dock-fab").innerHTML = `<svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true"><polyline points="2,12 6,12 8,5 11,15 13,9 18,9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>${L("Ask the IR analyst", "IR-Analyst fragen")}</span><kbd>A</kbd>`;
-  $("#dock-head").innerHTML = `<div><b>${L("IR analyst", "IR-Analyst")}</b><small><i class="${live ? "on" : ""}"></i>${live ? esc(S.status.model) + L(" · tools over the engine", " · Werkzeuge über die Engine") : L("template mode · add the JAIF key to .env", "Vorlagenmodus · JAIF-Schlüssel in .env")}</small></div>
+  $("#dock-head").innerHTML = `<div><b>${L("IR analyst", "IR-Analyst")}</b><small><i class="${live ? "on" : ""}"></i>${S.status && S.status.offline ? L("offline copy · saved answers to the suggested questions", "Offline-Kopie · gespeicherte Antworten auf die Vorschläge") : live ? esc(S.status.model) + L(" · tools over the engine", " · Werkzeuge über die Engine") : L("no language model connected · fixed-rule answers", "kein Sprachmodell verbunden · Antworten nach festen Regeln")}</small></div>
     <div class="dh-r">${S.chat.length ? `<button data-act="dockclear" class="x" title="${L("New conversation", "Neues Gespräch")}">${L("New", "Neu")}</button>` : ""}<button data-act="dock" class="x" aria-label="${L("Close", "Schließen")}">✕</button></div>`;
   $("#dock-ctx").innerHTML = `<span>${L("Looking at", "Kontext")}</span> <b>${esc(nice(u))}</b> · ${esc(where)}`;
   const log = $("#dock-log");
   log.innerHTML = S.chat.length ? S.chat.map(dockMsg).join("") + (S.busy ? `<div class="dm a busy"><span class="who">${L("Analyst", "Analyst")}</span><p><span class="caret"></span> ${L("reading the engine output…", "liest die Engine-Ergebnisse…")}</p></div>` : "")
     : `<div class="intro"><p>${L(`I answer questions about ${esc(nice(u))} with figures from the Xetra engine, and I can open any card, comparison or report for you.`, `Ich beantworte Fragen zu ${esc(nice(u))} mit Zahlen aus der Xetra-Engine und öffne jede Karte, jeden Vergleich oder Report für Sie.`)}</p><p class="m">${L("I say what the data shows, not why. Causes come only from the verified event calendar. No investment advice.", "Ich sage, was die Daten zeigen, nicht warum. Ursachen nur aus dem geprüften Ereigniskalender. Keine Anlageberatung.")}</p></div>`;
   $("#dock-sugg").innerHTML = dockSugg().map(q => `<button data-q="${esc(q)}">${esc(q)}</button>`).join("");
-  $("#dockq").placeholder = L("Ask about liquidity, a day, peers, results…", "Fragen zu Liquidität, einem Tag, Peers, Ergebnissen…");
-  $("#dockf button").disabled = S.busy;
+  const off = S.status && S.status.offline;
+  $("#dockq").placeholder = off ? L("Offline copy: pick a suggested question above", "Offline-Kopie: oben eine vorgeschlagene Frage wählen") : L("Ask about liquidity, a day, peers, results…", "Fragen zu Liquidität, einem Tag, Peers, Ergebnissen…");
+  $("#dockq").disabled = !!off;
+  $("#dockf button").disabled = S.busy || !!off;
   log.scrollTop = log.scrollHeight;
 }
 function dockToggle(on) { S.dock = on === undefined ? !S.dock : on; dockRender(); if (S.dock) setTimeout(() => $("#dockq") && $("#dockq").focus(), 220); }
@@ -817,7 +949,7 @@ async function dockAsk(q) {
   S.chat.push({role: "user", content: q}); S.busy = true; dockRender();
   try {
     const r = await post("/api/agent", {isin: S.isin, question: q, history, context: dockCtx(), lang: S.lang});
-    S.chat.push({role: "assistant", content: r.text, source: r.source, model: r.model, steps: r.steps, actions: r.actions, check: r.check});
+    S.chat.push({role: "assistant", content: r.text, source: r.source, model: r.model, steps: r.steps, actions: r.actions, check: r.check, cached: r.cached, note: r.note});
   } catch (e) { S.chat.push({role: "assistant", content: L("The analyst could not answer: ", "Der Analyst konnte nicht antworten: ") + e.message, source: "error"}); }
   S.busy = false; dockRender();
 }
@@ -883,7 +1015,7 @@ function coSugg() { const q = $("#co-in").value; CO.list = search(q, 8); CO.sel 
 function coToggle(on) { const pop = $("#co-pop"), b = $("[data-act=co]"); if (!pop) return; pop.classList.toggle("on", on); b.setAttribute("aria-expanded", on); if (on) { $("#co-in").value = ""; coSugg(); setTimeout(() => $("#co-in").focus(), 50); } }
 
 document.addEventListener("click", ev => {
-  const t = ev.target.closest("[data-go],[data-card],[data-act],[data-q],[data-open],[data-isin],[data-pick],[data-do]");
+  const t = ev.target.closest("[data-go],[data-card],[data-act],[data-q],[data-open],[data-isin],[data-pick],[data-do],[data-claim]");
   if (!ev.target.closest(".co")) coToggle(false);
   if (!ev.target.closest(".g-form")) $("#g-sugg").classList.remove("on");
   if (!t) return;
@@ -895,6 +1027,7 @@ document.addEventListener("click", ev => {
   if (t.dataset.open) { const [isin, day, ev2] = t.dataset.open.split("|"); openCard(day, ev2 || null, isin); return; }
   if (t.dataset.q) { dockAsk(t.dataset.q); return; }
   if (t.dataset.do) { doAction(JSON.parse(decodeURIComponent(t.dataset.do))); return; }
+  if (t.dataset.claim) { testClaim("", [t.dataset.claim]); return; }
   const a = t.dataset.act;
   if (a === "lang") { S.lang = t.dataset.v; S.aiLang = null; if ($("#ws").classList.contains("hidden")) gateText(); else vt(() => render()); }
   else if (a === "co") { ev.stopPropagation(); coToggle(!$("#co-pop").classList.contains("on")); }
@@ -909,7 +1042,11 @@ document.addEventListener("click", ev => {
   else if (a === "print") { window.print(); }
   else if (a === "dock") { dockToggle(); }
   else if (a === "dockclear") { S.chat = []; dockRender(); }
-  else if (a === "addev") { S.addEv = !S.addEv; render(); }
+  else if (a === "addev") { S.addEv = !S.addEv; S.calPrev = null; render(); }
+  else if (a === "calok") { commitEvents(S.calPrev.rows.filter(r => r.status === "matched")); }
+  else if (a === "calcancel") { S.calPrev = null; render(); }
+  else if (a === "brieftoggle") { S.briefOpen = !S.briefOpen; const k = keyOf(S.sel), slot = $("#briefslot"); if (slot) slot.innerHTML = briefHTML(k); }
+  else if (a === "copyclaim") { navigator.clipboard?.writeText(decodeURIComponent(t.dataset.txt)).then(() => toast(L("Copied", "Kopiert")), () => toast(L("Copy not allowed here", "Kopieren hier nicht erlaubt"))); }
 });
 document.addEventListener("change", ev => {
   if (ev.target.id === "evfile" && ev.target.files[0]) { importCalendar(ev.target.files[0]); ev.target.value = ""; return; }
@@ -920,6 +1057,7 @@ document.addEventListener("change", ev => {
 document.addEventListener("submit", ev => {
   ev.preventDefault();
   if (ev.target.id === "dockf") { const q = $("#dockq").value.trim(); if (q && !S.busy) { $("#dockq").value = ""; dockAsk(q); } }
+  if (ev.target.id === "claimf") { const q = $("#claimq").value.trim(); if (q) { testClaim(q, classifyClaim(q)); $("#claimq").value = ""; } }
   if (ev.target.id === "evform") { addEvents([{date: $("#ev-d").value, time: $("#ev-t").value, type: $("#ev-y").value, title: $("#ev-n").value}]); }
   if (ev.target.id === "g-form") { const u = resolveGate(); if (u) { $("#g-in").value = u.isin; anatomy(u.isin); $("#g-sugg").classList.remove("on"); openIsin(u.isin); } else $("#g-err").textContent = L("No DAX, MDAX or SDAX share found for this input.", "Keine DAX-, MDAX- oder SDAX-Aktie für diese Eingabe gefunden."); }
 });

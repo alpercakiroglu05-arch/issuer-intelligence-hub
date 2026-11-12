@@ -25,18 +25,21 @@ import json
 import math
 import os
 import re
+import time
 
 import numpy as np
 import pandas as pd
 
 from ai import llm
 from ai.checks import unsupported_numbers
-from config import DATA_DIR
-from engine import baseline, compare, data, impact
+from config import COMPARE_MIN_GROUP, DATA_DIR
+from engine import baseline, compare, data, evidence, impact
 
 MAX_ROUNDS = 6
+CACHE_VERSION = 3  # bump when the agent logic changes, so old cached answers are not replayed
 # GLM-5.3-Flash reasons before it answers; a small budget can end with no visible answer (model handbook)
 MAX_TOKENS = 4096
+BUDGET_S = 75  # whole tool loop; past this the deterministic answer is shown instead of a spinner
 
 SYSTEM = """You are the IR analyst inside the Issuer Intelligence Hub, a Deutsche Boerse Issuer Services tool.
 You help the investor-relations team of a listed company understand how its share trades on Xetra.
@@ -49,8 +52,16 @@ Rules:
 - Causes: the trading data shows THAT something happened, not WHY. Name a cause only if the event calendar
   (event_calendar / unusual_days) lists an announcement for that day, and say it is the listed announcement.
   Market context flags (index event, option expiry, market-wide volume) are mechanics, not company news.
+- A question about a specific day or event: call impact_card for that day, then show(view="card", day=...).
+- Whether an explanation of a move holds ("was it the market?", "did funds sell?", "was it an overreaction?",
+  "was there a leak?"): call check_explanation and report its verdict and evidence; say "consistent with",
+  never "caused by". If the verdict is not_testable, say what the data cannot show.
 - When the user wants to see, open, create or export something (impact card, comparison, report, dashboard),
-  call show() so the UI offers a one-click button. You can call show() and still answer in text.
+  call show() so the UI offers a one-click button. ALWAYS also answer the question in text with the key figures;
+  never reply only that a view is ready. Do not write links or placeholders like [VIEW CARD]: the UI shows
+  the button itself.
+- Rankings: comparison.n and compare_events count the OTHER events; the group is n + 1 events. Write
+  "#3 of 215" (rank_of_day of n_group), never "#3 of 214".
 - Glossary (do not mix them up): price.ret = the share's own return that day ("the share fell 23.2%");
   price.abn_ret = the stock-specific move = return minus the median return of the other index members
   ("stock-specific -21.7%"). Never call ret "stock-specific" or abn_ret "the share fell".
@@ -159,14 +170,17 @@ def unusual_days(isin: str, limit: int = 8) -> dict:
     ev = data.events()
     ev = ev[ev["isin"] == isin]
     by_day = {_day(d): r for d, r in zip(ev["reaction_day"], ev.to_dict("records"))}
+    canon = compare.day_ratios(isin)  # the impact card's "x normal", so the assistant and the card agree
     rows = []
     for r in ep.sort_values("severity", ascending=False).head(int(limit)).to_dict("records"):
         d = _day(r["peak_date"])
         m = by_day.get(d)
-        rows.append({"day": d, "days": r["days"], "abn_ret": r["peak_abn_ret"], "turnover_x_normal": r["max_vol_ratio"],
+        rows.append({"day": d, "days": r["days"], "abn_ret": r["peak_abn_ret"],
+                     "turnover_x_normal": canon["vol_ratio"].get(pd.Timestamp(d)),
                      "why_flagged": r["reason"], "market_context": r["context"] or None,
                      "calendar_entry": {"event_id": m["event_id"], "type": m["type"], "title": m["title"]} if m else None})
     return _clean({"n_total": len(ep), "rule": "turnover z>=3, stock-specific move z>=3 or XLM >=2x normal",
+                   "note": "day = the peak day of the episode; turnover_x_normal = that day vs the median of t-65..t-6",
                    "days": sorted(rows, key=lambda x: x["day"])})
 
 
@@ -194,19 +208,32 @@ def impact_card(isin: str, day: str, event_id: str | None = None) -> dict:
         intr.pop(k, None)
         on.pop(k, None)
     c["intraday"] = {**intr, "onset": on} if (intr or on) else None
+    cm = c.get("comparison")
+    if isinstance(cm, dict) and isinstance(cm.get("n"), int):
+        cm.setdefault("rank_of", cm["n"] + 1)  # group = the others + this event ("#3 of 215")
     return _clean(c)
 
 
 def compare_events(event_type: str = "NOTABLE_DAY", index: str | None = None, isin: str | None = None,
                    day: str | None = None) -> dict:
+    note = None
     t = compare.same_type_events(event_type, index or None)
     t = t[t["abn_ret"].notna()].copy()
+    if isin and day and len(t) < COMPARE_MIN_GROUP:  # too few to rank: widen like the impact card does
+        for et, ix in ((event_type, None), (compare.AUTO_TYPE, index), (compare.AUTO_TYPE, None)):
+            w = compare.same_type_events(et, ix)
+            w = w[w["abn_ret"].notna()]
+            if len(w) >= COMPARE_MIN_GROUP:
+                note = (f"only {len(t)} {event_type} events in {index or 'all indices'}; "
+                        f"ranked among {et} in {ix or 'DAX+MDAX+SDAX'} instead")
+                t, event_type, index = w.copy(), et, ix
+                break
     if t.empty:
-        return {"event_type": event_type, "n": 0}
+        return {"event_type": event_type, "n_group": 0}
     t["abs"] = t["abn_ret"].abs()
     t = t.sort_values("abs", ascending=False).reset_index(drop=True)
     names = t["isin"].map(data.display_name)
-    out = {"event_type": event_type, "index": index or "DAX+MDAX+SDAX", "n": len(t),
+    out = {"event_type": event_type, "index": index or "DAX+MDAX+SDAX", "n_group": len(t), "note": note,
            "median_abs_abn_ret": t["abs"].median(), "median_turnover_x_normal": t["vol_ratio"].median(),
            "top5": [{"name": n, "day": _day(r.reaction_day), "abn_ret": r.abn_ret, "turnover_x_normal": r.vol_ratio}
                     for n, r in zip(names.head(5), t.head(5).itertuples())]}
@@ -219,6 +246,23 @@ def compare_events(event_type: str = "NOTABLE_DAY", index: str | None = None, is
             if len(m):
                 out["rank_of_day"] = int(m.index[0]) + 1
     return _clean(out)
+
+
+def check_explanation(isin: str, day: str, explanation: str, event_id: str | None = None) -> dict:
+    """Test an explanation of a move against the card figures (engine/evidence.py): verdict per claim."""
+    ev = _find_event(isin, event_id)
+    if ev is None:  # the calendar entry for that reaction day, if any
+        e = data.events()
+        e = e[(e["isin"] == isin) & (pd.to_datetime(e["reaction_day"]) == pd.Timestamp(day))]
+        ev = e.iloc[0].to_dict() if len(e) else None
+    b = evidence.brief(isin, _day(day), ev)["en"]
+    ids = evidence.classify(explanation) or list(evidence.CLAIMS)
+    return _clean({"day": _day(day), "headline": b["headline"], "explanation": explanation,
+                   "checks": {k: {"claim": b["claims"][k]["label"], "verdict": b["claims"][k]["verdict"],
+                                  "evidence": b["claims"][k]["text"], "better_wording": b["claims"][k]["better"]} for k in ids},
+                   "data_cannot_tell": next(x["points"] for x in b["sections"] if x["key"] == "unknown"),
+                   "verdicts": "supported = consistent with the data (association, not proof); contradicted; partly; "
+                               "not_testable = the data cannot answer it"})
 
 
 def show(view: str, isin: str, day: str | None = None, event_id: str | None = None,
@@ -260,6 +304,11 @@ TOOLS = [
         "move). Pass isin (and day) to get this company's rank.",
         {"event_type": {"type": "string", "enum": TYPES}, "index": {"type": "string", "enum": ["DAX", "MDAX", "SDAX"]},
          "isin": _ISIN, "day": _DAY}, ["event_type"]),
+    _fn("check_explanation", "Test an explanation of a share move (e.g. 'it was the market', 'thin trading', "
+        "'funds sold', 'overreaction', 'a leak before the news', 'our results') against the figures of that day. "
+        "Returns a verdict per claim: supported / contradicted / partly / not_testable, the evidence and a more "
+        "defensible wording.", {"isin": _ISIN, "day": _DAY, "explanation": {"type": "string"},
+                                "event_id": {"type": "string"}}, ["isin", "day", "explanation"]),
     _fn("show", "Offer the user a one-click button that opens a view: the impact card of a day, the comparison "
         "page, the IR snapshot report or the dashboard.",
         {"view": {"type": "string", "enum": ["dashboard", "card", "compare", "report"]}, "isin": _ISIN, "day": _DAY,
@@ -268,17 +317,25 @@ TOOLS = [
 ]
 IMPL = {"find_company": find_company, "company_overview": company_overview, "peer_benchmark": peer_benchmark,
         "trading_cost_curve": trading_cost_curve, "unusual_days": unusual_days, "event_calendar": event_calendar,
-        "impact_card": impact_card, "compare_events": compare_events, "show": show}
+        "impact_card": impact_card, "compare_events": compare_events, "check_explanation": check_explanation,
+        "show": show}
 _NEEDS_ISIN = {"company_overview", "peer_benchmark", "trading_cost_curve", "unusual_days", "event_calendar",
-               "impact_card", "show"}
+               "impact_card", "check_explanation", "show"}
 
 
-def call_tool(name: str, args: dict, isin: str) -> dict:
+def call_tool(name: str, args: dict, isin: str, context: dict | None = None) -> dict:
     if name not in IMPL:
         return {"error": f"unknown tool {name}"}
     args = {k: v for k, v in (args or {}).items() if v not in (None, "")}
     if name in _NEEDS_ISIN:
         args.setdefault("isin", isin)
+    if name == "check_explanation" and (context or {}).get("day"):
+        args.setdefault("day", context["day"])
+        args.setdefault("event_id", context.get("event_id"))
+    if name == "compare_events":  # rank the company (and the open card's day) unless the model asked otherwise
+        args.setdefault("isin", isin)
+        if (context or {}).get("day") and args["isin"] == isin:
+            args.setdefault("day", context["day"])
     try:
         return IMPL[name](**args)
     except (ValueError, KeyError, TypeError, IndexError) as e:
@@ -329,7 +386,8 @@ def _assistant_msg(msg) -> dict:
 
 def _check(text, outputs, question, context):
     payload = {"tools": outputs, "question": question, "context": context or {}}
-    bad = unsupported_numbers(text, payload)
+    bad = [b for b in unsupported_numbers(text, payload)
+           if not re.fullmatch(r"20[0-3]\d", b.lstrip("+-−"))]  # years (FY 2025) are labels, not figures
     total = len(re.findall(r"\d+(?:[.,]\d+)?", text))
     return {"total": total, "unsupported": bad}
 
@@ -342,11 +400,30 @@ def _run_llm(question, isin, history, context, lang):
             msgs.append({"role": h["role"], "content": str(h["content"])[:2000]})
     msgs.append({"role": "user", "content": question})
     steps, actions, outputs, text = [], [], [], ""
+    repaired, draft = False, ""
+    t0 = time.monotonic()
     for _ in range(MAX_ROUNDS):
-        msg = llm.chat(msgs, tools=TOOLS, tool_choice="auto", temperature=0.1, max_tokens=MAX_TOKENS)
+        if time.monotonic() - t0 > BUDGET_S:
+            raise TimeoutError(f"agent took longer than {BUDGET_S} s")
+        try:
+            msg = llm.chat(msgs, tools=TOOLS, tool_choice="auto", temperature=0.1, max_tokens=MAX_TOKENS)
+        except Exception:  # noqa: BLE001  the repair round failed: judge the first draft (it is rejected below)
+            if not repaired:
+                raise
+            text = draft
+            break
         calls = getattr(msg, "tool_calls", None) or []
         if not calls:
-            text = (msg.content or "").strip()
+            text = re.sub(r"<think>.*?</think>", "", msg.content or "", flags=re.S).strip()
+            bad = _check(text, outputs, question, context)["unsupported"]
+            if bad and not repaired:  # one repair round: the model must fetch the figures or drop them
+                repaired, draft = True, text
+                msgs += [{"role": "assistant", "content": text},
+                         {"role": "user", "content": f"These figures are not in any tool result: {', '.join(bad[:8])}. "
+                                                     "Call the tools you need, then answer again using only figures "
+                                                     "from tool results."}]
+                text = ""
+                continue
             break
         msgs.append(_assistant_msg(msg))
         for t in calls:
@@ -354,10 +431,11 @@ def _run_llm(question, isin, history, context, lang):
                 args = json.loads(t.function.arguments or "{}")
             except ValueError:
                 args = {}
-            out = call_tool(t.function.name, args, isin)
+            out = call_tool(t.function.name, args, isin, context)
             steps.append({"tool": t.function.name, "args": {k: v for k, v in args.items() if k != "isin"}})
             if t.function.name == "show" and "error" not in out:
-                actions.append(out)
+                if out not in actions:
+                    actions.append(out)
             else:
                 outputs.append(out)
             msgs.append({"role": "tool", "tool_call_id": t.id, "content": json.dumps(out, default=str)[:14000]})
@@ -366,8 +444,15 @@ def _run_llm(question, isin, history, context, lang):
                        max_tokens=MAX_TOKENS)
         text = (msg.content or "").strip()
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+    check = _check(text, outputs, question, context)
+    if check["unsupported"]:  # still invented figures: never show them; the template answers with the same tools
+        fb = fallback(question, isin, context, lang)
+        fb["actions"] = fb["actions"] or actions
+        fb["rejected"] = check["unsupported"]
+        fb["note"] = f"model answer rejected by the numbers check: {', '.join(check['unsupported'][:5])}"
+        return fb
     return {"text": text, "source": "llm", "model": llm.model_name(), "steps": steps, "actions": actions,
-            "check": _check(text, outputs, question, context)}
+            "check": check}
 
 
 def _checked(out: dict, question: str, isin: str, context, lang: str) -> dict:
@@ -387,15 +472,15 @@ def run(question: str, isin: str, history=(), context=None, lang: str = "en") ->
     if not question:
         raise ValueError("empty question")
     if llm.available():
-        key = hashlib.sha256(json.dumps([llm.model_name(), question, isin, context, lang, list(history or [])[-6:]],
+        key = hashlib.sha256(json.dumps([CACHE_VERSION, llm.model_name(), SYSTEM, TOOLS, question, isin, context, lang, list(history or [])[-6:]],
                                         sort_keys=True, default=str).encode()).hexdigest()
         if _cache_on() and (hit := _cache(key)):
-            return _checked(hit, question, isin, context, lang)
+            return _checked({**hit, "cached": True}, question, isin, context, lang)  # labelled "saved answer"
         try:
             out = _run_llm(question, isin, history, context, lang)
             if out["text"]:
-                if _cache_on():
-                    _cache(key, out)
+                if _cache_on() and out["source"] == "llm" and not out["check"]["unsupported"]:
+                    _cache(key, out)  # only clean model answers are replayed in the demo
                 return _checked(out, question, isin, context, lang)
         except Exception as e:  # noqa: BLE001  network, quota, model without tool support -> template
             fb = fallback(question, isin, context, lang)
@@ -488,6 +573,35 @@ def fallback(question: str, isin: str, context=None, lang: str = "en") -> dict:
     if not day and has("this card", "this day", "diese karte", "diesen tag", "explain", "erklär", "summar", "zusammenfass") and ctx.get("day"):
         day = ctx["day"]
 
+    peerq = has("spread", "xlm", "trading cost", "handelskosten", "peer", "sector", "sektor", "size", "größe") and \
+        not has("event", "ereignis", "results", "ergebnis", "unusual", "auffällig", "this day", "diesen tag")
+    claim_ids = evidence.classify(question) if (ctx.get("day") or day) and has(
+        "market", "markt", "fund", "fonds", "short", "leak", "insider", "overreact", "übertr", "thin", "dünn",
+        "investor", "anleger", "index", "expir", "verfall", "revers", "erhol", "why", "warum", "because", "weil",
+        "explanation", "erklärung") else []
+    if claim_ids and not peerq:
+        td = _nearest_trading_day(isin, day or ctx["day"])
+        r = use("check_explanation", day=td, explanation=question,
+                event_id=ctx.get("event_id") if td == ctx.get("day") else None)
+        bl = evidence.brief(isin, td, _find_event(isin, ctx.get("event_id")) if td == ctx.get("day") else None)[lang]
+        vw = {"supported": ("supported by the data", "von den Daten gestützt"), "contradicted": ("contradicted by the data", "von den Daten widerlegt"),
+              "partly": ("partly supported", "teilweise gestützt"), "not_testable": ("not testable with this data", "mit diesen Daten nicht prüfbar")}
+        text = " ".join(f"{bl['claims'][k]['label']} {vw[bl['claims'][k]['verdict']][1 if de else 0]}: {bl['claims'][k]['text']}"
+                        for k in r["checks"])
+        act("card", day=td, event_id=ctx.get("event_id") if td == ctx.get("day") else None)
+        return {"text": text, "source": "template", "model": None, "steps": steps, "actions": actions,
+                "check": _check(text, outputs + [bl], question, context)}
+    if peerq and not day:
+        by = "sector" if has("sector", "sektor") else "size" if has("size", "größe") else "index"
+        p = use("peer_benchmark", by=by)
+        s, m = p["values"]["median_xlm_25k_bps"]["stock"], p["values"]["median_xlm_25k_bps"]["peer_median"]
+        t, tm = p["values"]["median_turnover_eur"]["stock"], p["values"]["median_turnover_eur"]["peer_median"]
+        text = (f"{name} vs. {p['group']} ({p['n_peers']} Werte), letzte 60 Handelstage: Handelskosten (XLM 25k) {s:.1f} Bp. "
+                f"vs. {m:.1f} Bp. Median, also {'günstiger' if s < m else 'teurer'}; Umsatz {_eur(t, True)} vs. {_eur(tm, True)} pro Tag.") if de else \
+               (f"{name} vs {p['group']} ({p['n_peers']} shares), last 60 trading days: trading cost (XLM 25k) {s:.1f} bps "
+                f"vs {m:.1f} bps median, so {'cheaper' if s < m else 'more expensive'}; turnover {_eur(t, False)} vs {_eur(tm, False)} a day.")
+        return {"text": text, "source": "template", "model": None, "steps": steps, "actions": actions,
+                "check": _check(text, outputs, question, context)}
     if has("report", "pdf", "export", "snapshot", "bericht"):
         d = ctx.get("day")
         act("report", day=d, event_id=ctx.get("event_id"))
@@ -506,28 +620,30 @@ def fallback(question: str, isin: str, context=None, lang: str = "en") -> dict:
             text = nar.template_narrative(card, lang)
             act("card", day=td, event_id=ev["event_id"] if ev else None)
     elif has("compare", "rank", "vergleich", "rang", "other compan", "andere", "similar event", "ähnlich", "which compan", "welches unternehmen") or (ctx.get("page") == "compare" and has("which", "welche", "who", "wer")):
-        etype = ctx.get("event_type") or "NOTABLE_DAY"
+        etype, idx = ctx.get("event_type") or "NOTABLE_DAY", ctx.get("index") if ctx.get("index") in ("DAX", "MDAX", "SDAX") else None
         if ctx.get("day"):
             card = use("impact_card", day=ctx["day"], event_id=ctx.get("event_id"))
-            if card.get("comparison"):
+            if card.get("comparison"):  # same group as the card shows ("#3 of 215 MDAX days")
                 etype = card["comparison"]["group_type"]
-        c = use("compare_events", event_type=etype, isin=isin, day=ctx.get("day"))
-        act("compare", event_type=etype)
-        if not c.get("n"):
+                gi = card["comparison"].get("group_index")
+                idx = gi if gi in ("DAX", "MDAX", "SDAX") else None
+        c = use("compare_events", event_type=etype, index=idx, isin=isin, day=ctx.get("day"))
+        act("compare", event_type=etype, index=idx)
+        if not c.get("n_group"):
             text = "Für diesen Ereignistyp gibt es noch keine Vergleichsfälle." if de else "No comparable events of this type yet."
         else:
             top = c["top5"][0]
             r = c.get("rank_of_day")
             if de:
-                text = (f"{c['n']} vergleichbare Fälle in {c['index']}; Median der titelspezifischen Bewegung "
+                text = (f"{c['n_group']} vergleichbare Fälle in {c['index']}; Median der titelspezifischen Bewegung "
                         f"{_pc(c['median_abs_abn_ret'], True, False)}, Umsatz {_x(c['median_turnover_x_normal'], True)} normal. "
                         f"Größter Fall: {top['name']} am {_d(top['day'], True)} ({_pc(top['abn_ret'], True)})."
-                        + (f" {name} liegt an diesem Tag auf Rang {r}." if r else ""))
+                        + (f" {name} liegt an diesem Tag auf Rang {r} von {c['n_group']}." if r else ""))
             else:
-                text = (f"{c['n']} comparable cases in {c['index']}; median stock-specific move "
+                text = (f"{c['n_group']} comparable cases in {c['index']}; median stock-specific move "
                         f"{_pc(c['median_abs_abn_ret'], False, False)}, turnover {_x(c['median_turnover_x_normal'], False)} normal. "
                         f"Largest: {top['name']} on {_d(top['day'], False)} ({_pc(top['abn_ret'], False)})."
-                        + (f" {name} ranks #{r} on that day." if r else ""))
+                        + (f" {name} ranks #{r} of {c['n_group']} on that day." if r else ""))
     elif has("result", "ergebnis", "quarter", "quartal", "earnings", "zahlen"):
         cal = use("event_calendar")
         res = [e for e in cal["events"] if e["type"] in ("FY", "Q1", "H1", "Q3")]

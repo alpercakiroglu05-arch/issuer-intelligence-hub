@@ -123,6 +123,8 @@ def impact_card(isin: str, day, event: dict | None = None) -> dict:
 
     ev = event or {}
     event_time = ev.get("time_local") if isinstance(ev.get("time_local"), str) and ev.get("time_local") else None
+    if event_time and ev.get("date") is not None and pd.Timestamp(ev["date"]).date() != day.date():
+        event_time = None  # published on an earlier day (after the close, weekend): no same-day lag to measure
     intra = _intraday_block(isin, day, event_time)
     timing = ev.get("timing", "unknown")
     if not isinstance(timing, str) or timing in ("", "unknown"):
