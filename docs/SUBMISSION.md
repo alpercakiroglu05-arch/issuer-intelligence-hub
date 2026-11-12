@@ -6,6 +6,8 @@ The Issuer Intelligence Hub is a self-service tool for the IR team of a DAX, MDA
 - **Part A** shows how the company's share normally trades.
 - **Part B** turns any announcement or unusual day into an **impact card**: what happened to price, turnover, trading cost, auctions and participants compared with normal, when the market started pricing the news, and how the event ranks against comparable events.
 - One click exports the card as a DE/EN IR snapshot.
+- For the three showcase shares a **market-intelligence layer** adds the *why*: cited external reporting (expectations,
+  guidance, analysts, competition) next to the engine's figures, phrased as "consistent with", never "caused by".
 
 All numbers come from Deutsche Börse exchange data and deterministic code. The language model only writes text from the computed numbers.
 
@@ -23,6 +25,7 @@ All data is the Deutsche Börse excerpt for **2 Jan – 30 Oct 2026 (213 trading
 | **Index constituents** | Daily DAX (40) / MDAX (50) / SDAX (70) membership, used as the peer group of each day |
 | **Xetra on-book trades** (1.7 GB, every trade, ns timestamps) | 1-minute bars for the 44 stocks with events (46 ISINs: Fresenius and Qiagen changed ISIN): **3.8 million bars**, used for intraday price path, news onset and exact auction volumes |
 | **Public sources** (`events/events.csv`) | **82 corporate events**, each with a source link, and the release time when the source shows it |
+| **Research packs** (`events/intel/<ticker>.json`) | For Zalando, CTS Eventim and Heidelberger Druck: 39 items from 35 cited public sources (analyst notes, expectations, guidance, competition, regulatory news), each with publisher, title, URL and publication day. Used only by the market-intelligence layer |
 
 **Events.** The demo showcases one share per index: Zalando (ZAL, DAX), CTS Eventim (EVD, MDAX) and Heidelberger Druck (HDD, SDAX). The calendar holds every 2026 event we found for CTS Eventim, Evotec (EVT, SDAX), Heidelberger Druck and Gerresheimer (GXI, the index-exit story): 40 events, plus the three results releases of Zalando. It also holds the first H1/Q3 publication of **all 40 DAX members** (36 half-year and 4 nine-month results), which is the group behind "compare all DAX results". Two rules apply:
 - A results event is the first moment the figures became public. If a company pre-released by ad hoc, that ad hoc is the event.
@@ -95,19 +98,27 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 
 ### AI and export
 - **Summary text (DE/EN):** the model gets only the card JSON and is told to use only its numbers, never invent causes, and give no advice. A **numbers check** (`ai/checks.py`) then compares every figure in the text with the JSON, allowing for percent, EUR m and rounding. Any unknown figure means the template text is shown instead, and the card says which one it is. Model: an open model through the JAIF gateway (OpenAI-compatible), swappable in `.env`. Answers are cached so the live demo does not depend on the network.
-- **IR analyst (a panel on every page):** the model calls engine functions as tools (company overview, share performance over a period, peer benchmark, trading cost curve, unusual days, event calendar, impact card, comparison, explanation check) and answers from their outputs only. Every number in the answer is checked against the tool outputs, and the meaning check below applies too; an answer that fails is replaced by the deterministic answer, the same rule as the card summary. Without a model key a deterministic router answers from the same tools. The suggested questions of the showcase shares are saved answers, so they appear at once.
+- **IR analyst (a panel on every page):** the model calls engine functions as tools (company overview, share performance over a period, peer benchmark, trading cost curve, unusual days, event calendar, impact card, comparison, explanation check, and for the showcase shares the cited market intelligence) and answers from their outputs only. Every number in the answer is checked against the tool outputs, and the meaning check below applies too; an answer that fails is replaced by the deterministic answer, the same rule as the card summary. Without a model key a deterministic router answers from the same tools. The suggested questions of the showcase shares are saved answers, so they appear at once.
+- **Market intelligence (why the share moved), showcase shares only:** "Market intelligence" on the overview for the
+  selected period and "Why the market reacted" on four impact cards (Zalando 6 May and 4 Aug, CTS Eventim 27 Mar,
+  Heidelberger Druck 29 Oct). The engine supplies the figures (move, peers, rank); the research pack supplies the cited
+  statements, ranked so that expectations and guidance pointing the same way as the move come first. An item published
+  after the reaction day is labelled "later reporting", and the text names what stays open. The model only phrases:
+  if its answer is invalid, cites an item that is not in the pack, uses a figure that is in neither the engine output
+  nor the pack, or claims a cause ("caused by", "due to the news"), the deterministic text is shown. The packs were
+  curated for the demo; in production the same format would be filled by a news and consensus feed.
 - **Meaning check:** a sentence like "the share fell X %" must use the share's own move, not the stock-specific (abnormal) move; otherwise the template is shown. The numbers check alone cannot catch this mix-up, because both numbers are in the card.
 - **IR snapshot:** one click on the card (*Export IR report (PDF)*) gives the card plus its checked summary as a PDF, in DE or EN; the same button on the overview gives the Part A report (key figures vs peers, liquidity trend, cost by order size, unusual days). The *Report* page builds a one-page board snapshot from sections the user ticks (share price, trading profile, peers, liquidity, unusual days, one impact card, the summary); the preview is exactly what is saved as PDF.
 
-## 3. Validation (all reproducible, 225 automated tests)
+## 3. Validation (all reproducible, 235 automated tests)
 
 | Check | Result |
 |---|---|
 | One-sided flow total vs Xetra turnover | **1.000** (median over all stock-days) |
 | Sum of 1-minute bars vs daily turnover | **1.000** for every one of the 44 stocks |
 | Opening + closing auction from single trades vs flow auction turnover | **97.6–99.7 %** per stock (the rest is the midday auction and volatility interruptions) |
-| News onset on clearly unusual days (focus stocks) | found on **17 of 19** days with \|abnormal z\| ≥ 3 |
-| Inferred timing vs published release time | consistent for **33 of 39** sourced events with a release time and a detected onset (85 %; 63 events have a release time) |
+| News onset on clearly unusual days (focus stocks EVD, EVT, HDD, GXI) | found on **19 of 19** days with \|abnormal z\| ≥ 3 |
+| Inferred timing vs published release time | consistent for **33 of 40** sourced events with a release time and a detected onset (82 %; 65 events have a release time) |
 | Releases during trading hours | onset after the release in **7 of 7**. Heidelberger Druck, 29 Oct: ad hoc at 12:00:53, onset **12:02** |
 | Card vs comparison table | identical metrics (tested) |
 | Event days vs normal | median turnover on guidance changes 7.4×, ad hocs 4.8×, H1 results 1.8×, AGMs 0.64× |
@@ -124,7 +135,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 
 ## 4. Limitations
 
-- **Causes:** the data shows *what* happened, not *why*. Reasons come only from the linked public sources. Some unusual days have no company news, and we say so.
+- **Causes:** the exchange data shows *what* happened, not *why*. Reasons come only from the linked public sources: the event calendar for every share, and the curated research packs for the three showcase shares. These packs are a hand-built sample, not a live news feed, and they show association, not proof. Some unusual days have no company news, and we say so.
 - **Intraday peers:** the onset uses the raw price move because there are no intraday peer prices. A market-wide move can also trigger it.
 - **Event times:** the 82 events were researched with AI-assisted web search, and every row has its source link. 17 have no published time, and 7 DAX times are pre-announced dpa-AFX slots (marked in the title). On 12 Nov we re-checked the 43 rows of the showcase and focus shares against their links: every date and time matches, and the titles say only what the linked page says.
 - **Own calendar:** the demo shows the researched calendar. The API already matches a company's own dates to trading days (`POST /api/calendar`), but the demo UI has no upload screen; in production the dates would come from the ERS corporate calendar.
@@ -138,24 +149,29 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 
 ## 5. What else IR teams need, and which data
 
-| Idea | Value for IR | Data needed |
-|---|---|---|
-| Index early warning | See an index exit coming (Gerresheimer was removed from the SDAX effective 10 Apr) | Index rules, free-float market cap, ranking lists |
-| Designated Sponsor monitor | Does our DS deliver the quote quality we pay for? | DS identity, quote and spread data per DS |
-| Block trades and placements | How much traded off the order book around an event | Off-exchange and block trade reports (the Xetra TES excerpt has only 4 small trades in index stocks) |
-| Surprise vs consensus | Separate "the figures" from "the expectations" | Analyst consensus estimates |
-| Shareholder identification | Who sold after the results? | Share register, custody data |
-| Derivatives positioning | Hedging and short build-up before events | Eurex open interest (usable for large caps; censored for most small-cap series) |
+The app's *Ideas* page shows the first six; the last three are further ideas.
+
+| Idea | Value for IR | Data we have | Data needed |
+|---|---|---|---|
+| Index watch | See an index exit coming (Gerresheimer was removed from the SDAX effective 10 Apr) | Daily index lists, turnover | Free-float market cap, official ranking lists |
+| Liquidity category monitor | Small caps such as Heidelberger Druck sit close to the Designated Sponsor thresholds | XLM, turnover | The official category list |
+| Announcement planner | Which publication time gives the cleanest reaction | 1-minute bars, event times | More events with exact times |
+| Pre-announcement liquidity | How turnover and trading cost behave before scheduled announcements, to plan publication timing | Turnover, XLM, 1-minute bars, the event calendar | Full financial calendars with exact times |
+| Derivatives positioning | How the market positioned before an event | Eurex open interest (usable for large caps) | Uncensored participant split (censored for >90 % of small-cap series) |
+| Surprise vs consensus | Separate "the figures" from "the expectations" | Stock-specific move per event | Analyst consensus estimates |
+| Designated Sponsor monitor | Does our DS deliver the quote quality we pay for? | XLM | DS identity, quote and spread data per DS |
+| Block trades and placements | How much traded off the order book around an event | — (the Xetra TES excerpt has only 4 small trades in index stocks) | Off-exchange and block trade reports |
+| Shareholder identification | Who sold after the results? | — | Share register, custody data |
 
 ## 6. How to run
 
 ```bash
 pip install -r requirements.txt
-python ingest/build_daily.py <raw> data        # ~25 s
+python ingest/build_daily.py <raw> data        # ~25 s; <raw> = the FUTURY_MDS_DATA folder
 python ingest/build_events.py
-python ingest/build_intraday.py                # ~3 min, every stock in events.csv
+python ingest/build_intraday.py --raw <raw>    # ~3 min, every stock in events.csv (or set IIH_RAW_DIR)
 python web/warm_cache.py                       # optional, with a model key: saves the AI texts of the showcase shares
-python web/server.py                           # demo UI: http://127.0.0.1:8600
+python web/server.py                           # demo UI: http://127.0.0.1:8600 (or double-click start.command / start.bat)
 streamlit run app/Home.py                      # backup UI: http://localhost:8501
-pytest                                         # 225 tests
+pytest                                         # 235 tests
 ```
