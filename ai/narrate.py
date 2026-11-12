@@ -52,19 +52,21 @@ def system_prompt(lang: str = "en") -> str:
     return SYSTEM.format(language=LANG.get(lang, "English")) + (SYSTEM_DE_STYLE if lang == "de" else "")
 
 
-def narrate_with_meta(card: dict, lang: str = "en") -> dict:
-    """{"text", "source": "llm" | "template", "model", "rejected": [numbers not in the JSON]}.
-    The LLM text is used only if every number in it can be found in the card JSON (ai/checks.py)."""
-    meta = {"source": "template", "model": None, "rejected": []}
+def narrate_with_meta(card: dict, lang: str = "en", fresh: bool = False) -> dict:
+    """{"text", "source": "llm" | "template", "model", "rejected": [numbers not in the JSON], "cached"}.
+    The LLM text is used only if every number in it can be found in the card JSON (ai/checks.py).
+    cached = the text is a saved model answer; fresh=True asks the model again."""
+    meta = {"source": "template", "model": None, "rejected": [], "cached": False}
     try:
         msg = llm.chat([
             {"role": "system", "content": system_prompt(lang)},
             {"role": "user", "content": json.dumps(card, default=str)},
-        ])
+        ], cache=not fresh)
         text = (msg.content or "").strip()
         bad = unsupported_numbers(text, card)
         if text and not bad:
-            return {"text": text, "source": "llm", "model": llm.model_name(), "rejected": []}
+            return {"text": text, "source": "llm", "model": llm.model_name(), "rejected": [],
+                    "cached": bool(getattr(msg, "cached", False))}
         meta["rejected"] = bad
     except Exception:  # noqa: BLE001  LLMUnavailable, network, quota ... -> deterministic text
         pass

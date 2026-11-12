@@ -15,6 +15,7 @@ API (all GET unless noted, JSON):
     /api/card?isin=&day=&event_id=        impact_card() + 1-minute bars + aftershocks
          [&date=&time=&type=&title=]      ... for an event the user added or imported (not in events.csv)
     /api/compare?type=&index=             same-type events (engine.compare)
+    /api/evidence?isin=&day=&event_id=    evidence brief + explanation check for one card (engine/evidence.py)
     POST /api/calendar {isin,events:[{date,time,type,title}]}  match the company's own calendar to trading days
     POST /api/narrate {isin,day,event_id,lang}   AI summary (LLM or template fallback)
     POST /api/agent {isin,question,history,context,lang}  IR analyst agent (ai/agent.py: tool calling over the engine)
@@ -24,6 +25,7 @@ API (all GET unless noted, JSON):
 import argparse
 import json
 import math
+import re
 import sys
 import traceback
 from datetime import date, datetime
@@ -39,7 +41,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from config import DATA_DIR, HERO_TICKERS, SECTORS_CSV, XETRA_CLOSE_AUCTION, XETRA_OPEN  # noqa: E402
-from engine import baseline, compare, data, impact  # noqa: E402
+from engine import baseline, compare, data, evidence, impact  # noqa: E402
 
 WEB = Path(__file__).resolve().parent
 
@@ -159,6 +161,8 @@ def issuer(isin: str) -> dict:
         "index_auction_share": [r(bench["auction_share"].get(d)) for d in dates],
         "index_ret": [r(bench["ret"].get(d)) for d in dates],
     }
+    canon = compare.day_ratios(isin)  # THE "x normal" (impact-card baseline), same as the card and the assistant
+    series["vol_ratio"] = [r(canon["vol_ratio"].get(d)) for d in dates]
     ep = baseline.anomaly_episodes(isin)
     ev = data.events()
     ev = ev[ev["isin"] == isin]
@@ -167,7 +171,9 @@ def issuer(isin: str) -> dict:
     for row in ep.to_dict("records"):
         day = str(pd.Timestamp(row["peak_date"]).date())
         m = by_day.get(day)
+        pk = pd.Timestamp(day)
         eps.append({**clean(row), "peak_date": day, "context": row.get("context") or "",
+                    "peak_vol_ratio": r(canon["vol_ratio"].get(pk)), "peak_xlm_ratio": r(canon["xlm_ratio"].get(pk)),
                     "event": clean({k: m[k] for k in ("event_id", "type", "title", "verified")}) if m else None})
     u = next(x for x in universe() if x["isin"] == isin)
     return clean({
@@ -191,45 +197,73 @@ def _timing(t: str | None) -> str:
 
 def calendar(body: dict) -> dict:
     """The company's own event calendar (typed in or imported as CSV/ICS in the browser) -> reaction days.
-    Same rule as ingest/build_events.py: after the close or on a non-trading day -> next trading day."""
+    Same rule as ingest/build_events.py: after the close or on a non-trading day -> next trading day.
+    Every row comes back with a status (matched | before_data | after_data | invalid) and the reason, so the
+    browser can preview the import before anything is saved."""
     isin = body["isin"]
     days = pd.DatetimeIndex(sorted(data.stock(isin)["date"].unique()))
     out = []
-    for e in body.get("events", [])[:200]:
+    for e in body.get("events", [])[:500]:
+        raw = {k: e.get(k) for k in ("date", "time", "type", "title")}
         try:
             d = pd.Timestamp(str(e["date"])[:10])
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError):
+            out.append({**raw, "status": "invalid", "reaction_day": None, "note": "date not readable (use YYYY-MM-DD)"})
             continue
         t = (e.get("time") or "").strip()[:5] or None
+        if t and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t):
+            t = None
         timing = _timing(t)
+        etype = str(e.get("type") or "OTHER").upper()[:12]
+        base = {"event_id": f"USR_{etype}_{d.strftime('%Y%m%d')}{'_' + t.replace(':', '') if t else ''}",
+                "type": etype, "date": str(d.date()), "time_local": t or "", "timing": timing,
+                "title": str(e.get("title") or etype)[:160], "verified": "0", "source_url": "", "user": True}
+        if d < days[0]:
+            out.append({**base, "status": "before_data", "reaction_day": None,
+                        "note": f"before the data starts ({days[0].date()})"})
+            continue
         pos = int(days.searchsorted(d))
-        if pos < len(days) and days[pos] == d and timing == "post_close":
+        same = pos < len(days) and days[pos] == d
+        if same and timing == "post_close":
             pos += 1
         if pos >= len(days):
-            out.append({**e, "reaction_day": None, "note": "after the end of the data"})
+            out.append({**base, "status": "after_data", "reaction_day": None,
+                        "note": f"after the end of the data ({days[-1].date()})"})
             continue
-        etype = str(e.get("type") or "OTHER").upper()[:12]
-        out.append({"event_id": f"USR_{etype}_{d.strftime('%Y%m%d')}{'_' + t.replace(':', '') if t else ''}",
-                    "type": etype, "date": str(d.date()), "time_local": t or "", "timing": timing,
-                    "title": str(e.get("title") or etype)[:160], "reaction_day": str(days[pos].date()),
-                    "verified": "0", "source_url": "", "user": True})
-    return {"events": out}
+        rule = ("same trading day" if same and timing != "post_close" else
+                "next trading day: published after the 17:35 closing auction" if same else
+                "next trading day: the date is not a trading day")
+        out.append({**base, "status": "matched", "reaction_day": str(days[pos].date()), "rule": rule})
+    return {"events": out, "first_date": str(days[0].date()), "last_date": str(days[-1].date())}
 
 
-def card(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
+def _event(isin: str, event_id: str | None, user: dict | None = None) -> dict | None:
+    """The calendar event behind a card: events.csv, or the user's own entry (passed in the query)."""
     ev = find_event(isin, event_id)
     if ev is None and user and user.get("date"):
         t = (user.get("time") or "").strip()[:5]
         ev = {"event_id": event_id, "type": (user.get("type") or "OTHER").upper(), "date": user["date"],
               "time_local": t, "timing": _timing(t), "title": user.get("title") or "Own calendar entry",
               "source_url": ""}
+    return ev
+
+
+def evidence_brief(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
+    """Evidence brief + explanation check (engine/evidence.py), EN and DE, for one card."""
+    return clean(evidence.brief(isin, day, _event(isin, event_id, user)))
+
+
+def card(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
+    ev = _event(isin, event_id, user)
     c = impact.impact_card(isin, day, ev)
     s = data.stock(isin)
     i = int(s.index[s["date"] == pd.Timestamp(day)][0])
     prev_close = r(s.loc[i - 1, "price"]) if i > 0 else None
     after = s.iloc[max(0, i - 5): i + 16]
-    aftershocks = [{"t": int(k - i), "date": str(d.date()), "vol_ratio": r(v), "xlm_ratio": r(x), "abn_ret": r(a)}
-                   for k, d, v, x, a in zip(after.index, after["date"], after["vol_ratio"], after["xlm_25k_ratio"], after["abn_ret"])]
+    canon = compare.day_ratios(isin)  # same baseline as the card, so day 0 here = the card's figure
+    aftershocks = [{"t": int(k - i), "date": str(d.date()), "vol_ratio": r(canon["vol_ratio"].get(d)),
+                    "xlm_ratio": r(canon["xlm_ratio"].get(d)), "abn_ret": r(a)}
+                   for k, d, a in zip(after.index, after["date"], after["abn_ret"])]
     bars = None
     b = data.intraday(isin)
     if b is not None and len(b):
@@ -272,8 +306,9 @@ def narrate(body: dict) -> dict:
     lang = body.get("lang", "en")
     # narrate_with_meta: the model's text is used only if every number in it is in the card (ai/checks.py);
     # "source" says which one the user sees, so the label is honest even when the check rejects a draft
-    m = nar.narrate_with_meta(c, lang)
-    return {"text": m["text"], "source": m["source"], "model": m["model"], "rejected": m["rejected"], "lang": lang}
+    m = nar.narrate_with_meta(c, lang, fresh=bool(body.get("fresh")))
+    return {"text": m["text"], "source": m["source"], "model": m["model"], "rejected": m["rejected"],
+            "cached": m.get("cached", False), "lang": lang}
 
 
 def agent(body: dict) -> dict:
@@ -324,12 +359,15 @@ class Handler(SimpleHTTPRequestHandler):
         routes = {
             "/api/status": lambda: {"data_dir": str(DATA_DIR), "stocks": len(universe()),
                                     "intraday_stocks": len(data.intraday_isins()), "llm": llm_available(),
-                                    "model": llm_model(), "last_date": str(data.daily()["date"].max().date())},
+                                    "model": llm_model(), "first_date": str(data.daily()["date"].min().date()),
+                                    "last_date": str(data.daily()["date"].max().date())},
             "/api/universe": universe,
             "/api/issuer": lambda: issuer(q["isin"]),
             "/api/card": lambda: card(q["isin"], q["day"], q.get("event_id"),
                                       {k: q[k] for k in ("date", "time", "type", "title") if k in q} or None),
             "/api/compare": lambda: compare_table(q.get("type", "NOTABLE_DAY"), q.get("index")),
+            "/api/evidence": lambda: evidence_brief(q["isin"], q["day"], q.get("event_id"),
+                                                    {k: q[k] for k in ("date", "time", "type", "title") if k in q} or None),
         }
         if u.path in routes:
             return self._guard(routes[u.path])

@@ -35,8 +35,9 @@ DOCK = {  # the chips of the assistant dock (web/app.js, dockSugg); the page is 
                          "What were our biggest moves this year?", "How large an order can the book absorb?"],
                   "de": ["Hat sich unsere Liquidität verbessert?", "Wie sind unsere Spreads im Sektorvergleich?",
                          "Was waren unsere größten Bewegungen dieses Jahr?", "Wie große Orders nimmt das Orderbuch auf?"]},
-    "card": {"en": ["Explain this card in two sentences", "How does this rank against similar events?"],
-             "de": ["Erklären Sie diese Karte in zwei Sätzen",
+    "card": {"en": ["Was this the market, or company-specific?", "Explain this card in two sentences",
+                    "How does this rank against similar events?"],
+             "de": ["War das der Markt oder unternehmensspezifisch?", "Erklären Sie diese Karte in zwei Sätzen",
                     "Wie ordnet sich das gegenüber ähnlichen Ereignissen ein?"]},
 }
 

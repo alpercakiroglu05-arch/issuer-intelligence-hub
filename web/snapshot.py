@@ -10,7 +10,9 @@ server (teammates, mentors, the jury). It opens with a double click, no Python, 
 What is inside: the page (index.html + app.css + app.js inlined) and the JSON answers of every API call the demo
 makes for the chosen shares: dashboard, every impact card (calendar events and unusual days), comparisons,
 AI summaries (EN/DE) and the analyst's suggested questions. A small fetch() shim answers from that JSON.
-Not inside: other shares, typed analyst questions and the own-calendar import (they need the live server).
+Also inside: the evidence brief of every card; the explanation check runs in the browser, so it works offline.
+Not inside: other shares, typed analyst questions and the own-calendar import (they need the live server);
+the page says so before the user tries them (status.offline).
 
 The file contains processed Deutsche Boerse data: share it inside the team only, never commit it.
 """
@@ -59,6 +61,7 @@ def build(tickers, llm: bool, out: Path):
     uni = [u for u in srv.universe() if u["isin"] in isins]
     status = {**srv.clean({"stocks": len(uni), "intraday_stocks": len(uni), "llm": bool(llm and srv.llm_available()),
                            "model": srv.llm_model() if llm else None,
+                           "first_date": str(data.daily()["date"].min().date()),
                            "last_date": str(data.daily()["date"].max().date())}), "offline": True}
     snap["/api/status"], snap["/api/universe"] = status, uni
     sugg = suggestions()
@@ -75,6 +78,7 @@ def build(tickers, llm: bool, out: Path):
             url = f"/api/card?isin={isin}&day={day}" + (f"&event_id={ev}" if ev else "")
             try:
                 snap[url] = srv.card(isin, day, ev)
+                snap[url.replace("/api/card?", "/api/evidence?")] = srv.evidence_brief(isin, day, ev)
             except (KeyError, ValueError, IndexError) as e:
                 print("  skip card", isin, day, ev, e)
                 continue
