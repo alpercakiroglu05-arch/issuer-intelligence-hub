@@ -44,7 +44,7 @@ All data is the Deutsche Börse excerpt for **2 Jan – 30 Oct 2026 (213 trading
   - Timestamps are converted from UTC to Frankfurt time (DST aware).
   - An empty `SIDE` marks an auction trade.
   - Two stocks changed ISIN in 2026 (Fresenius, Qiagen); we merge both ISINs.
-- **XLM** exists only while a stock is an index member (Gerresheimer after it left the SDAX on 9 Apr).
+- **XLM** exists only while a stock is an index member (Gerresheimer after its removal from the SDAX, effective 10 Apr).
 
 ## 2. Model and logic
 
@@ -129,7 +129,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 
 | Idea | Value for IR | Data needed |
 |---|---|---|
-| Index early warning | See an index exit coming (Gerresheimer left the SDAX on 9 Apr) | Index rules, free-float market cap, ranking lists |
+| Index early warning | See an index exit coming (Gerresheimer was removed from the SDAX effective 10 Apr) | Index rules, free-float market cap, ranking lists |
 | Designated Sponsor monitor | Does our DS deliver the quote quality we pay for? | DS identity, quote and spread data per DS |
 | Block trades and placements | How much traded off the order book around an event | Off-exchange and block trade reports (the Xetra TES excerpt has only 4 small trades in index stocks) |
 | Surprise vs consensus | Separate "the figures" from "the expectations" | Analyst consensus estimates |
