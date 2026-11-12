@@ -160,3 +160,77 @@ def test_web_own_calendar_and_agent(base):
     a = _post(base, "/api/agent", {"isin": EVD, "question": "What happened on 27 Mar?", "lang": "de",
                                    "context": {"page": "dashboard"}, "history": []})
     assert a["source"] == "template" and a["actions"] and a["steps"]
+
+
+@pytest.mark.parametrize("question, day", [
+    ("Was 27 March just the market?", "2026-03-27"),          # "Was 27" is not a date, "27 March" is
+    ("It fell 23 percent on 27 March, why?", "2026-03-27"),   # "23 percent" is not a date
+    ("on March 27 it fell", "2026-03-27"),
+    ("Was war am 27. März?", "2026-03-27"),
+    ("Was war am 29.10.?", "2026-10-29"),
+    ("Who are the top 3 decliners?", None),                   # "3 dec..." is not 3 December
+    ("What happened on 31 February?", None),                  # not a real date
+    ("in May 2026 we had 5 events", None),
+])
+def test_parse_day_takes_real_dates_only(question, day):
+    from ai.agent import parse_day
+    assert parse_day(question) == day
+
+
+@needs_data
+@pytest.mark.parametrize("lang", ["en", "de"])
+@pytest.mark.parametrize("question", ["How do my trading costs compare with peers?", "What does a large order cost?",
+                                      "spread vs sector", "How does my share trade?"])
+def test_deterministic_answers_work_without_xlm(question, lang):
+    """Gerresheimer left the SDAX on 9 Apr: no XLM in the last 60 days. The answers say so; they do not crash."""
+    from ai import agent
+    from engine.data import isin_of
+    r = agent.fallback(question, isin_of("GXI"), {"page": "dashboard"}, lang)
+    assert r["text"] and "None" not in r["text"] and "nan" not in r["text"].lower()
+    assert r["check"]["unsupported"] == []
+
+
+@needs_data
+@pytest.mark.parametrize("question, context", [
+    ("What happened on 31 February?", {}),
+    ("Was war am 30.02.?", {}),
+    ("Was it a leak?", {"day": "not a date"}),
+    ("Was it just the market?", {"day": "2027-01-15"}),       # after the end of the data
+])
+def test_deterministic_answers_survive_impossible_dates(question, context):
+    from ai import agent
+    assert agent.fallback(question, EVD, context, "en")["text"]
+
+
+@needs_data
+def test_explanation_answer_uses_the_event_of_that_day():
+    """The deterministic explanation check reads the same event as the tool: the day's calendar entry, also when
+    the question names another day than the open card. The card it opens carries that event."""
+    from ai import agent
+    r = agent.fallback("Was 27 March just the market?", EVD, {"day": "2026-08-31"}, "en")
+    assert [s["tool"] for s in r["steps"]] == ["check_explanation"] and "contradicted by the data" in r["text"]
+    assert r["actions"][0]["day"] == "2026-03-27" and r["actions"][0]["event_id"] == "EVD_FY_20260326"
+    de = agent.fallback("War das nur der Markt?", EVD, {"day": "2026-03-27", "event_id": "EVD_FY_20260326"}, "de")
+    assert "von den Daten widerlegt" in de["text"] and de["check"]["unsupported"] == []
+
+
+@needs_data
+def test_assistant_meaning_check_rejects_the_wrong_move(monkeypatch):
+    """Same two checks as the card summary: "the share fell 21.7 %" is the stock-specific move, not the share's
+    own (23.2 %), so the model answer is not shown although 21.7 is a figure of the card."""
+    from ai import agent
+    _fake_llm(monkeypatch, _script("The share fell 21.7% on 8.6x normal turnover.",
+                                   "The share fell 21.7% on 8.6x normal turnover."))
+    r = agent.run("What happened on 27 March?", EVD, context={"page": "dashboard"})
+    assert r["source"] == "template" and r["rejected"] and "21.7" in r["rejected"][0]
+    assert "-23.2%" in r["text"]
+    _fake_llm(monkeypatch, _script("The share fell 23.2% (stock-specific -21.7%) on 8.6x normal turnover."))
+    ok = agent.run("What happened on 27 March?", EVD, context={"page": "dashboard"})
+    assert ok["source"] == "llm" and ok["check"]["unsupported"] == []
+
+
+def test_assistant_glossary_calls_the_peer_move_an_average():
+    """peer_ret is the equal-weighted mean of the other index members (ingest/build_daily.py), not a median."""
+    from ai.agent import SYSTEM
+    assert "equal-weighted average return of the other index members" in SYSTEM
+    assert "median return of the other index members" not in SYSTEM and "cohort" not in SYSTEM.lower()

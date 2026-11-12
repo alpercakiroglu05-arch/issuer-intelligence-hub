@@ -5,7 +5,7 @@ Contracts (short form) are in `docs/API_CONTRACT.md`; this file has the details 
 
 C2 modules: `engine/baseline.py` (Part A, "how does our share normally trade?"), `engine/impact.py`
 (impact card), `engine/compare.py` (same-type comparison; v1 by C1 in PR #7, follow-up PR #11; peer groups by
-index, sector and turnover cohort).
+index, sector and the 10 shares closest by turnover).
 
 ## `baseline.liquidity_trend(isin, window=60) -> dict`
 
@@ -330,7 +330,7 @@ comes from the engine and is only formatted (`_fmt()`, same as the impact card s
 
 - The index median uses `idx_latest`, so a stock that changed index is compared with its current index.
 - Medians over 60 trading days react slowly; one huge day hardly moves them (by design).
-- DS category is an estimate (order book turnover only, XLM median), not the official Deutsche Börse classification.
+- DS category is an estimate (order book turnover and XLM as the daily average of the last four months; unknown without XLM), not the official Deutsche Börse classification.
 - `monthly` covers Jan–Oct 2026 (the data excerpt); the first and last months can be partial.
 - Sectors are a snapshot (Deutsche Börse list of 31 Oct 2026); 1 stock (KCO) is blank. Utilities has only 2 stocks.
 - Size is a turnover proxy: a large but rarely traded company gets small-cap peers. Old ISINs (FRE, QIA) have no

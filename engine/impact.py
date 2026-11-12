@@ -14,9 +14,8 @@ CAR      = sum of abnormal returns t0 .. t+5
 
 comparison block: percentile of this event vs. events of the same type (engine/compare.py)
 
-TODO C2:
-  - intraday block: news onset ("market started pricing at HH:MM") is in engine/onset.py (C1, done)
-  - unit tests on GXI 2026-02-11 (known values: ret -31.4%, abn -30.5%, vol ratio ~20x)
+Intraday block: news onset is in engine/onset.py, auction volumes in engine/auctions.py.
+Known values are pinned in tests (GXI 2026-02-11: ret -31.4%, abnormal -30.5%, volume ~20x).
 """
 import numpy as np
 import pandas as pd

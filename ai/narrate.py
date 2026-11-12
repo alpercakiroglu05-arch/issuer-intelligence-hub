@@ -6,8 +6,6 @@ Rule: the LLM only sees the impact_card JSON. Every number in the text must come
 Numbers check (ai/checks.py): an LLM text with a number that is not in the card JSON is rejected and the
 template text is used instead, and so is a text that calls another number the share's own move
 (meaning_errors). narrate_with_meta() says which one the user sees.
-
-TODO C4: tune the prompt with the IR expert (tone: factual, no advice, no speculation)
 """
 import json
 

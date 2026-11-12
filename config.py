@@ -71,8 +71,7 @@ LIQUIDITY_TREND_TOL = 0.10
 # Same-type comparison (engine/compare.py): smallest group worth a percentile
 COMPARE_MIN_GROUP = 5
 
-# Peer groups (engine/compare.py peer_group): market cap is not in the data, so "size" is a
-# peers: every benchmark (web, Streamlit, report, assistant) = median over the peers of each stock's median
+# Peer groups (engine/compare.py peer_group, peer_medians): every benchmark (web, Streamlit, report, assistant) = median over the peers of each stock's median
 # over the last PEER_DAYS trading days (engine.compare.peer_medians). Size = the SIZE_PEERS_N stocks with the
 # closest median turnover (market cap is not in the data).
 PEER_DAYS = 60

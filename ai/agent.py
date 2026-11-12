@@ -31,12 +31,12 @@ import numpy as np
 import pandas as pd
 
 from ai import llm
-from ai.checks import unsupported_numbers
+from ai.checks import meaning_errors, unsupported_numbers
 from config import COMPARE_MIN_GROUP, DATA_DIR
 from engine import baseline, compare, data, evidence, impact
 
 MAX_ROUNDS = 6
-CACHE_VERSION = 3  # bump when the agent logic changes, so old cached answers are not replayed
+CACHE_VERSION = 4  # bump when the agent logic changes, so old cached answers are not replayed
 # GLM-5.3-Flash reasons before it answers; a small budget can end with no visible answer (model handbook)
 MAX_TOKENS = 4096
 BUDGET_S = 75  # whole tool loop; past this the deterministic answer is shown instead of a spinner
@@ -65,14 +65,14 @@ Rules:
 - Rankings: comparison.n and compare_events count the OTHER events; the group is n + 1 events. Write
   "#3 of 215" (rank_of_day of n_group), never "#3 of 214".
 - Glossary (do not mix them up): price.ret = the share's own return that day ("the share fell 23.2%");
-  price.abn_ret = the stock-specific move = return minus the median return of the other index members
+  price.abn_ret = the stock-specific move = return minus the equal-weighted average return of the other index members
   ("stock-specific -21.7%"). Never call ret "stock-specific" or abn_ret "the share fell".
 - "Has liquidity improved?": use the liquidity_trend verdict and summary (last 60 vs previous 60 trading days,
   stock vs index). Never compare a 60-day median with a 4-month average.
 - If the calendar lists an announcement for a day, name it; never say there is no context when there is one.
 - Do not mention internal field names, z-scores or severity scores.
   XLM = Xetra Liquidity Measure: round-trip cost of a EUR 25k order (spread + price impact) in basis points.
-  "Size cohort" is a turnover proxy; market capitalisation is not in the data.
+  "Size peers" are the shares closest in daily turnover (a proxy); market capitalisation is not in the data.
 - No investment advice, no price predictions, no judgement of the company's strategy.
 - Style: factual, short (max ~120 words), plain text for an IR manager: no markdown, no ** and no bullet lists. Answer in {language}.
 - Data covers Xetra trading from 2 Jan to {last_date}. Today in the product is the day after the last close.
@@ -203,6 +203,16 @@ def _find_event(isin, event_id):
     return hit.iloc[0].to_dict() if len(hit) else None
 
 
+def _event_on(isin, day, event_id=None):
+    """The calendar event of a card: by id, else the entry whose reaction day is this day (None if there is none)."""
+    ev = _find_event(isin, event_id)
+    if ev is None and day:
+        e = data.events()
+        e = e[(e["isin"] == isin) & (pd.to_datetime(e["reaction_day"]) == pd.Timestamp(day))]
+        ev = e.iloc[0].to_dict() if len(e) else None
+    return ev
+
+
 def impact_card(isin: str, day: str, event_id: str | None = None) -> dict:
     c = impact.impact_card(isin, day, _find_event(isin, event_id))
     intr = dict(c.get("intraday") or {})
@@ -253,12 +263,7 @@ def compare_events(event_type: str = "NOTABLE_DAY", index: str | None = None, is
 
 def check_explanation(isin: str, day: str, explanation: str, event_id: str | None = None) -> dict:
     """Test an explanation of a move against the card figures (engine/evidence.py): verdict per claim."""
-    ev = _find_event(isin, event_id)
-    if ev is None:  # the calendar entry for that reaction day, if any
-        e = data.events()
-        e = e[(e["isin"] == isin) & (pd.to_datetime(e["reaction_day"]) == pd.Timestamp(day))]
-        ev = e.iloc[0].to_dict() if len(e) else None
-    b = evidence.brief(isin, _day(day), ev)["en"]
+    b = evidence.brief(isin, _day(day), _event_on(isin, day, event_id))["en"]
     ids = evidence.classify(explanation) or list(evidence.CLAIMS)
     return _clean({"day": _day(day), "headline": b["headline"], "explanation": explanation,
                    "checks": {k: {"claim": b["claims"][k]["label"], "verdict": b["claims"][k]["verdict"],
@@ -391,6 +396,12 @@ def _check(text, outputs, question, context):
     payload = {"tools": outputs, "question": question, "context": context or {}}
     bad = [b for b in unsupported_numbers(text, payload)
            if not re.fullmatch(r"20[0-3]\d", b.lstrip("+-−"))]  # years (FY 2025) are labels, not figures
+    # meaning check (ai/checks.py): "the share fell X %" must be the share's own move of a card the tools returned,
+    # not its stock-specific move. With several cards the sentence may be about any of them.
+    cards = [o for o in outputs if isinstance(o, dict) and isinstance(o.get("price"), dict)
+             and o["price"].get("ret") is not None]
+    if cards:
+        bad += min((meaning_errors(text, c) for c in cards), key=len)
     total = len(re.findall(r"\d+(?:[.,]\d+)?", text))
     return {"total": total, "unsupported": bad}
 
@@ -459,8 +470,9 @@ def _run_llm(question, isin, history, context, lang):
 
 
 def _checked(out: dict, question: str, isin: str, context, lang: str) -> dict:
-    """Same rule as the card summary: a model answer with a figure that is not in the tool outputs is not shown;
-    the deterministic answer from the same tools is shown instead, and `rejected` says which figures failed."""
+    """Same rule as the card summary: a model answer with a figure that is not in the tool outputs, or that
+    calls the stock-specific move "the share fell X %", is not shown; the deterministic answer from the same
+    tools is shown instead, and `rejected` says which figures failed."""
     bad = (out.get("check") or {}).get("unsupported") or []
     if not bad:
         return out
@@ -498,31 +510,48 @@ def ask(question: str, isin: str) -> str:
 
 
 # ---------- deterministic fallback (no key): same tools, fixed wording ----------
-_MON = {m: i + 1 for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"])}
-_MON.update({"mär": 3, "mai": 5, "okt": 10, "dez": 12, "march": 3, "märz": 3, "june": 6, "juni": 6, "july": 7, "juli": 7})
+_MONTHS = [("jan", "january", "januar"), ("feb", "february", "februar"), ("mar", "march", "mär", "märz", "maerz"),
+           ("apr", "april"), ("may", "mai"), ("jun", "june", "juni"), ("jul", "july", "juli"), ("aug", "august"),
+           ("sep", "sept", "september"), ("oct", "okt", "october", "oktober"), ("nov", "november"),
+           ("dec", "dez", "december", "dezember")]
+_MON = {name: i + 1 for i, names in enumerate(_MONTHS) for name in names}
+_DAY_MONTH = re.compile(r"\b(\d{1,2})\.?\s*([a-zA-ZäÄ]{3,9})\b")   # "27 March", "27. März"
+_MONTH_DAY = re.compile(r"\b([a-zA-ZäÄ]{3,9})\.?\s+(\d{1,2})\b")    # "March 27"
+
+
+def _date(y, m, d) -> str | None:
+    try:
+        return pd.Timestamp(year=int(y), month=int(m), day=int(d)).strftime("%Y-%m-%d")
+    except ValueError:  # "31 February"
+        return None
 
 
 def parse_day(q: str) -> str | None:
-    m = re.search(r"\b(20\d\d)-(\d{1,2})-(\d{1,2})\b", q)
-    if m:
-        return f"{m[1]}-{int(m[2]):02d}-{int(m[3]):02d}"
-    m = re.search(r"\b(\d{1,2})\.(\d{1,2})\.(?:(20\d\d)\b)?", q)
-    if m:
-        return f"{m[3] or 2026}-{int(m[2]):02d}-{int(m[1]):02d}"
-    m = re.search(r"\b(\d{1,2})\.?\s*([a-zäA-Z]{3,9})\b", q) or re.search(r"\b([a-zA-Z]{3,9})\s+(\d{1,2})\b", q)
-    if m:
-        a, b = m.groups()
-        d, mon = (a, b) if a.isdigit() else (b, a)
-        mon = mon.lower()
-        k = _MON.get(mon) or _MON.get(mon[:3])
-        if k:
-            return f"2026-{k:02d}-{int(d):02d}"
+    """The first real calendar date in a question: ISO, German "27.03." / "27.03.2026", "27 March", "March 27"
+    (year 2026 unless written). A month must be a month name or its usual abbreviation, so "23 percent" and
+    "top 3 decliners" are not dates; an impossible date ("31 February") is skipped."""
+    for m in re.finditer(r"\b(20\d\d)-(\d{1,2})-(\d{1,2})\b", q):
+        if d := _date(m[1], m[2], m[3]):
+            return d
+    for m in re.finditer(r"\b(\d{1,2})\.(\d{1,2})\.(?:(20\d\d)\b)?", q):
+        if d := _date(m[3] or 2026, m[2], m[1]):
+            return d
+    hits = [(m.start(), m[2], m[1]) for m in _DAY_MONTH.finditer(q)] + \
+           [(m.start(), m[1], m[2]) for m in _MONTH_DAY.finditer(q)]
+    for _, mon, day in sorted(hits):  # two passes: "Was 27 March" has the non-date "Was 27" before the date
+        k = _MON.get(mon.lower())
+        if k and (d := _date(2026, k, day)):
+            return d
     return None
 
 
 def _nearest_trading_day(isin, day):
+    """The first trading day on or after `day`; None for no date, an impossible one or one after the data."""
+    t = pd.to_datetime(day, errors="coerce")
+    if day is None or pd.isna(t):
+        return None
     s = data.stock(isin)
-    d = s["date"][s["date"] >= pd.Timestamp(day)]
+    d = s["date"][s["date"] >= t]
     return _day(d.iloc[0]) if len(d) else None
 
 
@@ -544,6 +573,24 @@ def _d(day, de):
 
 def _x(x, de):
     return "–" if x is None else (f"{x:.1f}".replace(".", ",") + "×" if de else f"{x:.1f}×")
+
+
+def _peer_text(p, name, de):
+    """Peer benchmark in one sentence. A share without XLM (not a DAX, MDAX or SDAX member) gets turnover only."""
+    v = p["values"]
+    s, m = v["median_xlm_25k_bps"]["stock"], v["median_xlm_25k_bps"]["peer_median"]
+    t, tm = v["median_turnover_eur"]["stock"], v["median_turnover_eur"]["peer_median"]
+    if de:
+        cost = ("Handelskosten: kein XLM für diese Aktie (XLM gibt es nur für DAX-, MDAX- und SDAX-Werte)"
+                if s is None or m is None else
+                f"Handelskosten (XLM 25k) {s:.1f} Bp. vs. {m:.1f} Bp. Median, also {'günstiger' if s < m else 'teurer'}")
+        return (f"{name} vs. {p['group']} ({p['n_peers']} Werte), letzte 60 Handelstage: {cost}; "
+                f"Umsatz {_eur(t, True)} vs. {_eur(tm, True)} pro Tag.")
+    cost = ("trading cost: no XLM for this share (XLM exists only for DAX, MDAX and SDAX members)"
+            if s is None or m is None else
+            f"trading cost (XLM 25k) {s:.1f} bps vs {m:.1f} bps median, so {'cheaper' if s < m else 'more expensive'}")
+    return (f"{name} vs {p['group']} ({p['n_peers']} shares), last 60 trading days: {cost}; "
+            f"turnover {_eur(t, False)} vs {_eur(tm, False)} a day.")
 
 
 def _eur(x, de):
@@ -582,27 +629,23 @@ def fallback(question: str, isin: str, context=None, lang: str = "en") -> dict:
         "market", "markt", "fund", "fonds", "short", "leak", "insider", "overreact", "übertr", "thin", "dünn",
         "investor", "anleger", "index", "expir", "verfall", "revers", "erhol", "why", "warum", "because", "weil",
         "explanation", "erklärung") else []
-    if claim_ids and not peerq:
-        td = _nearest_trading_day(isin, day or ctx["day"])
-        r = use("check_explanation", day=td, explanation=question,
-                event_id=ctx.get("event_id") if td == ctx.get("day") else None)
-        bl = evidence.brief(isin, td, _find_event(isin, ctx.get("event_id")) if td == ctx.get("day") else None)[lang]
+    td = _nearest_trading_day(isin, day or ctx.get("day")) if claim_ids and not peerq else None
+    if td:
+        eid = ctx.get("event_id") if td == ctx.get("day") else None
+        r = use("check_explanation", day=td, explanation=question, event_id=eid)
+        ev = _event_on(isin, td, eid)
+        bl = evidence.brief(isin, td, ev)["de" if de else "en"]
         vw = {"supported": ("supported by the data", "von den Daten gestützt"), "contradicted": ("contradicted by the data", "von den Daten widerlegt"),
               "partly": ("partly supported", "teilweise gestützt"), "not_testable": ("not testable with this data", "mit diesen Daten nicht prüfbar")}
         text = " ".join(f"{bl['claims'][k]['label']} {vw[bl['claims'][k]['verdict']][1 if de else 0]}: {bl['claims'][k]['text']}"
                         for k in r["checks"])
-        act("card", day=td, event_id=ctx.get("event_id") if td == ctx.get("day") else None)
+        act("card", day=td, event_id=(ev or {}).get("event_id"))
         return {"text": text, "source": "template", "model": None, "steps": steps, "actions": actions,
                 "check": _check(text, outputs + [bl], question, context)}
     if peerq and not day:
         by = "sector" if has("sector", "sektor") else "size" if has("size", "größe") else "index"
         p = use("peer_benchmark", by=by)
-        s, m = p["values"]["median_xlm_25k_bps"]["stock"], p["values"]["median_xlm_25k_bps"]["peer_median"]
-        t, tm = p["values"]["median_turnover_eur"]["stock"], p["values"]["median_turnover_eur"]["peer_median"]
-        text = (f"{name} vs. {p['group']} ({p['n_peers']} Werte), letzte 60 Handelstage: Handelskosten (XLM 25k) {s:.1f} Bp. "
-                f"vs. {m:.1f} Bp. Median, also {'günstiger' if s < m else 'teurer'}; Umsatz {_eur(t, True)} vs. {_eur(tm, True)} pro Tag.") if de else \
-               (f"{name} vs {p['group']} ({p['n_peers']} shares), last 60 trading days: trading cost (XLM 25k) {s:.1f} bps "
-                f"vs {m:.1f} bps median, so {'cheaper' if s < m else 'more expensive'}; turnover {_eur(t, False)} vs {_eur(tm, False)} a day.")
+        text = _peer_text(p, name, de)
         return {"text": text, "source": "template", "model": None, "steps": steps, "actions": actions,
                 "check": _check(text, outputs, question, context)}
     if has("report", "pdf", "export", "snapshot", "bericht"):
@@ -679,19 +722,22 @@ def fallback(question: str, isin: str, context=None, lang: str = "en") -> dict:
     elif has("order size", "large order", "block", "ordergröße", "große order", "institution", "curve", "kurve", "absorb"):
         c = use("trading_cost_curve")
         s = c["summary"]
-        text = (f"{name}: Eine 100-T€-Order kostet im Median {s['cost_100k_bps']:.0f} Bp. (Peers {s['peer_cost_100k_bps']:.0f}). "
+        if s["cost_100k_bps"] is None:  # no XLM: the share is not a DAX, MDAX or SDAX member
+            text = (f"{name}: Für diese Aktie gibt es kein XLM (nur für DAX-, MDAX- und SDAX-Werte), "
+                    "daher keine Kosten nach Ordergröße.") if de else \
+                   (f"{name}: there is no XLM for this share (it exists only for DAX, MDAX and SDAX members), "
+                    "so the cost by order size cannot be shown.")
+            return {"text": text, "source": "template", "model": None, "steps": steps, "actions": actions,
+                    "check": _check(text, outputs, question, context)}
+        peer = "–" if s["peer_cost_100k_bps"] is None else f"{s['peer_cost_100k_bps']:.0f}"
+        text = (f"{name}: Eine 100-T€-Order kostet im Median {s['cost_100k_bps']:.0f} Bp. (Peers {peer}). "
                 f"Das Orderbuch nimmt an den meisten Tagen Orders bis {s['largest_absorbed_label']} auf.") if de else \
-               (f"{name}: a €100k order costs a median {s['cost_100k_bps']:.0f} bps round trip (peers {s['peer_cost_100k_bps']:.0f}). "
+               (f"{name}: a €100k order costs a median {s['cost_100k_bps']:.0f} bps round trip (peers {peer}). "
                 f"The order book absorbs orders up to {s['largest_absorbed_label']} on most days.")
     elif has("spread", "xlm", "cost", "kosten", "peer", "sector", "sektor", "size", "größe"):
         by = "sector" if has("sector", "sektor") else "size" if has("size", "größe") else "index"
         p = use("peer_benchmark", by=by)
-        s, m = p["values"]["median_xlm_25k_bps"]["stock"], p["values"]["median_xlm_25k_bps"]["peer_median"]
-        t, tm = p["values"]["median_turnover_eur"]["stock"], p["values"]["median_turnover_eur"]["peer_median"]
-        text = (f"{name} vs. {p['group']} ({p['n_peers']} Werte), letzte 60 Handelstage: Handelskosten (XLM 25k) {s:.1f} Bp. "
-                f"vs. {m:.1f} Bp. Median, also {'günstiger' if s < m else 'teurer'}; Umsatz {_eur(t, True)} vs. {_eur(tm, True)} pro Tag.") if de else \
-               (f"{name} vs {p['group']} ({p['n_peers']} shares), last 60 trading days: trading cost (XLM 25k) {s:.1f} bps "
-                f"vs {m:.1f} bps median, so {'cheaper' if s < m else 'more expensive'}; turnover {_eur(t, False)} vs {_eur(tm, False)} a day.")
+        text = _peer_text(p, name, de)
     else:
         o = use("company_overview")
         lt = o["liquidity_trend"]
