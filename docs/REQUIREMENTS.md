@@ -27,7 +27,7 @@ So the user is an IR person **without a terminal**. They enter their company and
 | — | "Has liquidity improved?" (problem statement) | p. 9 | Overview → liquidity verdict sentence + Xetra liquidity category check | `baseline.liquidity_trend`, `kpis` |
 | B1 | **Impact card (brief: Part B):** link announcements (results, dividends, press releases, ad hoc) to trading data | p. 10 | **Impact card** tab | `impact.impact_card` |
 | V | Visual impact card: volume vs. baseline, spread movement, price formation in the opening/closing auctions | p. 10/11 | Impact card → card body: volume gauge, spread gauge, opening and closing auction blocks, intraday chart | `card.volume`, `card.liquidity`, `card.auctions`, `card.intraday` |
-| VI | Ingest a corporate event calendar and match events to intraday data | p. 11/12 | Impact card → event list (from `events/events.csv`, with type, time, source and verified flag) **+ "Add event" / "Import calendar" (CSV or ICS from Outlook/Google)** for the company's own dates, with a preview of every row (matched / before or after the data / skipped and why) before saving; ICS time zones are converted; the time decides the reaction day. "Reaction detected in trading at HH:MM" on the chart (inferred from trades, not the publication time) | `data.events`, `POST /api/calendar`, `onset.onset`, `intraday_bars` |
+| VI | Ingest a corporate event calendar and match events to intraday data | p. 11/12 | Events → **Impact cards**: the ingested corporate event calendar (`events/events.csv`, 80 researched events with type, time, source and verified flag; `ingest/build_events.py` matches each to its reaction day: after the 17:35 closing auction or on a non-trading day, the next trading day), plus "Create an impact card for any day". "Reaction detected in trading at HH:MM" on the chart (inferred from trades, not the publication time) | `data.events`, `POST /api/calendar`, `onset.onset`, `intraday_bars` |
 | VII | Compare events of the same type (e.g. all DAX results in the past year) | p. 10/11 | **Compare** tab (type + index filters, table, scatter; the open card is highlighted) | `compare.same_type_events`, `card.comparison` |
 | IV | Package insights into a shareable "IR snapshot" report | p. 11 | **Export IR report (PDF)** on the dashboard (Part A) and on every impact card (snapshot), one click, DE/EN; **Report** tab for a custom mix | `GET /api/export` → `report.export.part_a_html` / `to_html` + `to_pdf` |
 | VIII | Exportable summary for IR teams | p. 10/11 | Report tab: checkboxes for share price (period), trading profile, peers, liquidity, unusual days and/or impact card, DE/EN, PDF | same |
@@ -41,7 +41,7 @@ So the user is an IR person **without a terminal**. They enter their company and
 ```
 Opens on the last company ── share search (⌘K): ISIN / name / ticker ──►  Company workspace
                                                             ├─ Dashboard      A1, I, II, III, liquidity verdict, cost by order size
-                                                            ├─ Impact card    B1, V, VI (+ own calendar) + AI summary
+                                                            ├─ Impact card    B1, V, VI + AI summary
                                                             ├─ Compare        VII
                                                             ├─ IR snapshot    IV, VIII (custom report; one-click PDF on dashboard and card)
                                                             └─ Ideas          next ideas + data needed
@@ -64,7 +64,7 @@ Opens on the last company ── share search (⌘K): ISIN / name / ticker ─�
 - [ ] AI summary EN → DE.
 - [ ] IR analyst (key A): "What were our biggest moves this year?" → button opens the card.
 - [ ] Impact card → evidence brief → "The whole market sold off" → Contradicted.
-- [ ] Impact card → Import calendar (CSV/ICS) → preview → Add → card in one click.
+- [ ] Events → Impact cards → "Create an impact card for any day" → card in one click.
 - [ ] Compare → FY results across indices.
 - [ ] Report → PDF.
 - [ ] Ideas → GXI index exit story.

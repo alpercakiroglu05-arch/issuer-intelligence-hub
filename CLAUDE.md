@@ -107,9 +107,11 @@ Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `
 
 ## Findings for the demo and pitch
 
-Hero stocks (max 3 per challenge, set in `config.HERO_TICKERS`; the team may still change them):
+Hero stocks (max 3 per challenge, one per index, `config.HERO_TICKERS` = ZAL, EVD, HDD since 12 Nov; EVT before):
+- **ZAL Zalando (DAX).** Trigger (calendar): Q2/H1 2026 results on 4 Aug at 07:00. On 4 Aug: −13.4 % (DAX peers +0.3 %,
+  stock-specific −13.6 %), 6.0× normal turnover, reaction detected at 09:02; rank 1 of 36 DAX half-year results.
 - **EVD CTS Eventim (MDAX), main demo flow.** Trigger (sourced): FY 2025 results and 2026 outlook on 26 Mar at 17:45, after the close (proposed dividend €1.44 per share). The linked release gives no prior-year dividend, no numeric 2026 targets and no reason for the fall: do **not** say "dividend cut (€1.66 → €1.44)" or "disappointing targets" in the pitch unless a source for it is added to `events.csv`. On 27 Mar: −23.2 % (peers −1.5 %, abnormal −21.7 %), 8.6× normal turnover, agent orders net selling (−36 %). The opening auction (09:02) was only −2.3 %, but the market started pricing the news at **09:03** (onset detector): −15 % by 09:18, i.e. 65 % of the day's move within 15 minutes, with volatility interruptions at 09:07 and 09:12. The low came at 16:44. The closing auction (17:35) traded **€25.6m** (3.6× normal) and set the price 1.5 % below the last trade (normal ±0.2 %); the opening auction was 9.6× normal.
-- **EVT Evotec (SDAX).** Trigger (sourced): ad hoc guidance cut on 13 Jul at 21:17. On 14 Jul: −24 %, a −22 % gap at the open (news before the open). 19 % of turnover traded in the first 15 minutes; the low came at 09:18.
+- **EVT Evotec (SDAX), former showcase, data unchanged.** Trigger (sourced): ad hoc guidance cut on 13 Jul at 21:17. On 14 Jul: −24 %, a −22 % gap at the open (news before the open). 19 % of turnover traded in the first 15 minutes; the low came at 09:18.
 - **HDD Heidelberger Druck (SDAX).** A small cap (~€1.3m/day, XLM ~90 bps, close to the Designated Sponsor thresholds) with several strong days. This is the liquidity story. Sourced triggers: Q3 results 5 Feb 07:30 (−14 %), drone-defense JV ad hoc 18 Mar 14:15 (+9 %), dpa-AFX drone-defense report 14 Apr 06:10 (+19 %), guidance cut 15 Apr 17:59 (−11 % next day), **guidance cut ad hoc 29 Oct at 12:00:53 → onset detector says 12:02**.
 - **GXI Gerresheimer, a pitch story only.** Trigger (sourced): ad hoc on 10 Feb at 22:28 (results postponed over an accounting investigation, guidance cut, impairments). On 11 Feb: −31.4 % (peers −0.9 %), 20× turnover, 20 % of turnover in the first 15 minutes, low at 09:22. It **left the SDAX after 9 Apr** (STOXX: deleted effective 10 Apr; last index day in the data 9 Apr), so there is no XLM data after that. This gives the "index early-warning" idea.
 - The **reasons** for these moves are NOT in the trading data. They come from `events/events.csv` (80 sourced events, researched 11 Nov; the 40 hero rows were re-checked against their links on 12 Nov: every date and time matches, titles were cut back to what the linked page says, three dead links were replaced). Quote only what the linked source says; never invent causes. Not found (no company news): EVD 27 Feb, 5 Mar, 30 Mar; EVT 3 Feb, 14 Apr (analyst comments), 12 Oct. EVD 31 Aug (19× turnover) = MSCI Germany deletion effective at the close.
@@ -140,7 +142,7 @@ Done on `main`:
   **After ANY prompt, card or engine change run `python web/warm_cache.py`** (~4 min).
 - **Web (`web/`) = demo UI:** share search, overview (1M/3M/YTD), dashboard (trading over time, peers, liquidity trend, cost by order
   size, unusual days with calendar and market context), impact card, compare, report, ideas, IR analyst dock.
-  Own calendar (brief VI): add an event or import CSV/ICS on the card page (`/api/calendar`, #36).
+  Brief VI: the ingested event calendar (events.csv) on the Events page "Impact cards"; the calendar upload UI was removed (`/api/calendar` stays).
   **One-click PDF** (#41): *Export IR report (PDF)* on every card (snapshot + checked summary) and on the
   dashboard (Part A), DE/EN.
 - **Streamlit (`app/`) = backup and analyst view.** Deleted by a direct push to main (2bd0c3c), restored in #39.

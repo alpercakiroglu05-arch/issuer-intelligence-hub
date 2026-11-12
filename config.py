@@ -35,12 +35,14 @@ EVENTS_CSV = REPO_ROOT / "events" / "events.csv"
 SECTORS_CSV = REPO_ROOT / "events" / "sectors.csv"
 NAMES_CSV = REPO_ROOT / "events" / "names.csv"   # readable company names for the event stocks
 
-# Stocks we showcase (max 3 per the challenge). Proposed - team decides.
+# Stocks we showcase (max 3 per the challenge), one per index so the demo covers DAX, MDAX and SDAX:
+#   ZAL  Zalando (DAX):      H1 results 4 Aug 07:00 -> -13.4% (stock-specific -13.6%), 6.0x turnover, onset 09:02,
+#                            rank 1 of 36 DAX half-year results (the brief's "compare all DAX results")
 #   EVD  CTS Eventim (MDAX): 27 Mar -23% after FY results (26 Mar 17:45); priced from 09:03, closing auction 3.6x normal
-#   EVT  Evotec (SDAX):      14 Jul -24%, -22% gap at the open (news before the open)
 #   HDD  Heidelberger Druck (SDAX): small cap, ~EUR 1.3m/day, XLM ~90 bps -> liquidity story
-#   (GXI Gerresheimer: -31% on 11 Feb, left the SDAX on 9 Apr -> no XLM data afterwards; pitch story only)
-HERO_TICKERS = ["EVD", "EVT", "HDD"]
+#   (EVT Evotec (SDAX), 14 Jul -24%, was a showcase stock until 12 Nov; its researched events stay in the data.
+#    GXI Gerresheimer: -31% on 11 Feb, left the SDAX on 9 Apr -> no XLM data afterwards; pitch story only)
+HERO_TICKERS = ["ZAL", "EVD", "HDD"]
 # example companies, one per index (DAX, MDAX, SDAX); a UI may offer them as a start. Zalando = the DAX member with the
 # largest H1 reaction among the 40 DAX stocks, which all have one calendar event and full minute data.
 EXAMPLE_TICKERS = ["ZAL", "EVD", "HDD"]
