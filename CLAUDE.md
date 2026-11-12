@@ -42,7 +42,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 
 ```bash
 pip install -r requirements.txt
-python web/server.py                      # demo UI (web/hub, C3): http://127.0.0.1:8600 (previous UI: /index.html)
+python web/server.py                      # demo UI (web/, C3): http://127.0.0.1:8600 (or double-click start.command / start.bat)
 streamlit run app/Home.py                 # backup UI and analyst view: http://localhost:8501
 pytest                                    # 205 tests (incl. web API); data tests skip if data/ is empty
 python web/warm_cache.py                  # re-warm the demo caches (summaries + assistant) after ANY prompt, card or engine change
@@ -138,7 +138,7 @@ Done on `main`:
   (56 from the model, 2 templates: EVT 10 Mar and 6 May EN, where the check caught a number) and 36 assistant
   answers (0 flagged). EVD 27 Mar EN/DE are served from the cache without network.
   **After ANY prompt, card or engine change run `python web/warm_cache.py`** (~4 min).
-- **Web (`web/`) = demo UI:** ISIN entry, dashboard (trading over time, peers, liquidity trend, cost by order
+- **Web (`web/`) = demo UI:** share search, overview (1M/3M/YTD), dashboard (trading over time, peers, liquidity trend, cost by order
   size, unusual days with calendar and market context), impact card, compare, report, ideas, IR analyst dock.
   Own calendar (brief VI): add an event or import CSV/ICS on the card page (`/api/calendar`, #36).
   **One-click PDF** (#41): *Export IR report (PDF)* on every card (snapshot + checked summary) and on the
