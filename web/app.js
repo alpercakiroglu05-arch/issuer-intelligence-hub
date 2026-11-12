@@ -131,17 +131,17 @@ function timelineSVG(d) {
   const a = tl[M[0]], b = tl[M[1]], max = Math.max(...a.filter(isN), ...b.filter(isN), 0) * 1.08 || 1;
   const x = i => ml + (i + .5) * pw / n, y = v => mt + ph - v / max * ph, bw = Math.max(1.5, pw / n * .62);
   const path = arr => arr.map((v, i) => isN(v) ? `${i && isN(arr[i - 1]) ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}` : "").join("");
-  let g = [0, .5, 1].map(f => `<line x1="${ml}" x2="${W - mr}" y1="${y(max * f / 1.08)}" y2="${y(max * f / 1.08)}" stroke="#e3e6eb"/><text x="${ml - 8}" y="${y(max * f / 1.08) + 4}" text-anchor="end" font-size="11" fill="#5b6472">${f ? M[2](max * f / 1.08) : "0"}</text>`).join("");
+  let g = [0, .5, 1].map(f => `<line x1="${ml}" x2="${W - mr}" y1="${y(max * f / 1.08)}" y2="${y(max * f / 1.08)}" stroke="#e8e8ed"/><text x="${ml - 8}" y="${y(max * f / 1.08) + 4}" text-anchor="end" font-size="11" fill="#86868b">${f ? M[2](max * f / 1.08) : "0"}</text>`).join("");
   const step = Math.max(1, Math.round(n / 6));
-  g += tl.date.map((dt, i) => i % step === 0 ? `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#5b6472">${F.day(dt)}</text>` : "").join("");
-  g += S.metric === "turnover" ? a.map((v, i) => isN(v) ? `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(mt + ph - y(v)).toFixed(1)}" fill="#c3cad5"><title>${F.day(tl.date[i], true)} · ${M[2](v)}</title></rect>` : "").join("")
-    : `<path d="${path(a)}" fill="none" stroke="#1d4ed8" stroke-width="1.8"/>`;
-  g += `<path d="${path(b)}" fill="none" stroke="#5b6472" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+  g += tl.date.map((dt, i) => i % step === 0 ? `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#86868b">${F.day(dt)}</text>` : "").join("");
+  g += S.metric === "turnover" ? a.map((v, i) => isN(v) ? `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(mt + ph - y(v)).toFixed(1)}" rx="1.5" fill="#d2d2d7"><title>${F.day(tl.date[i], true)} · ${M[2](v)}</title></rect>` : "").join("")
+    : `<path d="${path(a)}" fill="none" stroke="#0071e3" stroke-width="1.8"/>`;
+  g += `<path d="${path(b)}" fill="none" stroke="#86868b" stroke-width="1.2" stroke-dasharray="4 3"/>`;
   const at = new Map(tl.date.map((dt, i) => [dt, i])), lanes = [-1e9, -1e9, -1e9];
   g += d.events.concat(ownRows(d)).sort((p, q) => p.day.localeCompare(q.day)).map(e => { const i = at.get(e.day); if (i === undefined) return ""; const X = x(i), ev = e.type !== "UNUSUAL_DAY";
     const label = (SHORT[e.type] || [e.type, e.type])[de() ? 1 : 0] + (isN(e.abn_ret) ? " " + F.pct(e.abn_ret, 0) : ""), w = label.length * 6.4 + 14;
     let ln = lanes.findIndex(v => X - w / 2 > v + 4); if (ln < 0) ln = 0; lanes[ln] = X + w / 2; const Y = 4 + ln * 20;
-    return `<g class="mk" data-card="${e.day}" data-ev="${esc(e.event_id || "")}"><title>${F.day(e.day, true)} · ${esc(typeL(e.type))}${e.title ? " · " + esc(e.title) : ""}</title><line x1="${X}" x2="${X}" y1="${Y + 16}" y2="${mt + ph}" stroke="${ev ? "#0f2a5f" : "#b4530f"}" stroke-width="1" opacity=".35"/><rect x="${(X - w / 2).toFixed(1)}" y="${Y}" width="${w.toFixed(1)}" height="16" rx="8" fill="${ev ? "#0f2a5f" : "#fdf0e3"}"/><text x="${X}" y="${Y + 11.5}" text-anchor="middle" font-size="10.5" font-weight="600" fill="${ev ? "#fff" : "#8a3b08"}">${esc(label)}</text></g>`; }).join("");
+    return `<g class="mk" data-card="${e.day}" data-ev="${esc(e.event_id || "")}"><title>${F.day(e.day, true)} · ${esc(typeL(e.type))}${e.title ? " · " + esc(e.title) : ""}</title><line x1="${X}" x2="${X}" y1="${Y + 16}" y2="${mt + ph}" stroke="${ev ? "#1d1d1f" : "#bf4800"}" stroke-width="1" opacity=".35"/><rect x="${(X - w / 2).toFixed(1)}" y="${Y}" width="${w.toFixed(1)}" height="16" rx="8" fill="${ev ? "#1d1d1f" : "#fff1e6"}"/><text x="${X}" y="${Y + 11.5}" text-anchor="middle" font-size="10.5" font-weight="600" fill="${ev ? "#fff" : "#bf4800"}">${esc(label)}</text></g>`; }).join("");
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L("Trading over time", "Handel im Zeitverlauf")}">${g}</svg>`;
 }
 const ownRows = d => ownEvents(S.isin).filter(e => e.reaction_day >= d.from && e.reaction_day <= d.to).map(e => ({day: e.reaction_day, published: e.date, time: e.time_local || null, timing: e.timing, event_id: e.event_id, type: e.type, title: e.title, own: true, context: []}));
@@ -155,9 +155,14 @@ function dashboard(d) {
   const rows = d.events.concat(ownRows(d)).sort((a, b) => b.day.localeCompare(a.day));
   return `<div class="wrap stack">
   <section><div class="eyebrow">${esc(d.ticker)} · ${esc(idx)}${d.sector ? " · " + esc(d.sector) : ""} · ${per}</div><h1>${esc(d.name)}</h1>
-    <p class="lede">${L(`Traded <b>${F.eur(t.turnover_eur.stock)}</b> a day (${idx} median ${F.eur(t.turnover_eur.index)}) at a cost of <b>${F.bps(t.xlm_25k.stock)}</b> for a €25k order (${F.bps(t.xlm_25k.index)}). The share moved <b>${F.pct(t.price.stock)}</b>, the ${idx} ${F.pct(t.price.index)}. <b>${t.unusual_days}</b> unusual ${t.unusual_days === 1 ? "day" : "days"}.`,
-      `Umsatz <b>${F.eur(t.turnover_eur.stock)}</b> pro Tag (${idx}-Median ${F.eur(t.turnover_eur.index)}) bei Kosten von <b>${F.bps(t.xlm_25k.stock)}</b> für eine 25-Tsd.-€-Order (${F.bps(t.xlm_25k.index)}). Die Aktie bewegte sich um <b>${F.pct(t.price.stock)}</b>, der ${idx} um ${F.pct(t.price.index)}. <b>${t.unusual_days}</b> ${t.unusual_days === 1 ? "auffälliger Tag" : "auffällige Tage"}.`)}</p>
-    <div class="meta"><span>${cat}</span><span class="grey">${d.isin}</span></div>
+    <p class="lede">${L(`How the share trades, how it compares with the ${idx}, and what happened around each announcement.`, `Wie die Aktie handelt, wie sie im ${idx}-Vergleich steht und was rund um jede Meldung geschah.`)}</p>
+    <div class="meta"><span class="pill-soft">${cat}</span><span class="grey">${d.isin}</span></div>
+    <div class="tiles bento">
+      ${tile(L("Turnover per day", "Umsatz pro Tag"), F.eur(t.turnover_eur.stock), L(`${idx} median ${F.eur(t.turnover_eur.index)} · ${F.rank(t.turnover_eur)}`, `${idx}-Median ${F.eur(t.turnover_eur.index)} · ${F.rank(t.turnover_eur)}`))}
+      ${tile(L("Trading cost, €25k order", "Handelskosten, 25-Tsd.-€-Order"), F.bps(t.xlm_25k.stock), L(`${idx} median ${F.bps(t.xlm_25k.index)} · ${F.rank(t.xlm_25k)}`, `${idx}-Median ${F.bps(t.xlm_25k.index)} · ${F.rank(t.xlm_25k)}`))}
+      ${tile(L("Price", "Kurs"), F.pct(t.price.stock), L(`${idx} ${F.pct(t.price.index)} · ${F.rank(t.price)}`, `${idx} ${F.pct(t.price.index)} · ${F.rank(t.price)}`), cls(t.price.stock))}
+      ${tile(L("Unusual days", "Auffällige Tage"), String(t.unusual_days), per)}
+    </div>
 </section>
 
   <section class="card"><div class="sec-h"><h2>${L("The period at a glance", "Der Zeitraum auf einen Blick")}</h2>
@@ -206,15 +211,15 @@ function intradaySVG(d) {
   const x = t => ml + Math.max(0, Math.min(T, min(t))) / T * (W - ml - mr);
   const rs = b.ret.filter(isN), lo = Math.min(0, ...rs), hi = Math.max(0, ...rs), pad = (hi - lo) * .08 || .01, y = v => mt + (hi + pad - v) / (hi - lo + 2 * pad) * ph;
   const vmax = Math.max(...b.eur.filter(isN), 1);
-  let g = `<line x1="${ml}" x2="${W - mr}" y1="${y(0)}" y2="${y(0)}" stroke="#9aa3af"/><text x="${ml - 8}" y="${y(0) + 4}" text-anchor="end" font-size="11" fill="#5b6472">0</text>`;
-  [lo, hi].filter(v => Math.abs(v) > .004).forEach(v => { g += `<text x="${ml - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#5b6472">${F.pct(v, 0)}</text>`; });
-  ["09:00", "11:00", "13:00", "15:00", "17:00"].forEach(t => { g += `<text x="${x(t)}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#5b6472">${t}</text>`; });
-  g += b.t.map((t, i) => isN(b.eur[i]) && b.eur[i] > 0 ? `<rect x="${(x(t) - 1).toFixed(1)}" y="${(vy - b.eur[i] / vmax * vh).toFixed(1)}" width="2" height="${(b.eur[i] / vmax * vh).toFixed(1)}" fill="${b.auction[i] ? "#1d4ed8" : "#c3cad5"}"/>` : "").join("");
+  let g = `<line x1="${ml}" x2="${W - mr}" y1="${y(0)}" y2="${y(0)}" stroke="#c7c7cc"/><text x="${ml - 8}" y="${y(0) + 4}" text-anchor="end" font-size="11" fill="#86868b">0</text>`;
+  [lo, hi].filter(v => Math.abs(v) > .004).forEach(v => { g += `<text x="${ml - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#86868b">${F.pct(v, 0)}</text>`; });
+  ["09:00", "11:00", "13:00", "15:00", "17:00"].forEach(t => { g += `<text x="${x(t)}" y="${H - 4}" text-anchor="middle" font-size="11" fill="#86868b">${t}</text>`; });
+  g += b.t.map((t, i) => isN(b.eur[i]) && b.eur[i] > 0 ? `<rect x="${(x(t) - 1).toFixed(1)}" y="${(vy - b.eur[i] / vmax * vh).toFixed(1)}" width="2" height="${(b.eur[i] / vmax * vh).toFixed(1)}" fill="${b.auction[i] ? "#0071e3" : "#d2d2d7"}"/>` : "").join("");
   let p = "", pen = false; b.t.forEach((t, i) => { if (isN(b.ret[i]) && min(t) >= 0 && min(t) <= T) { p += `${pen ? "L" : "M"}${x(t).toFixed(1)},${y(b.ret[i]).toFixed(1)}`; pen = true; } });
-  g += `<path d="${p}" fill="none" stroke="#111827" stroke-width="1.6" stroke-linejoin="round"/>`;
+  g += `<path d="${p}" fill="none" stroke="#1d1d1f" stroke-width="1.6" stroke-linejoin="round"/>`;
   const on = c.intraday && c.intraday.onset && c.intraday.onset.time;
-  if (on) g += `<line x1="${x(on)}" x2="${x(on)}" y1="${mt}" y2="${vy}" stroke="#b4530f" stroke-width="1.4" stroke-dasharray="4 3"/><text x="${x(on) + 8}" y="${mt + 12}" font-size="12" font-weight="600" fill="#8a3b08">${L("Reaction in trading from", "Reaktion im Handel ab")} ${on}</text>`;
-  g += `<text x="${W - mr}" y="${vy - vh - 4}" text-anchor="end" font-size="11" fill="#5b6472">${L("Turnover per minute · blue = auctions", "Umsatz pro Minute · blau = Auktionen")}</text>`;
+  if (on) g += `<line x1="${x(on)}" x2="${x(on)}" y1="${mt}" y2="${vy}" stroke="#bf4800" stroke-width="1.4" stroke-dasharray="4 3"/><text x="${x(on) + 8}" y="${mt + 12}" font-size="12" font-weight="600" fill="#bf4800">${L("Reaction in trading from", "Reaktion im Handel ab")} ${on}</text>`;
+  g += `<text x="${W - mr}" y="${vy - vh - 4}" text-anchor="end" font-size="11" fill="#86868b">${L("Turnover per minute · blue = auctions", "Umsatz pro Minute · blau = Auktionen")}</text>`;
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L("Price against the previous close, minute by minute", "Kurs gegenüber dem Vortagesschluss, Minute für Minute")}">${g}</svg>`;
 }
 function cardView(d, ev) {
@@ -285,16 +290,16 @@ function compareView(t) {
   const show = top.concat(mine.filter(r => r.rank > 15)), nm = company(S.isin);
   const W = 1040, H = 240, ml = 52, mr = 14, mt = 12, mb = 26, xs = v => ml + (Math.log(Math.max(.3, Math.min(60, v))) - Math.log(.3)) / (Math.log(60) - Math.log(.3)) * (W - ml - mr);
   const amax = Math.max(.05, ...t.rows.map(r => Math.abs(r.abn_ret || 0))), ys = v => mt + (amax - v) / (2 * amax) * (H - mt - mb);
-  const dots = t.rows.filter(r => isN(r.vol_ratio) && isN(r.abn_ret)).map(r => { const me = r.isin === S.isin; return `<circle cx="${xs(r.vol_ratio).toFixed(1)}" cy="${ys(r.abn_ret).toFixed(1)}" r="${me ? 5 : 3}" fill="${me ? "#1d4ed8" : "#c3cad5"}" ${me ? "" : 'opacity=".7"'}><title>${esc(r.display)} · ${F.day(String(r.reaction_day).slice(0, 10), true)} · ${F.pct(r.abn_ret)} · ${F.x(r.vol_ratio)}</title></circle>`; });
+  const dots = t.rows.filter(r => isN(r.vol_ratio) && isN(r.abn_ret)).map(r => { const me = r.isin === S.isin; return `<circle cx="${xs(r.vol_ratio).toFixed(1)}" cy="${ys(r.abn_ret).toFixed(1)}" r="${me ? 5 : 3}" fill="${me ? "#0071e3" : "#d2d2d7"}" ${me ? "" : 'opacity=".7"'}><title>${esc(r.display)} · ${F.day(String(r.reaction_day).slice(0, 10), true)} · ${F.pct(r.abn_ret)} · ${F.x(r.vol_ratio)}</title></circle>`; });
   return `<div class="wrap stack"><section><h1>${L("Compare events", "Ereignisse vergleichen")}</h1><p class="sub">${L("Every event of the same type in 2026, measured exactly like the impact card.", "Alle Ereignisse desselben Typs 2026, gemessen genau wie die Impact Card.")}</p></section>
   <section class="card"><div class="sec-h"><div style="display:flex;gap:8px;flex-wrap:wrap"><select class="field" id="cmp-type" aria-label="${L("Event type", "Ereignistyp")}">${types.map(x => `<option value="${x}" ${x === t.type ? "selected" : ""}>${esc(typeL(x))}</option>`).join("")}</select>
       <select class="field" id="cmp-index" aria-label="Index">${["ALL", "DAX", "MDAX", "SDAX"].map(x => `<option value="${x}" ${x === t.index ? "selected" : ""}>${x === "ALL" ? L("DAX, MDAX and SDAX", "DAX, MDAX und SDAX") : x}</option>`).join("")}</select></div>
       <span class="sub">${t.n} ${L("events", "Ereignisse")}${sel ? " · " + L(`${esc(nm ? nm.display : "")} on ${F.day(S.day)}: rank ${sel.rank} of ${t.n}`, `${esc(nm ? nm.display : "")} am ${F.day(S.day)}: Rang ${sel.rank} von ${t.n}`) : ""}</span></div>
-    <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L("Stock-specific move against turnover vs normal", "Titelspezifische Bewegung gegen Umsatz vs. normal")}"><line x1="${ml}" x2="${W - mr}" y1="${ys(0)}" y2="${ys(0)}" stroke="#9aa3af"/>
-      ${[1, 3, 10, 30].map(v => `<text x="${xs(v)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#5b6472">${F.x(v)}</text>`).join("")}<text x="${ml - 8}" y="${ys(amax) + 10}" text-anchor="end" font-size="11" fill="#5b6472">${F.pct(amax, 0)}</text><text x="${ml - 8}" y="${ys(-amax)}" text-anchor="end" font-size="11" fill="#5b6472">${F.pct(-amax, 0)}</text>${dots.join("")}</svg>
+    <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L("Stock-specific move against turnover vs normal", "Titelspezifische Bewegung gegen Umsatz vs. normal")}"><line x1="${ml}" x2="${W - mr}" y1="${ys(0)}" y2="${ys(0)}" stroke="#c7c7cc"/>
+      ${[1, 3, 10, 30].map(v => `<text x="${xs(v)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="#86868b">${F.x(v)}</text>`).join("")}<text x="${ml - 8}" y="${ys(amax) + 10}" text-anchor="end" font-size="11" fill="#86868b">${F.pct(amax, 0)}</text><text x="${ml - 8}" y="${ys(-amax)}" text-anchor="end" font-size="11" fill="#86868b">${F.pct(-amax, 0)}</text>${dots.join("")}</svg>
     <p class="note">${L("Across: turnover vs normal (log scale). Up/down: stock-specific move. Blue: this company.", "Waagerecht: Umsatz vs. normal (logarithmisch). Senkrecht: titelspezifische Bewegung. Blau: dieses Unternehmen.")}</p>
     <div class="scroll"><table><thead><tr><th>#</th><th>${L("Company", "Unternehmen")}</th><th>${L("Trading day", "Handelstag")}</th><th class="r">${L("Stock-specific move", "Titelspezifische Bewegung")}</th><th class="r">${L("Turnover vs normal", "Umsatz vs. normal")}</th></tr></thead><tbody>
-    ${show.map(r => `<tr class="go" data-open="${r.isin}|${String(r.reaction_day).slice(0, 10)}|${esc(r.event_id || "")}" ${r.isin === S.isin ? 'style="background:#f3f6fe"' : ""}><td>${r.rank}</td><td>${esc(r.display)}${r.title && t.type !== "NOTABLE_DAY" ? `<div class="sub">${esc(String(r.title).slice(0, 80))}</div>` : ""}</td><td>${F.day(String(r.reaction_day).slice(0, 10), true)}</td><td class="r ${cls(r.abn_ret)}"><b>${F.pct(r.abn_ret)}</b></td><td class="r">${F.x(r.vol_ratio)}</td></tr>`).join("")}
+    ${show.map(r => `<tr class="go" data-open="${r.isin}|${String(r.reaction_day).slice(0, 10)}|${esc(r.event_id || "")}" ${r.isin === S.isin ? 'style="background:#f5f5f7"' : ""}><td>${r.rank}</td><td>${esc(r.display)}${r.title && t.type !== "NOTABLE_DAY" ? `<div class="sub">${esc(String(r.title).slice(0, 80))}</div>` : ""}</td><td>${F.day(String(r.reaction_day).slice(0, 10), true)}</td><td class="r ${cls(r.abn_ret)}"><b>${F.pct(r.abn_ret)}</b></td><td class="r">${F.x(r.vol_ratio)}</td></tr>`).join("")}
     </tbody></table></div><p class="note">${L("Ranked by the size of the stock-specific move. Top 15, plus this company's own events.", "Sortiert nach Größe der titelspezifischen Bewegung. Top 15 sowie die eigenen Ereignisse dieses Unternehmens.")}</p></section></div>`;
 }
 
