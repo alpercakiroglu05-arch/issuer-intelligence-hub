@@ -8,7 +8,7 @@ Two caches, both in data/ (local, never committed):
 
 Run it after a prompt, card or engine change and before recording the demo:
 
-    python web/warm_cache.py              # hero stocks (config.HERO_TICKERS)
+    python web/warm_cache.py              # hero stocks and the example companies of the first screen
     python web/warm_cache.py EVD GXI      # chosen tickers
 
 It goes through the web server's own functions (narrate, agent) with the same arguments the web UI sends, so
@@ -27,7 +27,7 @@ import pandas as pd
 import server
 
 from ai import agent as ag
-from config import HERO_TICKERS
+from config import EXAMPLE_TICKERS, HERO_TICKERS
 from engine import baseline, data
 
 DOCK = {  # the chips of the assistant dock (web/app.js, dockSugg); the page is sent as context (dockCtx)
@@ -108,4 +108,4 @@ def main(tickers: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main([a.upper() for a in sys.argv[1:]] or list(HERO_TICKERS)))
+    sys.exit(main([a.upper() for a in sys.argv[1:]] or list(dict.fromkeys([*HERO_TICKERS, *EXAMPLE_TICKERS]))))

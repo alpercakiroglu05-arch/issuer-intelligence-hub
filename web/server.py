@@ -16,6 +16,8 @@ API (all GET unless noted, JSON):
          [&date=&time=&type=&title=]      ... for an event the user added or imported (not in events.csv)
     /api/compare?type=&index=             same-type events (engine.compare)
     /api/evidence?isin=&day=&event_id=    evidence brief + explanation check for one card (engine/evidence.py)
+    GET  /api/dashboard?isin=&period=3m|6m|all  the dashboard in one call (engine.market): header, tiles,
+                                          timeline, you vs market, big market days, events and unusual days
     POST /api/calendar {isin,events:[{date,time,type,title}]}  match the company's own calendar to trading days
     GET  /api/export?isin=&day=&event_id=&lang=  one-click IR report as a PDF file: with day = the impact card
                                           snapshot (report/template.html), without day = Part A (dashboard)
@@ -42,8 +44,8 @@ sys.path.insert(0, str(ROOT))
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from config import DATA_DIR, HERO_TICKERS, SECTORS_CSV, XETRA_CLOSE_AUCTION, XETRA_OPEN  # noqa: E402
-from engine import baseline, compare, data, evidence, impact  # noqa: E402
+from config import DATA_DIR, EXAMPLE_TICKERS, HERO_TICKERS, SECTORS_CSV, XETRA_CLOSE_AUCTION, XETRA_OPEN  # noqa: E402
+from engine import baseline, compare, data, evidence, impact, market  # noqa: E402
 
 WEB = Path(__file__).resolve().parent
 
@@ -93,9 +95,11 @@ def universe() -> list[dict]:
     sec = sectors()
     out = []
     for row in u.sort_values("avg_turnover_eur", ascending=False).itertuples():
-        out.append({"isin": row.isin, "ticker": row.ticker, "name": row.name, "index": row.idx_latest,
+        out.append({"isin": row.isin, "ticker": row.ticker, "name": row.name, "display": data.display_name(row.isin),
+                    "index": row.idx_latest,
                     "member_now": bool(row.member_now), "avg_turnover_eur": r(row.avg_turnover_eur, 0),
                     "intraday": row.isin in has, "hero": row.ticker in HERO_TICKERS,
+                    "example": EXAMPLE_TICKERS.index(row.ticker) if row.ticker in EXAMPLE_TICKERS and row.member_now else None,
                     "sector": sec.get(row.ticker)})
     return out
 
@@ -250,12 +254,37 @@ def card_event(isin: str, event_id: str | None, user: dict | None = None) -> dic
     return ev
 
 
+@lru_cache(maxsize=512)
+def _evidence_cached(isin: str, day: str, event_id: str | None) -> dict:
+    return clean(evidence.brief(isin, day, card_event(isin, event_id)))
+
+
 def evidence_brief(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
     """Evidence brief + explanation check (engine/evidence.py), EN and DE, for one card."""
+    if not user:
+        return _evidence_cached(isin, day, event_id or None)
     return clean(evidence.brief(isin, day, card_event(isin, event_id, user)))
 
 
+def dashboard(isin: str, period: str = "3m") -> dict:
+    """Everything the dashboard shows, from the engine (engine.market); the browser only formats."""
+    d = market.dashboard(isin, period)
+    d["cost_curve"] = (cost_curve(isin) or {}).get("summary")
+    return clean(d)
+
+
+@lru_cache(maxsize=512)
+def _card_cached(isin: str, day: str, event_id: str | None) -> dict:
+    return _card(isin, day, event_id, None)
+
+
 def card(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
+    """Impact card for the web. Cards of calendar events and unusual days are cached, so a click shows the
+    numbers at once; a card for the user's own calendar entry is computed each time."""
+    return _card(isin, day, event_id, user) if user else _card_cached(isin, day, event_id or None)
+
+
+def _card(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
     ev = card_event(isin, event_id, user)
     c = impact.impact_card(isin, day, ev)
     s = data.stock(isin)
@@ -277,13 +306,28 @@ def card(isin: str, day: str, event_id: str | None, user: dict | None = None) ->
                     "low": [r(x) for x in b["low"]], "high": [r(x) for x in b["high"]],
                     "eur": [r(x, 0) for x in b["volume_eur"]], "auction": [bool(x) for x in b["is_auction"]],
                     "buy": [r(x, 0) for x in b["aggr_buy_eur"]], "sell": [r(x, 0) for x in b["aggr_sell_eur"]]}
+            if prev_close:  # move vs the previous close per minute, so the browser computes nothing
+                bars["ret"] = [r(x / prev_close - 1) for x in b["close"]]
+    cm = c.get("comparison")
+    rank = None
+    if cm and cm.get("rank_abs_abn_ret"):
+        from report.fmt import formatters, group_label
+        of = cm.get("rank_of") or cm["n"] + 1
+        rank = {lang: {"rank": formatters(lang)["rank"](cm["rank_abs_abn_ret"], of), "group": group_label(cm, lang)}
+                for lang in ("en", "de")}
     return clean({"card": c, "prev_close": prev_close, "close": r(s.loc[i, "price"]), "bars": bars,
-                  "aftershocks": aftershocks, "event_row": ev})
+                  "aftershocks": aftershocks, "event_row": ev, "rank": rank})
 
 
 def compare_table(etype: str, index: str | None) -> dict:
-    t = compare.same_type_events(etype, index or None)
-    return clean({"types": compare.event_types(), "type": etype, "index": index or "ALL", "rows": records(t)})
+    t = compare.same_type_events(etype, index or None).copy()
+    # one rounded value everywhere: the card's precision (8.55 -> "8.6x" on the card and in this table)
+    t[["vol_ratio", "xlm_ratio"]] = t[["vol_ratio", "xlm_ratio"]].round(2)
+    t = t.sort_values("abs_abn_ret", ascending=False).reset_index(drop=True)
+    t["rank"] = t.index + 1
+    t["display"] = [data.display_name(i) for i in t["isin"]]
+    return clean({"types": compare.event_types(), "type": etype, "index": index or "ALL", "n": len(t),
+                  "rows": records(t)})
 
 
 def llm_available() -> bool:
@@ -408,6 +452,7 @@ class Handler(SimpleHTTPRequestHandler):
                                     "last_date": str(data.daily()["date"].max().date())},
             "/api/universe": universe,
             "/api/issuer": lambda: issuer(q["isin"]),
+            "/api/dashboard": lambda: dashboard(q["isin"], q.get("period", "3m")),
             "/api/card": lambda: card(q["isin"], q["day"], q.get("event_id"),
                                       {k: q[k] for k in ("date", "time", "type", "title") if k in q} or None),
             "/api/compare": lambda: compare_table(q.get("type", "NOTABLE_DAY"), q.get("index")),
