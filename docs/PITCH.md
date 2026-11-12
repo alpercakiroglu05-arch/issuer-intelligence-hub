@@ -2,7 +2,7 @@
 
 | Part | Time | Content |
 | --- | --- | --- |
-| Hook + problem | 30 s | 27 March: CTS Eventim falls 23 %. The CFO asks IR: *was it us or the market, and who sold?* Today the answer takes days and a paid broker report. Most MDAX/SDAX IR teams have no terminal and no analyst. |
+| Hook + problem | 30 s | 27 March: CTS Eventim falls 23 %. The CFO asks IR: *was it us or the market, and when did it start?* Today the answer takes days and a paid broker report. Most MDAX/SDAX IR teams have no terminal and no analyst. |
 | Solution | 15 s | **Issuer Intelligence Hub**: one click from any announcement to an impact card. Deutsche Börse's own Xetra data, explained in plain German or English. |
 | Live demo | 90–120 s | **Web front end** (`python web/server.py`, http://127.0.0.1:8600). Type `eventim` → dashboard (normal state, peers, liquidity verdict) → *Unusual days* → 27 Mar (FY results, announced 26 Mar 17:45) → impact card: −21.7 % vs peers, priced from 09:03, closing auction €25.6m (3.6×), #3 of 215 unusual MDAX days → AI summary EN → DE ("all figures match") → Report → PDF. **Backup:** the Streamlit app (`streamlit run app/Home.py`) and the recorded video. |
 | How it works | 30 s | OHLC + Flow Dynamics (who traded) + XLM (trading cost) + every single Xetra trade → deterministic engine → the LLM only writes from the computed JSON, so no number is invented. |
@@ -21,7 +21,7 @@
 | Criterion (scorecard question) | Our answer in the pitch |
 |---|---|
 | **Idea**: different approach? | Event-driven, not a static dashboard. **When** did the market price the news (onset minute)? **Was it us or the market?** (peer-adjusted move plus market context: index days, expiries). **How big was it?** (rank among events of the same type). |
-| **Execution**: "more than a good-looking dashboard?" | Built on every single Xetra trade (3.8M one-minute bars), with validations we can show: flow totals = turnover **1.000**; bars = turnover **1.000** for all 44 stocks; auctions from trades = **97.6–99.7 %** of flow auction turnover; Heidelberger Druck ad hoc at 12:00:53 → onset detected **12:02**; 69 automated tests. |
+| **Execution**: "more than a good-looking dashboard?" | Built on every single Xetra trade (3.8M one-minute bars), with validations we can show: flow totals = turnover **1.000**; bars = turnover **1.000** for all 44 stocks; auctions from trades = **97.6–99.7 %** of flow auction turnover; Heidelberger Druck ad hoc at 12:00:53 → onset detected **12:02**; 221 automated tests. |
 | **Relevance**: solves the challenge, no gimmicks? | All brief points I–VIII are in the app (see `docs/SUBMISSION.md`). Only DB's own data plus public announcements. It builds on what DB already has: the Stock Report, the Issuer Services Hub and the ERS corporate calendar. |
 | **Pitch**: problem, idea, value, USP clear? | One flow end to end, driven by the CFO's question. USP in one line: *from announcement to an explained impact card in one click, on Deutsche Börse's own trade data.* Backup video ready. |
 
