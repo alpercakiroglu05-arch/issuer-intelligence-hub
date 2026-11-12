@@ -75,7 +75,7 @@ stays in the API; the UI no longer offers a calendar upload.
 ## Offline copy to share
 
 ```bash
-python web/snapshot.py          # -> ~/Desktop/Issuer-Intelligence-Hub.html (EVD, EVT, HDD; ~2.5 MB)
+python web/snapshot.py          # -> ~/Desktop/Issuer-Intelligence-Hub.html (ZAL, EVD, HDD; ~3.5 MB)
 ```
 
 One HTML file that opens with a double click, without Python or `data/`. It contains the answers for the showcase shares
