@@ -20,7 +20,8 @@ Sessions: pre_market (< 09:00), opening_auction, at_open (first ONSET_OPEN_WINDO
 Limitation: the price move is raw (no intraday peer data), so a market-wide move can also trigger it.
 Validation:
   - 4 hero stocks x 205 days: onset found on 17 of 19 days with |abnormal return z| >= 3.
-  - 39 sourced events with a known release time (events.csv, 44 stocks): inferred timing matches the release
+  - 39 sourced events with a known release time and a detected onset (events.csv, 44 stocks; 63 have a release
+    time): inferred timing matches the release
     time in 33 of 39 (85 %; 72 % with a 5-minute open window); for all 7 releases during trading hours the
     onset comes after the release (HDD 29 Oct: ad hoc 12:00:53, onset 12:02).
 

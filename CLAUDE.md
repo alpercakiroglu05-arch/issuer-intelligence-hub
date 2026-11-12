@@ -44,7 +44,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 pip install -r requirements.txt
 python web/server.py                      # demo UI (web/hub, C3): http://127.0.0.1:8600 (previous UI: /index.html)
 streamlit run app/Home.py                 # backup UI and analyst view: http://localhost:8501
-pytest                                    # 146 tests (incl. web API); data tests skip if data/ is empty
+pytest                                    # 205 tests (incl. web API); data tests skip if data/ is empty
 python web/warm_cache.py                  # re-warm the demo caches (summaries + assistant) after ANY prompt, card or engine change
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
@@ -85,6 +85,7 @@ Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `
   - Fewer than 7 executions means the day is censored (empty, released later and summed with other days).
   - Delayed-release rows duplicate `(DATE, SECURITY_ID)`.
   - `VOLUME` is two-sided, so use the one-sided BUY/SELL columns.
+- **Peers:** `peer_ret` is the equal-weighted **mean** return of the other index members (not a median). Index peer groups and ranks use the current members only (`engine.compare.current_members()`: DAX 40, MDAX 50, SDAX 70), not every share that was ever a member.
 - **OHLC:**
   - Open/high/low/close are mid quotes. Returns use `CLOSE_AUCTION_PRICE` (fallback: last mid).
   - Ignore `ADJUSTED_PRICE` (deprecated and wrong).
@@ -100,7 +101,7 @@ Rebuild: `ingest/build_daily.py <raw> data` (~25 s), `ingest/build_events.py`, `
 - Flow one-sided total / OHLC turnover = **1.000** (median over all stock-days).
 - Sum of 1-min bars / daily turnover = **1.000** for every one of the 44 stocks (46 ISINs).
 - Opening + closing auction volume from the trade file = 97.6–99.7 % of flow auction turnover (median per hero stock); the rest is midday auction and volatility interruptions.
-- Onset vs announcement time: for all 7 events announced during trading hours (6 hero + Beiersdorf), the detected onset comes after the announcement (lag 2–117 min). Over all 39 sourced events with a release time (44 stocks), the timing inferred from the onset matches the release time in 33 (85 %).
+- Onset vs announcement time: for all 7 events announced during trading hours (6 hero + Beiersdorf), the detected onset comes after the announcement (lag 2–117 min). Over the 39 sourced events with a release time and a detected onset (44 stocks; 63 events have a release time), the timing inferred from the onset matches the release time in 33 (85 %).
 - Auction share is real: EVD on 27 Oct had **83 %** of turnover in the closing auction (raw trades and flows agree).
   60-day medians: DAX 51 %, MDAX 52 %, SDAX 34 %.
 
@@ -115,7 +116,7 @@ Hero stocks (max 3 per challenge, set in `config.HERO_TICKERS`; the team may sti
 
 Xetra liquidity rule (Being Public Guide p. 32): XLM (EUR 25k) ≤ 100 bps **and** ≥ EUR 2.5m/day (4-month average) means category A; otherwise a Designated Sponsor is needed. `engine.baseline.kpis()` gives an estimate.
 
-## Status (Thu ~01:00, all PRs up to #41 merged, 146 tests green)
+## Status (Thu morning, all PRs up to #50 merged, 205 tests green on `fix/oguzhan-full-read`)
 
 Done on `main`:
 - **Ingest:** daily (174 stocks x 213 days), events (80 sourced events), intraday (44 event stocks, 3.8M bars).
@@ -145,6 +146,18 @@ Done on `main`:
 - **Streamlit (`app/`) = backup and analyst view.** Deleted by a direct push to main (2bd0c3c), restored in #39.
 - **Docs:** `docs/SUBMISSION.md` (submission text), `docs/PITCH.md` (relevance lines, scorecard map, Q&A),
   `docs/REQUIREMENTS.md` (brief item -> page), `docs/C2_ENGINE.md`.
+
+Since #41 (Thu morning):
+- **Engine:** `market` (dashboard in one call: share vs index, ranks, event list), `evidence` (evidence brief and
+  explanation check, neutral wording, no leak or insider claims). Liquidity category as the guide defines it
+  (daily average of four months; `None` without XLM, e.g. Gerresheimer). Index peers = current members only.
+- **AI:** the assistant runs the numbers check and the meaning check; a failed answer is replaced by the
+  deterministic one. Deterministic answers work for shares without XLM and ignore impossible dates.
+- **Web:** `web/app.js`, `web/app.css` and `web/index.html` belong to **Alper**. Do not change them; report
+  findings to him. A card opened without an event id is linked to the calendar event of that reaction day
+  (`web/server.card_event`).
+- **Reports:** the episode table (Part A report, Streamlit) shows the card's turnover ratio
+  (`baseline.episode_card_ratio`).
 
 Open:
 1. ~~Assistant policy~~ ✅ Decided: a dock answer with a figure that is not in the tool outputs is replaced by the

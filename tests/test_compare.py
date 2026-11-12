@@ -258,3 +258,33 @@ def test_compare_tables_have_context_column():
     idx = same_type_events("INDEX")
     assert list(idx.columns) == TABLE_COLS and (idx["context"].str.contains("index_event")).all()
     assert same_type_events("H1")["context"].notna().all()
+
+
+@needs_data
+@pytest.mark.parametrize("ticker, n_peers", [("ZAL", 39), ("EVD", 49), ("HDD", 69)])
+def test_index_peers_are_the_current_members_only(ticker, n_peers):
+    """DAX 40, MDAX 50, SDAX 70: the index peer group is today's members without the stock, never shares that
+    left the index during the year (idx_latest alone gives SDAX 80)."""
+    from engine.compare import current_members, peer_group, peer_medians
+    from engine.data import isin_of
+    isin = isin_of(ticker)
+    g = peer_group(isin, "index")
+    assert g["n"] == n_peers and set(g["isins"]) <= current_members() and isin not in g["isins"]
+    assert peer_medians(isin)["groups"]["index"]["n"] == n_peers
+
+
+@needs_data
+def test_evidence_calls_the_peer_move_an_average_not_a_median():
+    """peer_ret is the equal-weighted mean of the other index members (ingest/build_daily.py)."""
+    import pandas as pd
+    from engine import evidence
+    from engine.data import daily, isin_of
+    evd = isin_of("EVD")
+    b = evidence.brief(evd, "2026-03-27")
+    assert "(equal-weighted average)" in b["en"]["sections"][0]["points"][0]
+    assert "(gleichgewichteter Durchschnitt)" in b["de"]["sections"][0]["points"][0]
+    d = daily()
+    day = d[(d["date"] == pd.Timestamp("2026-03-27")) & (d["idx"].fillna(d["idx_latest"]) == "MDAX")]
+    others = day.loc[day["isin"] != evd, "ret"]
+    stored = day.loc[day["isin"] == evd, "peer_ret"].iloc[0]
+    assert stored == pytest.approx(others.mean(), abs=1e-9) and abs(stored - others.median()) > 1e-4

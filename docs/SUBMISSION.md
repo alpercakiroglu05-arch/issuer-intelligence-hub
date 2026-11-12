@@ -91,7 +91,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 - **Meaning check:** a sentence like "the share fell X %" must use the share's own move, not the stock-specific (abnormal) move; otherwise the template is shown. The numbers check alone cannot catch this mix-up, because both numbers are in the card.
 - **IR snapshot:** one click on the card (*Export IR report (PDF)*) gives the card plus its checked summary as a PDF, in DE or EN; the same button on the dashboard gives the Part A report (key figures vs peers, liquidity trend, cost by order size, unusual days).
 
-## 3. Validation (all reproducible, 175 automated tests)
+## 3. Validation (all reproducible, 205 automated tests)
 
 | Check | Result |
 |---|---|
@@ -99,10 +99,10 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 | Sum of 1-minute bars vs daily turnover | **1.000** for every one of the 44 stocks |
 | Opening + closing auction from single trades vs flow auction turnover | **97.6–99.7 %** per stock (the rest is the midday auction and volatility interruptions) |
 | News onset on clearly unusual days (focus stocks) | found on **17 of 19** days with \|abnormal z\| ≥ 3 |
-| Inferred timing vs published release time | consistent for **33 of 39** sourced events with a time (85 %) |
+| Inferred timing vs published release time | consistent for **33 of 39** sourced events with a release time and a detected onset (85 %; 63 events have a release time) |
 | Releases during trading hours | onset after the release in **7 of 7**. Heidelberger Druck, 29 Oct: ad hoc at 12:00:53, onset **12:02** |
 | Card vs comparison table | identical metrics (tested) |
-| Event days vs normal | median turnover on guidance changes 7.7×, ad hocs 4.6×, H1 results 1.8×, AGMs 0.65× |
+| Event days vs normal | median turnover on guidance changes 7.4×, ad hocs 4.8×, H1 results 1.8×, AGMs 0.64× |
 
 **Example, CTS Eventim, 27 Mar 2026.**
 - **Trigger:** FY 2025 results and 2026 targets on 26 Mar at 17:45, after the closing auction.
@@ -145,5 +145,5 @@ python ingest/build_events.py
 python ingest/build_intraday.py                # ~3 min, every stock in events.csv
 python web/server.py                           # demo UI: http://127.0.0.1:8600
 streamlit run app/Home.py                      # backup UI: http://localhost:8501
-pytest                                         # 175 tests
+pytest                                         # 205 tests
 ```

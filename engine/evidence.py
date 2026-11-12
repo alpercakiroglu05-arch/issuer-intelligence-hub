@@ -138,10 +138,10 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
     changed = []
     if _ok(ret):
         changed.append(T(f"The share closed {f['pct'](ret)} (closing auction vs the previous close); the other {idx} "
-                         f"members moved {f['pct'](peer)} (median). Stock-specific move: {f['pct'](abn)}"
+                         f"members moved {f['pct'](peer)} (equal-weighted average). Stock-specific move: {f['pct'](abn)}"
                          + (f", {abs(z):.1f}x its normal daily stock-specific move." if _ok(z) else "."),
                          f"Die Aktie schloss {f['pct'](ret)} (Schlussauktion vs. Vortag); die übrigen {idx}-Werte "
-                         f"bewegten sich um {f['pct'](peer)} (Median). Titelspezifisch: {f['pct'](abn)}"
+                         f"bewegten sich um {f['pct'](peer)} (gleichgewichteter Durchschnitt). Titelspezifisch: {f['pct'](abn)}"
                          + (f", das {abs(z):.1f}-Fache der normalen Tagesbewegung.".replace(".", ",", 1) if _ok(z) else ".")))
     if _ok(v.get("ratio")):
         changed.append(T(f"Turnover {f['eur'](v['turnover_eur'])}, {f['x'](v['ratio'])} the normal "
@@ -455,7 +455,7 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
 # which checks a free-text explanation touches (EN/DE keywords). The same list is in web/app.js (CLAIM_RX).
 CLAIM_RX = {
     "market": r"\b(whole|overall|broad|general|entire) market|market[- ](sell-?off|fell|fall|drop|decline|weak|was down|rout|turmoil)"
-              r"|it was the market|was (this|it) (just )?the market|war das (nur )?der markt|sector|industry|macro|interest rate|peers (fell|dropped|were down)|everyone|all stocks"
+              r"|it was the market|was (this|it) (just )?the market|(just|only|simply) the market|war das (nur )?der markt|nur der markt|sector|industry|macro|interest rate|peers (fell|dropped|were down)|everyone|all stocks"
               r"|gesamtmarkt|marktschwäche|markt (fiel|brach|war schwach)|sektor|branche|konjunktur|zinsen|lag am markt",
     "announcement": r"result|earning|announc|guidance|ad.?hoc|dividend|figures|numbers|outlook|quarterly|report"
                     r"|ergebnis|zahlen|meldung|prognose|dividende|ausblick|quartal|bericht",

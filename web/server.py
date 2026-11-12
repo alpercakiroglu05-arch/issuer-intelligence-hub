@@ -247,9 +247,15 @@ def calendar(body: dict) -> dict:
     return {"events": out, "first_date": str(days[0].date()), "last_date": str(days[-1].date())}
 
 
-def card_event(isin: str, event_id: str | None, user: dict | None = None) -> dict | None:
-    """The calendar event of a card: from events.csv, else the company's own entry (typed in the browser)."""
+def card_event(isin: str, event_id: str | None, user: dict | None = None, day: str | None = None) -> dict | None:
+    """The calendar event of a card: from events.csv by id, else the company's own entry (typed in the browser),
+    else the events.csv entry whose reaction day is `day`. So a card opened from a list without an event id
+    (compare table, assistant) still shows its announcement instead of "no calendar entry"."""
     ev = find_event(isin, event_id)
+    if ev is None and not (user and user.get("date")) and day:
+        e = data.events()
+        hit = e[(e["isin"] == isin) & (pd.to_datetime(e["reaction_day"]) == pd.Timestamp(day))]
+        ev = hit.iloc[0].to_dict() if len(hit) else None
     if ev is None and user and user.get("date"):
         t = (user.get("time") or "").strip()[:5]
         ev = {"event_id": event_id, "type": (user.get("type") or "OTHER").upper(), "date": user["date"],
@@ -260,14 +266,14 @@ def card_event(isin: str, event_id: str | None, user: dict | None = None) -> dic
 
 @lru_cache(maxsize=512)
 def _evidence_cached(isin: str, day: str, event_id: str | None) -> dict:
-    return clean(evidence.brief(isin, day, card_event(isin, event_id)))
+    return clean(evidence.brief(isin, day, card_event(isin, event_id, day=day)))
 
 
 def evidence_brief(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
     """Evidence brief + explanation check (engine/evidence.py), EN and DE, for one card."""
     if not user:
         return _evidence_cached(isin, day, event_id or None)
-    return clean(evidence.brief(isin, day, card_event(isin, event_id, user)))
+    return clean(evidence.brief(isin, day, card_event(isin, event_id, user, day)))
 
 
 def dashboard(isin: str, period: str = "3m") -> dict:
@@ -289,7 +295,7 @@ def card(isin: str, day: str, event_id: str | None, user: dict | None = None) ->
 
 
 def _card(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
-    ev = card_event(isin, event_id, user)
+    ev = card_event(isin, event_id, user, day)
     c = impact.impact_card(isin, day, ev)
     s = data.stock(isin)
     i = int(s.index[s["date"] == pd.Timestamp(day)][0])
@@ -364,7 +370,7 @@ def export_file(q: dict) -> tuple[bytes, str, str]:
     ticker = data.ticker_of(isin)
     if q.get("day"):
         user = {k: q[k] for k in ("date", "time", "type", "title") if k in q} or None
-        c = impact.impact_card(isin, q["day"], card_event(isin, q.get("event_id"), user))
+        c = impact.impact_card(isin, q["day"], card_event(isin, q.get("event_id"), user, q["day"]))
         html = to_html(c, nar.narrate_with_meta(c, lang)["text"], lang)
         name = f"IR_snapshot_{ticker}_{q['day']}_{lang.upper()}"
     else:
@@ -379,7 +385,9 @@ def export_file(q: dict) -> tuple[bytes, str, str]:
 
 def narrate(body: dict) -> dict:
     from ai import narrate as nar
-    c = impact.impact_card(body["isin"], body["day"], find_event(body["isin"], body.get("event_id")))
+    # the same event as the card and the export: by id, else the company's own entry, else the day's entry
+    user = {k: body[k] for k in ("date", "time", "type", "title") if body.get(k)} or None
+    c = impact.impact_card(body["isin"], body["day"], card_event(body["isin"], body.get("event_id"), user, body["day"]))
     lang = body.get("lang", "en")
     # narrate_with_meta: the model's text is used only if every number in it is in the card (ai/checks.py);
     # "source" says which one the user sees, so the label is honest even when the check rejects a draft
@@ -477,7 +485,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         u = urlparse(self.path)
-        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0)) or 0) or b"{}")
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0)) or 0) or b"{}")
+        except ValueError:
+            return self._json({"error": "the request body is not valid JSON"}, 400)
+        if not isinstance(body, dict):
+            return self._json({"error": "the request body must be a JSON object"}, 400)
         routes = {"/api/narrate": narrate, "/api/ask": ask, "/api/agent": agent, "/api/calendar": calendar}
         if u.path in routes:
             return self._guard(routes[u.path], body)

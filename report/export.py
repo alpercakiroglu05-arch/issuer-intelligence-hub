@@ -228,6 +228,7 @@ def part_a_data(isin: str, peer_by: str = "index") -> dict:
     ev = ev[ev["isin"] == isin]
     ev_day = pd.to_datetime(ev["reaction_day"])
     top = eps.sort_values("severity", ascending=False).head(MAX_EPISODES).sort_values("start", ascending=False)
+    top = top.assign(max_vol_ratio=baseline.episode_card_ratio(isin, top))
     episodes = [{"start": pd.Timestamp(r.start).date().isoformat(), "end": pd.Timestamp(r.end).date().isoformat(),
                  "days": int(r.days),
                  "event": " · ".join(ev.loc[(ev_day >= r.start) & (ev_day <= r.end), "title"]),

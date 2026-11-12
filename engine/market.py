@@ -90,8 +90,7 @@ def periods() -> list[dict]:
 def _members(isin: str) -> tuple[str, pd.DataFrame]:
     d = data.daily()
     idx = d.loc[d["isin"] == isin, "idx_latest"].iloc[-1]
-    u = data.universe()
-    now = set(u.loc[u["member_now"].astype(bool), "isin"]) | {isin}   # current members only (SDAX = 70, not 80)
+    now = compare.current_members() | {isin}   # current members only (SDAX = 70, not 80)
     return idx, d[(d["idx_latest"] == idx) & d["isin"].isin(now)]
 
 
