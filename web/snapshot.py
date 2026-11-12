@@ -8,9 +8,8 @@ server (teammates, mentors, the jury). It opens with a double click, no Python, 
     python web/snapshot.py --llm                # AI texts from the language model in .env (slower), not templates
 
 What is inside: the page (index.html + app.css + app.js inlined) and the JSON answers of every API call the demo
-makes: the dashboard (3M / 6M / all) of every share with minute data, and for the example companies every
-impact card (calendar events, unusual days, big market days), comparisons, AI summaries (EN/DE) and the
-analyst's suggested questions. A small fetch() shim answers from that JSON.
+makes for the chosen shares: dashboard, every impact card (calendar events and unusual days), comparisons,
+AI summaries (EN/DE) and the analyst's suggested questions. A small fetch() shim answers from that JSON.
 Also inside: the evidence brief of every card; the explanation check runs in the browser, so it works offline.
 Not inside: other shares, typed analyst questions and the own-calendar import (they need the live server);
 the page says so before the user tries them (status.offline).
@@ -21,6 +20,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -28,7 +28,6 @@ from pathlib import Path
 WEB = Path(__file__).resolve().parent
 ROOT = WEB.parent
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(WEB))
 
 
 def load_server(llm: bool):
@@ -40,39 +39,41 @@ def load_server(llm: bool):
     return srv
 
 
-PERIODS = ("3m", "6m", "all")
+def suggestions() -> dict:
+    """The analyst's suggested questions per page, read from app.js so the keys always match the UI."""
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    body = js[js.index("function dockSugg()"):js.index("function dockMsg(")]
+    pages = {}
+    for page, block in re.findall(r"(card|compare|report):\s*\[(.*?)\]", body, flags=re.S):
+        pages[page] = re.findall(r'L\("([^"]+)",\s*"([^"]+)"\)', block)
+    default = body[body.index("||"):]
+    pages["dashboard"] = re.findall(r'L\("([^"]+)",\s*"([^"]+)"\)', default)
+    return pages
 
 
 def build(tickers, llm: bool, out: Path):
-    """Dashboards (all periods) for every stock with minute data; impact cards, evidence, summaries and the
-    assistant's suggested questions for `tickers` (the example companies). The picker marks the other
-    companies, whose cards are not in the copy."""
     srv = load_server(llm)
-    import warm_cache
     from engine import compare, data
 
     t0 = time.time()
-    full = [data.isin_of(t) for t in tickers]
-    events = data.events()
-    wide = list(dict.fromkeys(full + [i for i in events["isin"].unique() if i in data.intraday_isins()]))
+    isins = [data.isin_of(t) for t in tickers]
     snap = {}
-    uni = [{**u, "offline_missing": u["isin"] not in full} for u in srv.universe() if u["isin"] in wide]
+    uni = [u for u in srv.universe() if u["isin"] in isins]
     status = {**srv.clean({"stocks": len(uni), "intraday_stocks": len(uni), "llm": bool(llm and srv.llm_available()),
                            "model": srv.llm_model() if llm else None,
                            "first_date": str(data.daily()["date"].min().date()),
                            "last_date": str(data.daily()["date"].max().date())}), "offline": True}
     snap["/api/status"], snap["/api/universe"] = status, uni
-    for t in compare.event_types():
+    sugg = suggestions()
+    types = compare.event_types()
+    for t in types:
         for idx in ("ALL", "DAX", "MDAX", "SDAX"):
             snap[f"/api/compare?type={t}" + (f"&index={idx}" if idx != "ALL" else "")] = srv.compare_table(t, None if idx == "ALL" else idx)
-    for isin in wide:
-        dash = {p: srv.dashboard(isin, p) for p in PERIODS}
-        for p, d in dash.items():
-            snap[f"/api/dashboard?isin={isin}&period={p}"] = d
-        if isin not in full:
-            continue
-        sel = {(e["day"], e["event_id"]) for e in dash["all"]["events"]}
-        sel |= {(r["date"], None) for d in dash.values() for r in d["market_days"]}
+    for isin in isins:
+        iss = srv.issuer(isin)
+        snap[f"/api/issuer?isin={isin}"] = iss
+        sel = {(str(e["reaction_day"])[:10], e["event_id"]) for e in iss["events"] if e.get("reaction_day")}
+        sel |= {(a["peak_date"], None) for a in iss["anomalies"]}
         for day, ev in sorted(sel, key=lambda x: (x[0], x[1] or "")):
             url = f"/api/card?isin={isin}&day={day}" + (f"&event_id={ev}" if ev else "")
             try:
@@ -83,14 +84,14 @@ def build(tickers, llm: bool, out: Path):
                 continue
             for lang in ("en", "de"):
                 snap[f"narrate|{isin}|{day}|{ev or ''}|{lang}"] = srv.narrate({"isin": isin, "day": day, "event_id": ev, "lang": lang})
-        top = warm_cache.top_card(isin)
-        for page, ctx in (("dashboard", {"page": "dashboard"}),
-                          ("card", {"page": "card", "day": top[0], "event_id": top[1]} if top else None)):
-            if ctx is None:
-                continue
-            for lang, qs in warm_cache.DOCK[page].items():
-                for q in qs:
-                    snap[f"agent|{isin}|{lang}|{page}|{ctx.get('day', '')}|{q}"] = srv.agent({"isin": isin, "question": q, "context": ctx, "lang": lang})
+                for en, de in sugg.get("card", []):
+                    q = en if lang == "en" else de
+                    ctx = {"page": "card", "day": day, "event_id": ev}
+                    snap[f"agent|{isin}|{lang}|card|{day}|{q}"] = srv.agent({"isin": isin, "question": q, "context": ctx, "lang": lang})
+        for page in ("dashboard", "compare", "report"):
+            for en, de in sugg.get(page, []):
+                for lang, q in (("en", en), ("de", de)):
+                    snap[f"agent|{isin}|{lang}|{page}||{q}"] = srv.agent({"isin": isin, "question": q, "context": {"page": page}, "lang": lang})
         print(f"  {data.ticker_of(isin)}: {sum(1 for k in snap if isin in k)} answers")
 
     html = (WEB / "index.html").read_text(encoding="utf-8")
@@ -128,10 +129,9 @@ window.__SNAP = %s;
 
 
 def main():
-    from config import EXAMPLE_TICKERS
+    from config import HERO_TICKERS
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tickers", nargs="+", default=list(EXAMPLE_TICKERS),
-                    help="companies with every impact card inside (default: the example companies)")
+    ap.add_argument("--tickers", nargs="+", default=list(HERO_TICKERS))
     ap.add_argument("--llm", action="store_true", help="AI texts from the model in .env instead of templates")
     ap.add_argument("--out", type=Path, default=Path.home() / "Desktop" / "Issuer-Intelligence-Hub.html")
     a = ap.parse_args()

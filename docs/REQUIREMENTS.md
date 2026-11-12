@@ -36,35 +36,35 @@ So the user is an IR person **without a terminal**. They enter their company and
 | Ideas | What else could be relevant for IR, and which data it needs | p. 10 | **Ideas** tab (have / need data per idea) | — |
 | Data | DAX/MDAX/SDAX with ISIN, up to three showcase stocks; OHLC, flows, XLM, open interest; public event calendars | p. 12 | ISIN entry screen (all 174 shares; EVD, EVT and HDD as quick picks), footer data sources | `data.universe` |
 
-## 3. Site structure (simple UI, 12 Nov)
-
-Team decision: a calm product an IR manager understands in 10 seconds. No landing page, no ISIN entry, three
-navigation items. Every number on screen comes from the API; `web/app.js` only formats and draws.
+## 3. Site structure (no duplicates)
 
 ```
-top bar: Dashboard · Compare · How it works | company picker (name or ticker) | 3M / 6M / All | DE / EN | Ask | Export PDF
-
-Dashboard (Part A)      header: name, index, sector, liquidity category            Part A
-                        4 tiles: turnover, trading cost, price vs index, unusual days   I, II, III
-                        Trading over time: one chart, 3 measures, clickable markers     I, III, VI
-                        You vs market: price, turnover, cost vs index with rank          II
-                        Big market days: the share on the strongest index days           II, III
-                        Events & unusual days: one list, one click per row -> card       III, VI
-Impact card (Part B)    4 tiles -> minute chart with reaction time -> auctions, who traded
-                        -> summary (AI text, checked) -> evidence -> Test an explanation   V, VI, VII
-Compare                 same-type events, opened from the card with the card's own group   VII
-How it works            4 steps, what the data cannot say, what else IR needs (+ data)     Output
-Export PDF              dashboard = Part A report, card = IR snapshot, DE / EN              IV, VIII
-Ask                     assistant panel with the page as context                             Output
+ISIN entry (full screen) ── enter ISIN / name / ticker ──►  Company workspace
+                                                            ├─ Dashboard      A1, I, II, III, liquidity verdict, cost by order size
+                                                            ├─ Impact card    B1, V, VI (+ own calendar) + AI summary
+                                                            ├─ Compare        VII
+                                                            ├─ IR snapshot    IV, VIII (custom report; one-click PDF on dashboard and card)
+                                                            └─ Ideas          next ideas + data needed
+                                          IR analyst dock (every page): AI questions; opens the pages above in one click
 ```
 
-Removed on purpose: the ISIN entry page, the Report builder tab (one Export PDF button instead), the Ideas tab
-(now in How it works), the second event list on the card page, "Regenerate" for the AI text, count-up and
-draw-in animations.
+- **One company switcher** (the ISIN chip in the header) replaces the old search button, which only repeated the menu.
+- **One click to a PDF, Report for a custom mix.** The dashboard and every impact card have *Export IR report (PDF)*
+  (brief: "with one click … including an exportable short report"): the server returns the same PDF as Streamlit
+  (`GET /api/export`, `report/export.py`). The card's *Put in report* link still opens Report with that card selected.
+- **The AI writes words, the engine computes numbers.** Without an LLM key the AI box shows the template text and says so.
+- **The analyst is a dock, not a page**, so it never repeats a page: it answers and hands over to the page that owns the topic.
+- **Data date is explicit:** the excerpt ends with the close on 30 Oct 2026. The header says "Xetra data as of the close on 30 October 2026".
+  In production the same pipeline would run every evening after the close (T+1).
 
 ## 4. Checklist for the demo
 
-- [ ] App opens on the dashboard; first visit shows the picker and three examples (DAX, MDAX, SDAX).
-- [ ] Pick CTS Eventim -> period All -> row "26 Mar 17:45 · Full-year results" -> impact card in under a second.
-- [ ] Card: reaction in trading from 09:03 -> Test an explanation ("It was the overall market.") -> Export PDF (EN, DE).
-- [ ] "see all" on the rank tile -> Compare shows rank 3 of 215 (same group as the card).
+- [ ] Enter `DE0005470306` (CTS Eventim) → dashboard loads with real data.
+- [ ] Unusual days → 27 Mar → "Create impact card" → card with −23 % / 8.6× / closing auction.
+- [ ] AI summary EN → DE.
+- [ ] IR analyst (key A): "What were our biggest moves this year?" → button opens the card.
+- [ ] Impact card → evidence brief → "The whole market sold off" → Contradicted.
+- [ ] Impact card → Import calendar (CSV/ICS) → preview → Add → card in one click.
+- [ ] Compare → FY results across indices.
+- [ ] Report → PDF.
+- [ ] Ideas → GXI index exit story.
