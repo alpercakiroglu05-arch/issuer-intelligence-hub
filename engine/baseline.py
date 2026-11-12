@@ -18,7 +18,7 @@ import pandas as pd
 
 from config import (ANOMALY_Z, DS_LOOKBACK_DAYS, DS_TURNOVER_MIN_EUR, DS_XLM_MAX_BPS, LIQUIDITY_TREND_TOL,
                     MARKET_WIDE_SHARE, MARKET_WIDE_VOL_RATIO, MIN_PEER_GROUP)
-from engine.compare import peer_group, peer_medians
+from engine.compare import current_members, peer_group, peer_medians
 from engine.data import daily, events, stock
 
 PROFILE_COLS = [
@@ -38,9 +38,9 @@ def profile(isin: str, start=None, end=None) -> pd.DataFrame:
 
 
 def index_benchmark(idx: str, col: str) -> pd.Series:
-    """Daily median of `col` across all stocks whose latest index is `idx`."""
+    """Daily median of `col` across the current members of `idx` (shares that left the index are not in it)."""
     d = daily()
-    return d[d["idx_latest"] == idx].groupby("date")[col].median()
+    return d[(d["idx_latest"] == idx) & d["isin"].isin(current_members())].groupby("date")[col].median()
 
 
 def anomalies(isin: str, z: float = ANOMALY_Z) -> pd.DataFrame:
@@ -344,3 +344,16 @@ def anomaly_episodes(isin: str, z: float = ANOMALY_Z) -> pd.DataFrame:
                      "reason": ", ".join(reasons), "severity": g["severity"].max(),
                      "context": ", ".join(f for f in CONTEXT_FLAGS if f in ctx)})
     return pd.DataFrame(rows, columns=EPISODE_COLS).sort_values("start", ascending=False).reset_index(drop=True)
+
+
+def episode_card_ratio(isin: str, episodes: pd.DataFrame) -> pd.Series:
+    """Highest "turnover vs normal" of each episode on the impact card's baseline (median of t-65..t-6,
+    engine.compare.day_ratios), so a table of episodes shows the figure the card of that day shows (8.6x), not
+    the rolling 60-day ratio that finds the episodes (8.5x). Falls back to the rolling ratio where the card has
+    no baseline yet (the first weeks of the data)."""
+    from engine.compare import day_ratios
+    ratio = day_ratios(isin)["vol_ratio"]
+    out = [ratio[(ratio.index >= pd.Timestamp(e.start)) & (ratio.index <= pd.Timestamp(e.end))].max()
+           for e in episodes.itertuples()]
+    return pd.Series(out, index=episodes.index, dtype="float64").fillna(episodes["max_vol_ratio"])
+

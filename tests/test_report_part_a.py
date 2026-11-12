@@ -131,3 +131,15 @@ def test_snapshot_shows_rank_incl_this_day():
     c = card["comparison"]
     assert f"rank {c['rank_abs_abn_ret']} of {c['rank_of']} (incl. this day)" in to_html(card, "text", "en")
     assert f"Rang {c['rank_abs_abn_ret']} von {c['rank_of']} (inkl. dieses Tages)" in to_html(card, "text", "de")
+
+
+@needs_data
+def test_part_a_episode_ratio_is_the_cards_ratio():
+    """The episode table and the impact card of the same day show one "turnover vs normal" (card baseline)."""
+    from engine import impact
+    from engine.data import isin_of
+    from report.export import part_a_data
+    isin = isin_of("EVD")
+    ep = next(e for e in part_a_data(isin)["episodes"] if e["start"] == "2026-03-27")
+    card = impact.impact_card(isin, "2026-03-27")
+    assert ep["max_vol_ratio"] == pytest.approx(card["volume"]["ratio"], abs=0.006)

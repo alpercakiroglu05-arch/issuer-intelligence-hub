@@ -33,7 +33,7 @@ prof, anom, k, trend, episodes = load(isin)
 
 @st.cache_data
 def peer_median(isin: str, by: str, col: str) -> pd.Series:
-    """Daily median of `col` across the stock's peer group (index, sector or turnover cohort)."""
+    """Daily median of `col` across the stock's peer group (index, sector or closest by turnover)."""
     if by == "index":
         return baseline.index_benchmark(k["index"], col)
     isins = compare.peer_group(isin, by)["isins"]
@@ -47,10 +47,10 @@ choice = st.segmented_control("Compare with", list(PEERS), default="Index") or "
 by = PEERS[choice]
 key = f"{by}_median"
 g = k["peer_groups"][by]
-peer = g["name"] if by != "size" else f"{g['name']} cohort"
+peer = g["name"]
 st.caption(f"{k['period']} · compared with the median stock of **{g['label']}** ({g['n']} peers)"
            + (" · sector unknown, showing the index" if g["fallback"] else "")
-           + (" · size = turnover cohort (market cap is not in the data)" if by == "size" else ""))
+           + (" · size = the stocks closest in daily turnover (market cap is not in the data)" if by == "size" else ""))
 if g["n"] < 3:
     st.warning("Small peer group: these medians rest on fewer than 3 other stocks.")
 
@@ -159,6 +159,7 @@ def linked_event(start, end) -> str:
 
 
 show = episodes.copy()
+show["max_vol_ratio"] = baseline.episode_card_ratio(isin, show)   # the card's baseline, so the card agrees
 show["event"] = [linked_event(a, b) for a, b in zip(show["start"], show["end"], strict=False)]
 show["market"] = [", ".join(CONTEXT_WORDS.get(f.strip(), f.strip()) for f in str(c).split(",") if f.strip())
                   for c in show.get("context", pd.Series("", index=show.index)).fillna("")]

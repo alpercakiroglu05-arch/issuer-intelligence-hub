@@ -85,10 +85,15 @@ def test_assistant_answer_with_invented_number_falls_back(monkeypatch):
         pytest.skip("data missing")
     from ai import agent, llm
     from engine.data import isin_of
-    monkeypatch.setattr(llm, "chat", lambda *a, **k: SimpleNamespace(content="Liquidity improved by 47.3%.", tool_calls=None))
+    calls = []
+    monkeypatch.setattr(llm, "available", lambda: True)
+    monkeypatch.setattr(llm, "model_name", lambda: "test-model")
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: calls.append(1) or SimpleNamespace(
+        content="Liquidity improved by 47.3%.", tool_calls=None))
+    assert os.environ["LLM_CACHE"] == "false"      # conftest: no cached answer can stand in for the model
     out = agent.ask("Has our liquidity improved?", isin_of("EVD"))
+    assert len(calls) == 2                         # the model was asked, and once more to repair the figure
     assert "47.3" not in out and "Stable" in out   # deterministic answer = liquidity_trend summary
-    assert os.environ["LLM_PROVIDER"] == "none"
 
 
 def test_prompt_asks_for_german_number_style_in_de_only():

@@ -32,7 +32,7 @@ cp .env.example .env                                   # optional: add LLM key
 ```bash
 python web/server.py           # demo UI (web front end) -> http://127.0.0.1:8600
 streamlit run app/Home.py      # backup UI / analyst view -> http://localhost:8501
-pytest                         # 146 tests incl. the web API (data tests skip if data/ is empty)
+pytest                         # 205 tests incl. the web API (data tests skip if data/ is empty)
 python web/warm_cache.py       # re-warm the demo caches (summaries + assistant) after any prompt, card or engine change
 ```
 
@@ -80,7 +80,7 @@ futury-build-days-2026/
 ├── app/                   backup UI (Streamlit): Home.py · pages/1_Dashboard · 2_Impact_Card · 3_Compare · 4_Assistant
 ├── events/                events.csv (80 sourced events) · sectors.csv (174 stocks, Deutsche Börse sectors)
 ├── docs/                  API_CONTRACT · SUBMISSION (data, model, logic) · REQUIREMENTS (brief → web page) · C2_ENGINE · SCOPE · PITCH · design/
-├── tests/                 146 tests: engine, data, web API over HTTP, PDF export, numbers and meaning check
+├── tests/                 205 tests: engine, data, web API over HTTP, PDF export, numbers and meaning check
 └── data/                  processed files (gitignored)
 ```
 

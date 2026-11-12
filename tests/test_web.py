@@ -134,3 +134,24 @@ def test_web_card_compare_and_examples_agree(base):
     assert row["vol_ratio"] == 8.55 and row["rank"] == 3 and t["n"] == 215 and row["display"].startswith("CTS Eventim")
     ex = sorted((u["example"], u["index"]) for u in get(base, "/api/universe") if u.get("example") is not None)
     assert [i for _, i in ex] == ["DAX", "MDAX", "SDAX"]   # one example company per index
+
+
+@needs_data
+def test_web_card_without_event_id_shows_the_calendar_event_of_that_day(base):
+    """A card opened from a list without an event id (compare table, assistant) is the same card as the one
+    opened from the calendar: it carries the announcement of that reaction day."""
+    q = "/api/card?isin=DE0005470306&day=2026-03-27"
+    plain, by_id = get(base, q), get(base, q + "&event_id=EVD_FY_20260326")
+    assert plain["event_row"]["event_id"] == "EVD_FY_20260326" and plain["card"] == by_id["card"]
+    assert plain["event_row"]["time_local"] == "17:45"
+    none = get(base, "/api/card?isin=DE0005470306&day=2026-03-30")   # no calendar entry for that day
+    assert none["event_row"] is None
+
+
+@needs_data
+def test_web_bad_json_body_is_a_400_not_a_crash(base):
+    import urllib.error
+    req = urllib.request.Request(base + "/api/agent", data=b"{not json", headers={"Content-Type": "application/json"})
+    with pytest.raises(urllib.error.HTTPError) as e:
+        urllib.request.urlopen(req, timeout=30)
+    assert e.value.code == 400

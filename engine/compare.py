@@ -168,6 +168,15 @@ def _latest() -> pd.DataFrame:
 
 
 @lru_cache(maxsize=1)
+def current_members() -> frozenset:
+    """ISINs that are index members on the last day of the data (universe.csv member_now): DAX 40, MDAX 50,
+    SDAX 70. `idx_latest` alone also keeps shares that left an index during the year (SDAX: 80)."""
+    from engine.data import universe
+    u = universe()
+    return frozenset(u.loc[u["member_now"].astype(bool), "isin"])
+
+
+@lru_cache(maxsize=1)
 def _sectors() -> pd.Series:
     """isin -> sector from events/sectors.csv (11 groups from Deutsche Boerse Prime Standard sectors)."""
     try:
@@ -239,6 +248,7 @@ def peer_medians(isin: str, days: int = PEER_DAYS) -> dict:
 
 def peer_group(isin: str, by: str = "index") -> dict:
     """Peers of `isin` (the stock itself and other ISINs of the same ticker excluded).
+    by="index": the current members of the stock's (latest) index, so MDAX = 49 others, never former members.
     by="sector" falls back to the index when the sector is unknown or has no other member."""
     if by not in PEER_BY:
         raise ValueError(f"by must be one of {PEER_BY}")
@@ -261,7 +271,7 @@ def peer_group(isin: str, by: str = "index") -> dict:
         name = f"{len(peers)} closest by turnover"
         return {"by": "size", "name": name, "label": f"{SIZE_LABEL}: {name}",
                 "isins": peers, "n": len(peers), "fallback": None}
-    peers = others[others["idx_latest"] == idx]
+    peers = others[(others["idx_latest"] == idx) & others["isin"].isin(current_members())]  # today's members only
     return {"by": "index", "name": idx, "label": f"Index: {idx}",
             "isins": peers["isin"].tolist(), "n": len(peers), "fallback": fallback}
 
