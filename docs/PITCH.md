@@ -52,7 +52,8 @@ Rules for the live demo:
 
 ## Demo checklist
 
-- [ ] Demo laptop (Oğuzhan's: the key and the caches are local): `git pull`, `python ingest/build_events.py`, `pytest` green, `python web/warm_cache.py` after the last merge that touches a prompt, a card or the engine (about 11 minutes), then `python web/server.py`. Open the page early (the first load takes 8–10 s) and walk the demo path once
+- [ ] Demo laptop (any laptop): `git pull`, `python ingest/build_events.py`, `pytest` green, then the saved AI answers, which are **not** in git: either copy `data/llm_cache.json` and `data/agent_cache.json` from a laptop that ran the warm-up on the same commit, or run `python web/warm_cache.py ZAL EVD HDD` (model key needed, about 8 minutes). Then `python web/server.py`. Check: the CTS Eventim card of 27 Mar says "Saved answer from Mistral AI". Open the page early (the first load takes 8–10 s) and walk the demo path once
+- [ ] No setup possible on the presenting laptop? Open the offline copy (one HTML file, `python web/snapshot.py --llm`): the three showcase shares with every saved answer, no typed questions
 - [ ] Backup screen recording of the **web** demo path ready by 12 Nov 12:00 (demo submission 13:30); Streamlit (`streamlit run app/Home.py`) open in a second tab as the live fallback
 - [ ] One person talks, one person clicks
 - [ ] Browser zoom up, notifications off, other tabs closed

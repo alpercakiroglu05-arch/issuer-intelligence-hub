@@ -136,10 +136,11 @@ Done on `main`:
   - **IR analyst dock** on every web page (#36, Alper): the model calls engine functions as tools (find_company,
     company_overview, peer_benchmark, trading_cost_curve, unusual_days, event_calendar, impact_card,
     compare_events, show) and answers from their outputs; without a key a deterministic router answers.
-- **Caches warmed** on the code of #40 (#41 changed no prompt or card): 58 card summaries for EVD, EVT, HDD
-  (56 from the model, 2 templates: EVT 10 Mar and 6 May EN, where the check caught a number) and 36 assistant
-  answers (0 flagged). EVD 27 Mar EN/DE are served from the cache without network.
-  **After ANY prompt, card or engine change run `python web/warm_cache.py`** (~4 min).
+- **Caches warmed** on 12 Nov after #61 for the showcase shares ZAL, EVD, HDD: 46 card summaries and 42 assistant
+  answers, all from the model, all served without network. They are two files, `data/llm_cache.json` and
+  `data/agent_cache.json`, on the machine that ran the warm-up (Oğuzhan's). They are **not** in git and **not** in
+  the shared OneDrive folder, so `git pull` does not bring them.
+  **After ANY prompt, card or engine change run `python web/warm_cache.py ZAL EVD HDD`** (about 8 minutes).
 - **Web (`web/`) = demo UI:** share search, overview (1M/3M/YTD), dashboard (trading over time, peers, liquidity trend, cost by order
   size, unusual days with calendar and market context), impact card, compare, report, ideas, IR analyst dock.
   Brief VI: the ingested event calendar (events.csv) on the Events page "Impact cards"; the calendar upload UI was removed (`/api/calendar` stays).
@@ -164,9 +165,18 @@ Since #41 (Thu morning):
 Open:
 1. ~~Assistant policy~~ ✅ Decided: a dock answer with a figure that is not in the tool outputs is replaced by the
    deterministic answer, the same rule as the card summary (`ai/agent._checked`).
-2. **Thu morning:** demo dry run on the web UI; backup video at 12:00 on the web UI; Streamlit open as the
-   live fallback. Run the demo from Oğuzhan's laptop (key and caches are local). Open the page early (first
-   load 8-10 s). Do not press "Regenerate" in the demo (it asks the model again).
+2. **Demo machine:** not tied to one laptop. Any laptop works after `git pull` and `python ingest/build_events.py`
+   plus ONE of these:
+   - copy `data/llm_cache.json` and `data/agent_cache.json` from a machine that ran the warm-up on the same commit.
+     The saved answers match because the processed data in OneDrive is byte-identical on every machine (checked
+     12 Nov); `.env` needs the same `LLM_PROVIDER` and `LLM_MODEL` and a key, otherwise the app shows templates.
+     Not yet tried on a second machine: another operating system may round a figure differently, and then a
+     summary is not found, so look at the label on every card you will show;
+   - run `python web/warm_cache.py ZAL EVD HDD` there (key needed, about 8 minutes);
+   - or open the offline copy, one HTML file from `python web/snapshot.py --llm` (showcase shares only, no typed
+     questions, no setup).
+   Check: the CTS Eventim card of 27 Mar says "Saved answer from Mistral AI". Open the page early (the first
+   load takes 8-10 s). Do not press "Ask the model again" in the demo. Streamlit stays the live fallback.
 3. **Human check:** Claude re-checked the 40 hero rows on 12 Nov (see above). Oğuzhan still looks once at the five rows named in the demo and pitch: EVD 26 Mar 17:45, EVT 13 Jul 21:17, HDD 18 Mar 14:15, HDD 29 Oct 12:00:53, GXI 10 Feb 22:28. Two non-hero rows (BAS H1 15 Jul, FME H1 3 Aug) still link to `app.boersengefluester.de`, which answered HTTP 504 on 12 Nov.
 4. **Deliverables:** 13:30 submission (`docs/SUBMISSION.md` + link or video), 14:30 deck (3-5 slides, `docs/PITCH.md`).
 5. Optional, cosmetic: the DE model text writes dates as "27. 03. 2026" (a prompt change means a re-warm).
