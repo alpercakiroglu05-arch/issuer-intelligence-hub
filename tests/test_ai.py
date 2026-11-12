@@ -147,3 +147,19 @@ def test_numbers_check_reads_english_thousands_in_titles():
     payload = {"title": "incoming orders down to EUR 1,628m"}
     assert unsupported_numbers("Auftragseingang 1,628 Mrd. EUR.", payload) == []
     assert unsupported_numbers("Auftragseingang 1,734 Mrd. EUR.", payload) == ["1,734"]
+
+
+def test_numbers_check_reads_german_dates_without_the_closing_dot():
+    """"am 14.04 und 03.02" are dates when the data has 14 Apr and 3 Feb; the same digits before a unit, a day
+    the data does not have, or a one-digit month stay numbers and are checked as such."""
+    from ai.checks import unsupported_numbers
+    payload = {"days": [{"day": "2026-04-14", "abn_ret": 0.168}, {"day": "2026-02-03", "abn_ret": -0.097}]}
+    assert unsupported_numbers("Die stärksten Tage: am 14.04 (+16,8 %) und 03.02 (−9,7 %).", payload) == []
+    assert unsupported_numbers("Am 14.04: +16,8 %.", payload) == []
+    assert unsupported_numbers("Die Aktie stieg um 14.04 %.", payload) == ["14.04"]       # a unit follows
+    assert unsupported_numbers("Umsatz 14.04-fach.", payload) == ["14.04"]
+    assert unsupported_numbers("Am 15.04 stieg die Aktie.", payload) == ["15.04"]         # not a day of the data
+    assert unsupported_numbers("Am 14.4 stieg die Aktie.", payload) == ["14.4"]           # could be a decimal
+    assert unsupported_numbers("Am 14.04.2026 und am 03.02. stieg sie.", payload) == []   # the old forms still work
+    assert unsupported_numbers("+16,8 % am 14.04., −9,7 % am 03.02., sonst ruhig.", payload) == []  # a comma follows
+
