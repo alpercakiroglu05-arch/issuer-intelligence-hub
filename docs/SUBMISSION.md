@@ -24,7 +24,7 @@ All data is the Deutsche Börse excerpt for **2 Jan – 30 Oct 2026 (213 trading
 | **Xetra on-book trades** (1.7 GB, every trade, ns timestamps) | 1-minute bars for the 44 stocks with events (46 ISINs: Fresenius and Qiagen changed ISIN): **3.8 million bars**, used for intraday price path, news onset and exact auction volumes |
 | **Public sources** (`events/events.csv`) | **80 corporate events**, each with a source link, and the release time when the source shows it |
 
-**Events.** We cover every 2026 event of the four focus stocks: CTS Eventim (EVD, MDAX), Evotec (EVT, SDAX), Heidelberger Druck (HDD, SDAX), and Gerresheimer (GXI) as a pitch story. We also cover the first H1/Q3 publication of **all 40 DAX members**. Two rules apply:
+**Events.** The demo showcases one share per index: Zalando (ZAL, DAX), CTS Eventim (EVD, MDAX) and Heidelberger Druck (HDD, SDAX). The calendar holds every 2026 event we found for CTS Eventim, Evotec (EVT, SDAX), Heidelberger Druck and Gerresheimer (GXI, the index-exit story): 40 events. It also holds the first H1/Q3 publication of **all 40 DAX members** (36 half-year and 4 nine-month results), which is the group behind "compare all DAX results". Two rules apply:
 - A results event is the first moment the figures became public. If a company pre-released by ad hoc, that ad hoc is the event.
 - Times come from the EQS/DGAP release header. Unknown times stay empty and are never guessed.
 
@@ -55,7 +55,8 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 ```
 
 ### Part A: the normal state
-- **Headline numbers** are 60-day medians of turnover, XLM (EUR 25k), auction share and agent share, each against the median stock of the same index.
+- **Period view (1 month, 3 months, year to date):** the share's price return against the equal-weighted return of its index peers, and its median turnover and trading cost with their rank among the current index members. Prices are closing-auction prices, not adjusted for dividends; the page says so and names the ex-dividend day.
+- **Peer table** (fixed window): 60-day medians of turnover, XLM (EUR 25k), auction share, agent share and volatility, each against the median stock of the same index, sector and size group.
 - **Xetra liquidity category (estimate):** category A if XLM (EUR 25k) ≤ 100 bps and order book turnover ≥ EUR 2.5m a day, both as the daily average of the last four months (Being Public Guide, p. 32). Otherwise category B, which needs a Designated Sponsor for continuous trading. A share without XLM (not a DAX, MDAX or SDAX member in that window) gets no category.
 - **Unusual days:** volume z ≥ 3, |abnormal return z| ≥ 3, or XLM ≥ 2× normal. Possible corporate actions (|return| > 40 %) are excluded. Consecutive unusual days are merged into one episode.
 - **Trading cost by order size:** XLM from €10k to €10m against the peer median, plus the largest order the Xetra book absorbed on most of the last 60 days. This is the live version of the XLM table in Deutsche Börse's monthly Stock Report.
@@ -85,13 +86,20 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
   - The event is ranked within its group: same type in the same index if there are ≥ 5 other events, else all indices, else all automatically detected unusual days (871 in 2026).
   - Shown as percentiles of stock-specific move, turnover and trading cost against normal, plus the rank.
 
+- **Evidence and explanation check** (no language model): fixed rules on the card's own figures sort what the data
+  shows into "what changed", "what the broader market did", "what was distinctive about trading", "how unusual it was", "what the
+  data cannot tell" and "what to check next". Seven common explanations ("it was the overall market", "thin trading
+  exaggerated the move", "funds or short sellers sold", ...) each get one of five verdicts: consistent with the
+  data, partly consistent, contradicted, no sign in the data, or not testable with this data. Exchange data shows
+  participant types, not investor names, so "who sold" is always answered as not testable.
+
 ### AI and export
 - **Summary text (DE/EN):** the model gets only the card JSON and is told to use only its numbers, never invent causes, and give no advice. A **numbers check** (`ai/checks.py`) then compares every figure in the text with the JSON, allowing for percent, EUR m and rounding. Any unknown figure means the template text is shown instead, and the card says which one it is. Model: an open model through the JAIF gateway (OpenAI-compatible), swappable in `.env`. Answers are cached so the live demo does not depend on the network.
-- **IR analyst (dock on every page):** the model calls engine functions as tools (company overview, peer benchmark, trading cost curve, unusual days, event calendar, impact card, comparison) and answers from their outputs only. Every number in the answer is checked against the tool outputs; an answer with a figure that cannot be traced is replaced by the deterministic answer, the same rule as the card summary. Without a model key a deterministic router answers from the same tools.
+- **IR analyst (a panel on every page):** the model calls engine functions as tools (company overview, share performance over a period, peer benchmark, trading cost curve, unusual days, event calendar, impact card, comparison, explanation check) and answers from their outputs only. Every number in the answer is checked against the tool outputs, and the meaning check below applies too; an answer that fails is replaced by the deterministic answer, the same rule as the card summary. Without a model key a deterministic router answers from the same tools. The suggested questions of the showcase shares are saved answers, so they appear at once.
 - **Meaning check:** a sentence like "the share fell X %" must use the share's own move, not the stock-specific (abnormal) move; otherwise the template is shown. The numbers check alone cannot catch this mix-up, because both numbers are in the card.
-- **IR snapshot:** one click on the card (*Export IR report (PDF)*) gives the card plus its checked summary as a PDF, in DE or EN; the same button on the dashboard gives the Part A report (key figures vs peers, liquidity trend, cost by order size, unusual days).
+- **IR snapshot:** one click on the card (*Export IR report (PDF)*) gives the card plus its checked summary as a PDF, in DE or EN; the same button on the overview gives the Part A report (key figures vs peers, liquidity trend, cost by order size, unusual days). The *Report* page builds a one-page board snapshot from sections the user ticks (share price, trading profile, peers, liquidity, unusual days, one impact card, the summary); the preview is exactly what is saved as PDF.
 
-## 3. Validation (all reproducible, 205 automated tests)
+## 3. Validation (all reproducible, 225 automated tests)
 
 | Check | Result |
 |---|---|
@@ -105,18 +113,21 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 | Event days vs normal | median turnover on guidance changes 7.4×, ad hocs 4.8×, H1 results 1.8×, AGMs 0.64× |
 
 **Example, CTS Eventim, 27 Mar 2026.**
-- **Trigger:** FY 2025 results and 2026 targets on 26 Mar at 17:45, after the closing auction.
+- **Trigger:** FY 2025 results and 2026 outlook on 26 Mar at 17:45, after the closing auction.
 - **Price:** −23.2 % against peers −1.5 %, so −21.7 % stock-specific.
 - **Activity:** 8.6× normal turnover, with agent orders net selling.
 - **Timing:** the opening auction was only −2.3 %, but the market started pricing at **09:03** and was −15 % by 09:18.
 - **Auctions:** the closing auction traded EUR 25.6m (3.6× normal) and set the price 1.5 % below the last trade (normally ±0.2 %).
-- **Rank:** the third-largest stock-specific move among 215 unusual MDAX days in 2026.
+- **Rank:** the third-largest stock-specific move among 215 unusual MDAX days in 2026 (only three full-year results have data, so the card ranks it in the broader group and says so).
+
+**Example of a same-type comparison, Zalando, 4 Aug 2026.** Half-year results at 07:00, before the open: −13.4 % against DAX peers +0.3 %, so −13.6 % stock-specific, on 6.0× normal turnover; the market started pricing at 09:02. It is the largest stock-specific move of the **36 DAX half-year results** in the data.
 
 ## 4. Limitations
 
 - **Causes:** the data shows *what* happened, not *why*. Reasons come only from the linked public sources. Some unusual days have no company news, and we say so.
 - **Intraday peers:** the onset uses the raw price move because there are no intraday peer prices. A market-wide move can also trigger it.
-- **Event times:** the 80 events were researched with AI-assisted web search, and every row has its source link. 17 have no published time, and 7 DAX times are pre-announced dpa-AFX slots (marked in the title).
+- **Event times:** the 80 events were researched with AI-assisted web search, and every row has its source link. 17 have no published time, and 7 DAX times are pre-announced dpa-AFX slots (marked in the title). On 12 Nov we re-checked the 41 rows of the showcase and focus shares against their links: every date and time matches, and the titles say only what the linked page says.
+- **Own calendar:** the demo shows the researched calendar. The API already matches a company's own dates to trading days (`POST /api/calendar`), but the demo UI has no upload screen; in production the dates would come from the ERS corporate calendar.
 - **Peer groups:** the dashboard engine compares a stock with three groups: its index, its sector, and the stocks of similar size.
   - **Sector:** 11 groups built from Deutsche Börse's official Prime Standard sectors (`events/sectors.csv`, 173 of 174 stocks; the last one falls back to the index).
   - **Similar size:** the 10 stocks closest in median turnover over the last 60 days (a size proxy).
@@ -143,7 +154,8 @@ pip install -r requirements.txt
 python ingest/build_daily.py <raw> data        # ~25 s
 python ingest/build_events.py
 python ingest/build_intraday.py                # ~3 min, every stock in events.csv
+python web/warm_cache.py                       # optional, with a model key: saves the AI texts of the showcase shares
 python web/server.py                           # demo UI: http://127.0.0.1:8600
 streamlit run app/Home.py                      # backup UI: http://localhost:8501
-pytest                                         # 205 tests
+pytest                                         # 225 tests
 ```
