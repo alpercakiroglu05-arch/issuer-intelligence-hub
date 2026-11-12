@@ -181,11 +181,11 @@ def kpis(isin: str, days: int = 60) -> dict:
 # ---------- liquidity trend: "has our liquidity improved?" ----------
 TREND_HELP = {
     "improved": "Trading got cheaper and/or more shares traded, and nothing got worse by more than 10%. "
-                "A good message for the board; check whether the whole index moved the same way.",
+                "Compare with the index column to see whether the whole market moved the same way.",
     "worsened": "Trading got more expensive and/or fewer shares traded, and nothing improved by more than 10%. "
-                "Worth a conversation with the Designated Sponsor or a look at investor outreach.",
+                "Compare with the index column to see whether the whole market moved the same way.",
     "mixed": "Trading got cheaper, but fewer shares traded (or the other way round). "
-             "Check both before telling the board that liquidity improved.",
+             "Both figures are needed to describe the change.",
     "stable": "Trading cost and turnover both stayed within 10% of the previous period.",
     None: "Not enough trading history for a comparison yet.",
 }
