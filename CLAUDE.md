@@ -35,7 +35,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 
 - 6 people: 4 coders + 2 non-code (research/events + pitch).
 - **Oğuzhan** (`Bthn28`) is the tech lead. He merges PRs and owns **C1 (data) together with Claude**, because the raw data is on his laptop.
-- C2 engine · C3 app/UI · C4 AI + report: the other coders. Work packages and checklists are in `README.md`.
+- C2 engine · C3 app/UI · C4 AI + report: the other coders. Work packages and checklists are in `docs/TEAM.md` (the README is the description for the jury).
 - GitHub collaborators to invite: `ydnka`, `alpercakiroglu05-arch`, plus one more. Status: pending, blocked on GitHub "Confirm access".
 
 ## How to work in this repo
