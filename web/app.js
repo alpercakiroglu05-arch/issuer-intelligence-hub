@@ -368,15 +368,21 @@ function rows(list) {
   if (!list.length) return `<div class="card lead-empty">${L("No unusual days in this period.", "Keine auffälligen Tage in diesem Zeitraum.")}</div>`;
   return `<div class="list rv">${list.map(r => `<button class="row" data-open="${r.day}|${esc(r.ev || "")}" data-morph=".a">
     <span class="d">${dS(r.day)}</span><span class="t">${r.type ? `<span class="tag">${esc(TAG(r.type))}</span>` : ""}${esc(r.title)}${r.sub ? `<small>${esc(r.sub)}</small>` : ""}</span>
-    <span class="a ${(r.abn || 0) < 0 ? "dn" : "up"} num">${pct(r.abn)}</span><span class="xr num">${X(r.vol)}</span>${CHEV}</button>`).join("")}</div>`;
+    <span class="a ${(r.abn || 0) < 0 ? "dn" : "up"} num">${pct(r.abn)}</span><span class="xr num">${X(r.vol)}</span><span class="golbl">${L("Impact card", "Impact Card")} ${CHEV}</span></button>`).join("")}</div>`;
 }
 function vEvents() {
-  const off = S.st.offline;
-  return `<section class="wrap hero"><div class="eyebrow rv">${esc(nice(U(S.isin)))}</div><h1 class="h-hero rv" style="--d:.05s">${L("Events", "Ereignisse")}</h1>
-    <p class="lede rv" style="--d:.1s">${L("Every announcement and every unusual trading day, measured against the share's own normal and its peers. Choose one to see its impact card.", "Jede Meldung und jeder auffällige Handelstag, gemessen am eigenen Normalzustand und an den Peers. Wählen Sie einen Tag für seine Impact Card.")}</p>
-    ${off ? "" : `<div class="rv" style="--d:.15s;margin-top:22px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost sm" data-act="add">${L("Add a date", "Datum hinzufügen")}</button><label class="btn ghost sm" style="cursor:pointer">${L("Import calendar (CSV, ICS)", "Kalender importieren (CSV, ICS)")}<input type="file" id="calfile" accept=".csv,.ics,.txt" hidden></label></div>`}
+  const off = S.st.offline, all = timeline(), ann = all.filter(r => r.type), un = all.filter(r => !r.type), m = S.iss.meta;
+  return `<section class="wrap hero"><div class="eyebrow rv">${esc(nice(U(S.isin)))} · ${L("Events", "Ereignisse")}</div><h1 class="h-hero rv" style="--d:.05s">${L("Impact cards", "Impact Cards")}</h1>
+    <p class="lede rv" style="--d:.1s">${L("Every announcement and every unusual trading day has an impact card: how the share reacted against its own normal and its peers. Choose one below, or create a card for any trading day.", "Jede Meldung und jeder auffällige Handelstag hat eine Impact Card: wie die Aktie gegenüber ihrem Normalzustand und ihren Peers reagierte. Unten auswählen oder eine Karte für jeden Handelstag erstellen.")}</p>
+    <form class="card mkcard rv" id="anyday" style="--d:.15s" autocomplete="off"><div><b>${L("Create an impact card for any day", "Impact Card für einen beliebigen Tag")}</b><p class="note" style="margin-top:2px">${L(`Any trading day from ${dY(m.first_date)} to ${dY(m.last_date)}. A weekend or holiday opens the next trading day.`, `Jeder Handelstag vom ${dY(m.first_date)} bis ${dY(m.last_date)}. Ein Wochenende oder Feiertag öffnet den nächsten Handelstag.`)}</p></div>
+      <div class="mkrow"><input type="date" id="anyday-d" min="${m.first_date}" max="${m.last_date}" required aria-label="${L("Trading day", "Handelstag")}"><button class="btn sm">${L("Create impact card", "Impact Card erstellen")}</button></div></form>
+    ${off ? "" : `<div class="rv" style="--d:.2s;margin-top:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost sm" data-act="add">${L("Add a date from your calendar", "Datum aus Ihrem Kalender")}</button><label class="btn ghost sm" style="cursor:pointer">${L("Import calendar (CSV, ICS)", "Kalender importieren (CSV, ICS)")}<input type="file" id="calfile" accept=".csv,.ics,.txt" hidden></label></div>`}
     ${S.addOpen ? addForm() : ""}${calPreview()}</section>
-  <section class="wrap" style="margin-top:40px">${rows(timeline())}<p class="note">${L("Stock-specific move · turnover vs normal (median of trading days t−65 to t−6)", "Titelspezifische Bewegung · Umsatz vs. normal (Median der Handelstage t−65 bis t−6)")}</p></section>`;
+  <section class="wrap" style="margin-top:44px"><div class="sec-head"><h2 class="h-sec rv">${L("Announcements", "Meldungen")} <span class="cnt">${ann.length}</span></h2></div>
+    ${ann.length ? rows(ann) : `<div class="card lead-empty">${L("No calendar entries for this share yet. Add a date or import your calendar above.", "Noch keine Kalendereinträge für diese Aktie. Oben ein Datum hinzufügen oder den Kalender importieren.")}</div>`}</section>
+  <section class="wrap" style="margin-top:44px"><div class="sec-head"><h2 class="h-sec rv">${L("Unusual days without a calendar entry", "Auffällige Tage ohne Kalendereintrag")} <span class="cnt">${un.length}</span></h2></div>
+    ${un.length ? rows(un) : `<div class="card lead-empty">${L("None in 2026.", "Keine in 2026.")}</div>`}
+    <p class="note">${L("Each row: stock-specific move · turnover vs normal (median of trading days t−65 to t−6). The data shows that something happened, not why.", "Je Zeile: titelspezifische Bewegung · Umsatz vs. normal (Median der Handelstage t−65 bis t−6). Die Daten zeigen, dass etwas passiert ist, nicht warum.")}</p></section>`;
 }
 const EVTYPES = ["FY", "Q1", "H1", "Q3", "ADHOC", "GUIDANCE", "DIVIDEND_EX", "AGM", "CMD", "MA", "OTHER"];
 function addForm() {
@@ -399,7 +405,7 @@ function vEvent() {
   const r = timeline().find(x => x.day === S.day && (x.ev || "") === (S.ev || "")) || timeline().find(x => x.day === S.day) || {day: S.day, abn: null, vol: null, title: L("Trading day", "Handelstag")};
   return `<section class="wrap ic-hero"><button class="back" data-go="events" data-dir="pop">${BACK} ${L("Events", "Ereignisse")}</button>
     <div class="eyebrow" style="margin-top:22px" id="ic-eye">${dY(S.day)}</div>
-    <h1 class="h-sec" style="margin-top:8px;max-width:24em" id="ic-title">${esc(r.type ? r.title : L("Unusual trading day", "Auffälliger Handelstag"))}</h1>
+    <h1 class="h-sec" style="margin-top:8px;max-width:24em" id="ic-title">${esc(r.type ? r.title : r.unusual ? L("Unusual trading day", "Auffälliger Handelstag") : L("Trading day", "Handelstag"))}</h1>
     <div class="src" id="ic-src"></div>
     <div class="ic-num"><span class="big ${(r.abn || 0) < 0 ? "dn" : "up"} num" style="view-transition-name:hero" id="ic-big">${pct(r.abn)}</span><div class="ctx" id="ic-ctx">${L("Stock-specific move", "Titelspezifische Bewegung")}<br>${X(r.vol)} ${L("normal turnover", "normaler Umsatz")}</div></div>
     <div class="card summary rv" id="ic-sum"><div class="ai">${SPARK}</div><div><div class="wait" style="padding:4px 0"><span class="spin"></span>${L("Building the impact card from Xetra data…", "Impact Card wird aus Xetra-Daten berechnet…")}</div></div></div>
@@ -413,9 +419,9 @@ async function fillEvent() {
   if (S.route !== "event" || keyOf(S.isin, S.day, S.ev) !== k) return;
   if (d.error) { $("#ic-sum").innerHTML = `<div class="ai">!</div><div><p>${L("The card could not be built: ", "Die Karte konnte nicht berechnet werden: ")}${esc(d.error)}</p></div>`; $("#panel").innerHTML = ""; return; }
   const c = d.card, e = c.event, notable = e.type === "NOTABLE_DAY", row = d.event_row || {}, [dt, tm] = (e.datetime_local || "").split(" ");
-  $("#ic-eye").innerHTML = notable ? L(`Detected from trading on ${dY(e.reaction_day)}`, `Aus dem Handel erkannt am ${dY(e.reaction_day)}`)
-    : `${L("Published", "Veröffentlicht")} ${dS(dt)}${tm ? " · " + tm : ""}${e.timing ? " · " + TIMING(e.timing) : ""}<span class="dot">·</span>${L("Reaction", "Reaktion")} ${dS(e.reaction_day)}`;
-  $("#ic-title").textContent = notable ? L("Unusual trading day", "Auffälliger Handelstag") : e.title;
+  $("#ic-eye").innerHTML = notable ? (S.iss.anomalies.some(a => a.peak_date === day10(e.reaction_day)) ? L(`Unusual day, detected from trading on ${dY(e.reaction_day)}`, `Auffälliger Tag, aus dem Handel erkannt am ${dY(e.reaction_day)}`) : L(`${dY(e.reaction_day)} · no calendar entry`, `${dY(e.reaction_day)} · kein Kalendereintrag`)) : `${L("Published", "Veröffentlicht")} ${dS(dt)}${tm ? " · " + tm : ""}${e.timing ? " · " + TIMING(e.timing) : ""}<span class="dot">·</span>${L("Reaction", "Reaktion")} ${dS(e.reaction_day)}`;
+  const unusual = S.iss.anomalies.some(a => a.peak_date === day10(e.reaction_day));
+  $("#ic-title").textContent = notable ? (unusual ? L("Unusual trading day", "Auffälliger Handelstag") : L("Trading day", "Handelstag")) : e.title;
   $("#ic-src").innerHTML = notable ? `<span>${L("No calendar entry. The cause is not in the data and has not been verified.", "Kein Kalendereintrag. Die Ursache steht nicht in den Daten und ist nicht geprüft.")}</span>`
     : String(e.event_id || "").startsWith("USR_") ? `<span>${L("From your own calendar, not checked against a source", "Aus Ihrem eigenen Kalender, nicht mit einer Quelle geprüft")}</span>`
     : `<span>${String(row.verified) === "1" ? "✓ " + L("Date and time verified against the source", "Datum und Uhrzeit mit der Quelle geprüft") : L("Source not yet verified", "Quelle noch nicht geprüft")}</span>${e.source_url ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">${L("Source", "Quelle")} ↗</a>` : ""}`;
@@ -800,6 +806,12 @@ document.addEventListener("submit", async ev => {
     if (!ids.length) { toast(L("No check matches. Try “market”, “thin trading”, “funds sold” or “overreaction”.", "Keine Prüfung passt. Versuchen Sie „Markt“, „dünner Handel“, „Fonds“ oder „Übertreibung“.")); return; }
     S.tested[k] = ids; const [d, b] = await Promise.all([S.cards[k], S.briefs[k]]); $("#panel").innerHTML = panel(d, b);
     const el = $("#cl-" + ids[0]); el.scrollIntoView({behavior: reduced ? "auto" : "smooth", block: "center"}); ids.forEach(i => $("#cl-" + i).classList.add("hl")); }
+  if (f.id === "anyday") {
+    const want = $("#anyday-d").value, dates = S.iss.series.date, day = dates.find(x => x >= want);
+    if (!day) { toast(L("No trading data on or after that day.", "Keine Handelsdaten ab diesem Tag.")); return; }
+    if (day !== want) toast(L(`${dL(want)} was not a trading day: showing ${dL(day)}.`, `${dL(want)} war kein Handelstag: ${dL(day)} wird gezeigt.`));
+    const r = timeline().find(x => x.day === day); openEvent(S.isin, day, r ? r.ev : null); return;
+  }
   if (f.id === "addf") {
     try { const r = await post("/api/calendar", {isin: S.isin, events: [{date: $("#f-d").value, time: $("#f-t").value, type: $("#f-y").value, title: $("#f-n").value}]}), e = r.events[0];
       if (!e || e.status !== "matched") { toast(e ? (e.note || e.status) : L("Not added", "Nicht hinzugefügt")); return; } commitEvents([e]); } catch (err) { toast(err.message); } }
