@@ -38,7 +38,7 @@ Rules for the live demo:
 
 - **"Stock Report 2.0."** DB already sends issuers a monthly *Stock Report* (guide p. 16): turnover by venue, a peer group, index comparison and XLM by order size. We make it on demand and event-driven, and our "trading cost by order size" chart is the live version of its XLM table.
 - **A module for the Issuer Services Hub, not a competitor.** The Hub already has a price chart, KPI comparison and calendar notifications (guide p. 18). We add what it lacks: the impact of each announcement, auctions, who traded, the minute the news was priced, and an explanation in plain DE/EN.
-- **"The event data is already yours."** Listed companies must send DB their *Corporate Calendar* via ERS (guide pp. 4–5). We researched 80 events by hand for the demo; in production they come straight from ERS.
+- **"The event data is already yours."** Listed companies must send DB their *Corporate Calendar* via ERS (guide pp. 4–5). We researched 82 events by hand for the demo; in production they come straight from ERS.
 - **Liquidity and Designated Sponsors.** XLM ≤ 100 bps and ≥ €2.5m a day decide whether a company needs a Designated Sponsor (guide p. 32). The dashboard estimates the category and shows what a large order really costs. Example: in Heidelberger Druck a €500k round trip (XLM) costs 13.8 % against 4.7 % for the median SDAX stock, and the book absorbs nothing larger on most days.
 
 ## Jury scorecard: what we show for each criterion
@@ -66,6 +66,6 @@ Rules for the live demo:
 - **What exists already, and why is this better?** The monthly Stock Report (PDF/Excel) and terminals. One lags, the other needs licences and analysts. We are on demand, event-driven and explained.
 - **Where do the reasons come from?** Never from the model. Each event in `events.csv` has a source link, which is shown on the card and in the PDF. For the showcase shares we re-checked every date and time against its link on 12 Nov, and the titles say only what the linked page says. Days without company news say so, and the market-context column shows index days and expiries.
 - **How do you know the onset minute is right?** For all 7 releases published during trading hours, the detected onset comes after the release (e.g. 12:00:53 → 12:02). Of the 63 events with a published time, 39 show a clear onset; for 33 of those 39 the timing inferred from trading matches the release time.
-- **Can a company add its own calendar (brief VI)?** The demo shows the researched calendar (80 events). The API already matches a company's own dates to trading days (`POST /api/calendar`); in production the dates come from the ERS corporate calendar, so nobody types them twice.
+- **Can a company add its own calendar (brief VI)?** The demo shows the researched calendar (82 events). The API already matches a company's own dates to trading days (`POST /api/calendar`); in production the dates come from the ERS corporate calendar, so nobody types them twice.
 - **The card says 8.6×, but €113.6m / €13.3m is 8.5?** The ratio is 8.545; the card stores 8.55 and shows one decimal. It is rounding, and the euro amounts beside it are exact.
 - **Why not market cap for "size"?** It is not in the data excerpt. We use the 10 stocks closest in turnover as a size proxy and say so on screen.

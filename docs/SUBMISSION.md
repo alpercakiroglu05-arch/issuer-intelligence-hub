@@ -22,9 +22,9 @@ All data is the Deutsche Börse excerpt for **2 Jan – 30 Oct 2026 (213 trading
 | **XLM spreads** (`dax_mdax_sdax_liquid_spreads`) | Trading cost (Xetra Liquidity Measure, `Impact_bps`) for order sizes from EUR 10k to 30m; we headline EUR 25k |
 | **Index constituents** | Daily DAX (40) / MDAX (50) / SDAX (70) membership, used as the peer group of each day |
 | **Xetra on-book trades** (1.7 GB, every trade, ns timestamps) | 1-minute bars for the 44 stocks with events (46 ISINs: Fresenius and Qiagen changed ISIN): **3.8 million bars**, used for intraday price path, news onset and exact auction volumes |
-| **Public sources** (`events/events.csv`) | **80 corporate events**, each with a source link, and the release time when the source shows it |
+| **Public sources** (`events/events.csv`) | **82 corporate events**, each with a source link, and the release time when the source shows it |
 
-**Events.** The demo showcases one share per index: Zalando (ZAL, DAX), CTS Eventim (EVD, MDAX) and Heidelberger Druck (HDD, SDAX). The calendar holds every 2026 event we found for CTS Eventim, Evotec (EVT, SDAX), Heidelberger Druck and Gerresheimer (GXI, the index-exit story): 40 events. It also holds the first H1/Q3 publication of **all 40 DAX members** (36 half-year and 4 nine-month results), which is the group behind "compare all DAX results". Two rules apply:
+**Events.** The demo showcases one share per index: Zalando (ZAL, DAX), CTS Eventim (EVD, MDAX) and Heidelberger Druck (HDD, SDAX). The calendar holds every 2026 event we found for CTS Eventim, Evotec (EVT, SDAX), Heidelberger Druck and Gerresheimer (GXI, the index-exit story): 40 events, plus the three results releases of Zalando. It also holds the first H1/Q3 publication of **all 40 DAX members** (36 half-year and 4 nine-month results), which is the group behind "compare all DAX results". Two rules apply:
 - A results event is the first moment the figures became public. If a company pre-released by ad hoc, that ad hoc is the event.
 - Times come from the EQS/DGAP release header. Unknown times stay empty and are never guessed.
 
@@ -118,7 +118,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 - **Activity:** 8.6× normal turnover, with agent orders net selling.
 - **Timing:** the opening auction was only −2.3 %, but the market started pricing at **09:03** and was −15 % by 09:18.
 - **Auctions:** the closing auction traded EUR 25.6m (3.6× normal) and set the price 1.5 % below the last trade (normally ±0.2 %).
-- **Rank:** the third-largest stock-specific move among 215 unusual MDAX days in 2026 (only three full-year results have data, so the card ranks it in the broader group and says so).
+- **Rank:** the third-largest stock-specific move among 215 unusual MDAX days in 2026 (only four full-year results have data, so the card ranks it in the broader group and says so).
 
 **Example of a same-type comparison, Zalando, 4 Aug 2026.** Half-year results at 07:00, before the open: −13.4 % against DAX peers +0.3 %, so −13.6 % stock-specific, on 6.0× normal turnover; the market started pricing at 09:02. It is the largest stock-specific move of the **36 DAX half-year results** in the data.
 
@@ -126,7 +126,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 
 - **Causes:** the data shows *what* happened, not *why*. Reasons come only from the linked public sources. Some unusual days have no company news, and we say so.
 - **Intraday peers:** the onset uses the raw price move because there are no intraday peer prices. A market-wide move can also trigger it.
-- **Event times:** the 80 events were researched with AI-assisted web search, and every row has its source link. 17 have no published time, and 7 DAX times are pre-announced dpa-AFX slots (marked in the title). On 12 Nov we re-checked the 41 rows of the showcase and focus shares against their links: every date and time matches, and the titles say only what the linked page says.
+- **Event times:** the 82 events were researched with AI-assisted web search, and every row has its source link. 17 have no published time, and 7 DAX times are pre-announced dpa-AFX slots (marked in the title). On 12 Nov we re-checked the 43 rows of the showcase and focus shares against their links: every date and time matches, and the titles say only what the linked page says.
 - **Own calendar:** the demo shows the researched calendar. The API already matches a company's own dates to trading days (`POST /api/calendar`), but the demo UI has no upload screen; in production the dates would come from the ERS corporate calendar.
 - **Peer groups:** the dashboard engine compares a stock with three groups: its index, its sector, and the stocks of similar size.
   - **Sector:** 11 groups built from Deutsche Börse's official Prime Standard sectors (`events/sectors.csv`, 173 of 174 stocks; the last one falls back to the index).

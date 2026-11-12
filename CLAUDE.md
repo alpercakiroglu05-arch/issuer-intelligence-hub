@@ -44,7 +44,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 pip install -r requirements.txt
 python web/server.py                      # demo UI (web/, C3): http://127.0.0.1:8600 (or double-click start.command / start.bat)
 streamlit run app/Home.py                 # backup UI and analyst view: http://localhost:8501
-pytest                                    # 205 tests (incl. web API); data tests skip if data/ is empty
+pytest                                    # 225 tests (incl. web API); data tests skip if data/ is empty
 python web/warm_cache.py                  # re-warm the demo caches (summaries + assistant) after ANY prompt, card or engine change
 ```
 - Branch `feat/<name>-<topic>` → PR → lead merges. `main` must always run (see `CONTRIBUTING.md`).
@@ -114,14 +114,14 @@ Hero stocks (max 3 per challenge, one per index, `config.HERO_TICKERS` = ZAL, EV
 - **EVT Evotec (SDAX), former showcase, data unchanged.** Trigger (sourced): ad hoc guidance cut on 13 Jul at 21:17. On 14 Jul: −24 %, a −22 % gap at the open (news before the open). 19 % of turnover traded in the first 15 minutes; the low came at 09:18.
 - **HDD Heidelberger Druck (SDAX).** A small cap (~€1.3m/day, XLM ~90 bps, close to the Designated Sponsor thresholds) with several strong days. This is the liquidity story. Sourced triggers: Q3 results 5 Feb 07:30 (−14 %), drone-defense JV ad hoc 18 Mar 14:15 (+9 %), dpa-AFX drone-defense report 14 Apr 06:10 (+19 %), guidance cut 15 Apr 17:59 (−11 % next day), **guidance cut ad hoc 29 Oct at 12:00:53 → onset detector says 12:02**.
 - **GXI Gerresheimer, a pitch story only.** Trigger (sourced): ad hoc on 10 Feb at 22:28 (results postponed over an accounting investigation, guidance cut, impairments). On 11 Feb: −31.4 % (peers −0.9 %), 20× turnover, 20 % of turnover in the first 15 minutes, low at 09:22. It **left the SDAX after 9 Apr** (STOXX: deleted effective 10 Apr; last index day in the data 9 Apr), so there is no XLM data after that. This gives the "index early-warning" idea.
-- The **reasons** for these moves are NOT in the trading data. They come from `events/events.csv` (80 sourced events, researched 11 Nov; the 40 hero rows were re-checked against their links on 12 Nov: every date and time matches, titles were cut back to what the linked page says, three dead links were replaced). Quote only what the linked source says; never invent causes. Not found (no company news): EVD 27 Feb, 5 Mar, 30 Mar; EVT 3 Feb, 14 Apr (analyst comments), 12 Oct. EVD 31 Aug (19× turnover) = MSCI Germany deletion effective at the close.
+- The **reasons** for these moves are NOT in the trading data. They come from `events/events.csv` (82 sourced events, researched 11–12 Nov; the 40 hero rows were re-checked against their links on 12 Nov: every date and time matches, titles were cut back to what the linked page says, three dead links were replaced). Quote only what the linked source says; never invent causes. Not found (no company news): EVD 27 Feb, 5 Mar, 30 Mar; EVT 3 Feb, 14 Apr (analyst comments), 12 Oct. EVD 31 Aug (19× turnover) = MSCI Germany deletion effective at the close.
 
 Xetra liquidity rule (Being Public Guide p. 32): XLM (EUR 25k) ≤ 100 bps **and** ≥ EUR 2.5m/day (4-month average) means category A; otherwise a Designated Sponsor is needed. `engine.baseline.kpis()` gives an estimate.
 
-## Status (Thu morning, all PRs up to #50 merged, 205 tests green on `fix/oguzhan-full-read`)
+## Status (Thu morning, all PRs up to #60 merged, 225 tests green)
 
 Done on `main`:
-- **Ingest:** daily (174 stocks x 213 days), events (80 sourced events), intraday (44 event stocks, 3.8M bars).
+- **Ingest:** daily (174 stocks x 213 days), events (82 sourced events), intraday (44 event stocks, 3.8M bars).
 - **Engine:**
   - `baseline`: KPIs, anomalies with market context, liquidity trend, episodes.
   - `impact`: card incl. auctions vs normal; `onset`: news onset; `auctions`: exact uncross volumes.
