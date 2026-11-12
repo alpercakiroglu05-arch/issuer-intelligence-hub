@@ -109,7 +109,7 @@ def test_web_one_click_export(base, query, name):
 @needs_data
 @pytest.mark.parametrize("period", ["3m", "6m", "all"])
 def test_web_dashboard_in_one_call(base, period):
-    """The simple UI draws the whole dashboard from /api/dashboard; the browser computes nothing."""
+    """/api/dashboard returns the market comparison, big market days, timeline and event list in one call."""
     d = get(base, f"/api/dashboard?isin={EVD}&period={period}")
     assert d["index"] == "MDAX" and d["sector"] == "Media & Telecom" and d["liquidity_category"] in ("A", "B")
     vm = d["versus_market"]
@@ -133,4 +133,4 @@ def test_web_card_compare_and_examples_agree(base):
     row = next(r for r in t["rows"] if r["isin"] == EVD and r["reaction_day"][:10] == "2026-03-27")
     assert row["vol_ratio"] == 8.55 and row["rank"] == 3 and t["n"] == 215 and row["display"].startswith("CTS Eventim")
     ex = sorted((u["example"], u["index"]) for u in get(base, "/api/universe") if u.get("example") is not None)
-    assert [i for _, i in ex] == ["DAX", "MDAX", "SDAX"]   # one example company per index on the first screen
+    assert [i for _, i in ex] == ["DAX", "MDAX", "SDAX"]   # one example company per index

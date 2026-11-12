@@ -1,5 +1,5 @@
 """
-Dashboard blocks of the simple web UI.  OWNER: C1/C3.  Deterministic, no model.
+Market comparison blocks for a dashboard (any front end).  OWNER: C1.  Deterministic, no model.
 
     window(period)                  -> the trading dates of "3m" (63 days), "6m" (126) or "all"
     versus_market(isin, period)     -> "You vs market": price, turnover and trading cost vs the index, with ranks

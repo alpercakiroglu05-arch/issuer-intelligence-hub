@@ -8,7 +8,7 @@ Two caches, both in data/ (local, never committed):
 
 Run it after a prompt, card or engine change and before recording the demo:
 
-    python web/warm_cache.py              # hero stocks and the example companies of the first screen
+    python web/warm_cache.py              # hero stocks and the example companies (config.EXAMPLE_TICKERS)
     python web/warm_cache.py EVD GXI      # chosen tickers
 
 It goes through the web server's own functions (narrate, agent) with the same arguments the web UI sends, so
