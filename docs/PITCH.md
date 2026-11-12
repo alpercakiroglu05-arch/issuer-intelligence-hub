@@ -19,7 +19,7 @@ Showcase: one share per index (`config.HERO_TICKERS`): Zalando (DAX), CTS Eventi
 | 2 | **Overview** | Year to date −16.6 % against −4.2 % for the MDAX peers; €13.1m turnover a day; a €25k order costs 20.3 bps; liquidity category A, no Designated Sponsor needed. Peers by index, sector and size. |
 | 3 | *Unusual days* → **27 Mar** (or *Open impact card*) | "Full-year results, published 26 Mar at 17:45, after the close. The date and time are checked against the source." |
 | 4 | Impact card, **At a glance** | −23.2 % on the day, MDAX peers −1.5 %, so −21.7 % was stock-specific. Closing auction €25.6m, 3.6× normal. #3 of 215 unusual MDAX days. |
-| 5 | The summary under the big figure, then **DE** (top right) | "Written by the model from the card. Every figure is checked against the card; a text that fails is replaced by a template." It shows "All 15 figures match the card" and "Saved answer". |
+| 5 | The summary under the big figure, then **DE** (top right) | "Written by the model from the card. Every figure is checked against the card; a text that fails is replaced by a template." It shows "All 10 figures match the card" and "Saved answer"; the card says "LARGEST OF 36 HALF-YEAR RESULTS (DAX)" in step 8. |
 | 6 | **The day** | "The opening auction was only −2.3 %. The market started pricing the news at 09:03." The low came at 16:44. |
 | 7 | **Evidence** | "It was the overall market": contradicted. "Funds or short sellers sold": not testable with exchange data, and the card says so. |
 | 8 | **Shares**, type `zalando`, Enter → *Open impact card* (4 Aug) | "Same-type comparison, as the brief asks: half-year results, published 07:00. −13.6 % stock-specific on 6.0× turnover, reaction at 09:02: the biggest of 36 DAX half-year results." Skip this step if time is short. |
@@ -29,8 +29,8 @@ Rules for the live demo:
 
 - **Use the suggested questions** in the analyst panel (**Ask**): they are saved answers and appear at once. A typed question goes to the model and takes about 30 seconds.
 - **Do not press *Ask the model again*** on a card: it calls the model live.
-- On the Eventim card, the suggested question *How does this rank against similar events?* says "8.5x" while the card says "8.6×" (the ratio is 8.545; the card rounds 8.55 up). Use the other two questions.
-- Zalando: the web card shows the opening auction as 15.9×, the PDF as 15.8× (the ratio is 15.85). Export the PDF from the Eventim card.
+- **Ask the analyst in English.** The three suggested questions on the Eventim card are consistent with the card in English. In German the saved answers are weaker: one shows field names ("(ret)", "(abn_ret)"), and the ranking answer says "8,5-fach" while the card says "8,6×" (the ratio is 8.545; the card rounds 8.55 up). The German card summary itself is fine.
+- Zalando: the web card and the summary show the opening auction as 15.9×, the table in the PDF as 15.8× (the ratio is 15.85). Export the PDF from the Eventim card.
 - Heidelberger Druck is the liquidity story if a juror asks about small caps: category B, a Designated Sponsor is needed (4-month daily average 86 bps, €788k a day).
 - The linked release for 27 Mar gives no prior-year dividend and no reason for the fall. Say "full-year results and outlook", not "dividend cut" or "disappointing targets".
 
