@@ -49,6 +49,12 @@ function nice(u) {
   return w.map(t => t.length <= 3 ? t : t.charAt(0) + t.slice(1).toLowerCase()).join(" ").replace(/\.$/, "") || u.ticker;
 }
 const U = isin => S.uni.find(u => u.isin === isin);
+/* "hIP_1.0-Mistral/Mistral-Medium-3.5-128B" -> "Mistral AI": the maker, not the gateway's model id */
+function modelName(id) {
+  const m = String(id || "");
+  return /mistral/i.test(m) ? "Mistral AI" : /claude|anthropic/i.test(m) ? "Claude" : /gpt|openai/i.test(m) ? "OpenAI"
+    : /llama/i.test(m) ? "Meta Llama" : /gemini/i.test(m) ? "Google Gemini" : /glm/i.test(m) ? "GLM" : (m.split("/").pop() || "AI");
+}
 const TYPE = t => ({NOTABLE_DAY: L("Unusual days", "Auffällige Tage"), FY: L("Full-year results", "Jahresergebnisse"), Q1: L("Q1 results", "Q1-Ergebnisse"), H1: L("Half-year results", "Halbjahresergebnisse"), Q3: L("Q3 results", "Q3-Ergebnisse"),
   DIVIDEND_EX: L("Ex-dividend days", "Ex-Dividenden-Tage"), AGM: L("AGMs", "Hauptversammlungen"), ADHOC: L("Ad hoc releases", "Ad-hoc-Meldungen"), GUIDANCE: L("Guidance changes", "Prognoseänderungen"), MA: L("M&A news", "M&A-Nachrichten"), INDEX: L("Index changes", "Indexänderungen"), CMD: L("Capital markets days", "Kapitalmarkttage"), OTHER: L("Other", "Sonstiges")}[t] || t);
 const TAG = t => ({ADHOC: "Ad hoc", DIVIDEND_EX: L("Dividend", "Dividende"), GUIDANCE: L("Guidance", "Prognose"), INDEX: "Index", MA: "M&A", OTHER: L("Other", "Sonstiges")}[t] || t);
@@ -144,7 +150,8 @@ function render(stat = false) {
   document.documentElement.lang = S.lang;
   const u = U(S.isin);
   $("#tabs").innerHTML = TABS().map(([k, t]) => `<button data-go="${k}" ${S.route === k || (k === "events" && S.route === "event") ? 'aria-current="page"' : ""}>${t}</button>`).join("");
-  $("#co").innerHTML = `<b>${u.ticker}</b><span>${esc(nice(u))}</span><kbd>⌘K</kbd>`;
+  $("#co").innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>${L("Shares", "Aktien")}</span>`;
+  $("#co").setAttribute("aria-label", L("Search shares", "Aktien suchen"));
   $$(".lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === S.lang));
   $(".ask-btn span").textContent = L("Ask", "Fragen");
   $("#foot").innerHTML = L(`Xetra data to the close on ${dY(S.st.last_date)} · ${S.uni.length} DAX, MDAX and SDAX shares · minute data for ${S.st.intraday_stocks} · ${S.st.llm ? "AI connected" : "AI in template mode"}. Numbers come from the engine; words from the model, with every figure checked. Causes come only from the verified calendar. Concept prototype, not an official Deutsche Börse product. Not investment advice.`,
@@ -278,14 +285,13 @@ const rowEv = r => r.event_id && !String(r.event_id).includes("NOTABLE_DAY") ? r
 
 /* ============================== views ============================== */
 function periodSeg() {
-  return `<div class="seg" data-seg="period" role="group" aria-label="${L("Period", "Zeitraum")}"><span class="thumb"></span>${PERIODS().map(p => `<button data-segv="${p.key}" aria-pressed="${p.key === S.period}" ${p.available ? "" : `disabled title="${esc(L(`Not available: ${p.reason}`, `Nicht verfügbar: ${p.reason}`))}"`}>${p.label}</button>`).join("")}</div>`;
+  return `<div class="seg" data-seg="period" role="group" aria-label="${L("Period", "Zeitraum")}"><span class="thumb"></span>${PERIODS().filter(p => p.available).map(p => `<button data-segv="${p.key}" aria-pressed="${p.key === S.period}">${p.label}</button>`).join("")}</div>`;
 }
 function periodNote() {
-  const d = S.dashNow, p = periodOf(S.period), pr = d.versus_market.price, off = PERIODS().filter(x => !x.available);
+  const d = S.dashNow, p = periodOf(S.period), pr = d.versus_market.price;
   const bits = [L(`${p.label}: ${dS(pr.start_close)} close to ${dY(d.to)} close, ${d.days} trading days`, `${p.label}: Schluss ${dS(pr.start_close)} bis Schluss ${dY(d.to)}, ${d.days} Handelstage`)];
   if (p.note) bits.push(L("the 31 Dec 2025 close is not in the data, so the 2 Jan move is not included", "der Schlusskurs vom 31.12.2025 fehlt in den Daten, die Bewegung vom 2. Jan. ist nicht enthalten"));
   bits.push(L("closing-auction prices, not adjusted for dividends", "Schlussauktionskurse, nicht um Dividenden bereinigt") + (pr.ex_dividend_days && pr.ex_dividend_days.length ? L(` (ex-dividend ${pr.ex_dividend_days.map(dS).join(", ")})`, ` (Ex-Dividende ${pr.ex_dividend_days.map(dS).join(", ")})`) : ""));
-  off.forEach(x => bits.push(L(`${x.label} not available: the data starts on ${dY(x.data_from)} (needs ${dY(x.needs_from)})`, `${x.label} nicht verfügbar: Die Daten beginnen am ${dY(x.data_from)} (nötig ab ${dY(x.needs_from)})`)));
   return bits.join(" · ");
 }
 function vOverview() {
@@ -400,7 +406,7 @@ async function fillSummary(fresh = false) {
   if (!box()) return;
   if (r.error) { $("#ic-sum").innerHTML = `<div class="ai">!</div><div><p>${L("The summary could not be generated: ", "Zusammenfassung fehlgeschlagen: ")}${esc(r.error)}</p></div>`; return; }
   const chk = numbersCheck(r.text, d.card), live = r.source === "llm";
-  const who = live ? (r.cached ? L(`Saved answer from ${r.model}`, `Gespeicherte Antwort von ${r.model}`) : L(`Written by ${r.model}`, `Geschrieben von ${r.model}`)) : r.rejected && r.rejected.length ? L("Template text: the model's draft had figures not in the card", "Vorlagentext: Entwurf des Modells hatte Zahlen, die nicht in der Karte stehen") : L("Template text, no language model connected", "Vorlagentext, kein Sprachmodell verbunden");
+  const who = live ? (r.cached ? L(`Saved answer from ${modelName(r.model)}`, `Gespeicherte Antwort von ${modelName(r.model)}`) : L(`Written by ${modelName(r.model)}`, `Geschrieben von ${modelName(r.model)}`)) : r.rejected && r.rejected.length ? L("Template text: the model's draft had figures not in the card", "Vorlagentext: Entwurf des Modells hatte Zahlen, die nicht in der Karte stehen") : L("Template text, no language model connected", "Vorlagentext, kein Sprachmodell verbunden");
   $("#ic-sum").innerHTML = `<div class="ai">${SPARK}</div><div><p>${esc(r.text)}</p><div class="meta">${chk ? (chk.bad ? `<span class="dn">${L(`${chk.bad} of ${chk.total} figures not found in the card`, `${chk.bad} von ${chk.total} Zahlen nicht in der Karte`)}</span>` : `<span class="ok">✓ ${L(`All ${chk.total} figures match the card`, `Alle ${chk.total} Zahlen stimmen mit der Karte überein`)}</span>`) : ""}<span>${esc(who)}</span>
     ${S.st.llm && !S.st.offline ? `<button class="link" data-act="regen">${L("Ask the model again", "Modell neu fragen")}</button>` : ""}<button class="link" data-act="ask-card">${L("Ask about this day", "Zu diesem Tag fragen")} ${CHEV}</button></div></div>`;
 }
@@ -577,7 +583,8 @@ const actL = a => a.view === "card" ? `${L("Open impact card", "Impact Card öff
 function drawChat() {
   const u = U(S.isin);
   $("#shtitle").textContent = L("IR Analyst", "IR-Analyst");
-  $("#shctx").textContent = `${nice(u)} · ${S.st.llm ? S.st.model : L("fixed-rule answers, no model connected", "Antworten nach festen Regeln, kein Modell")}`;
+  $("#shctx").innerHTML = S.st.llm ? `<span class="mdl" title="${esc(S.st.model)}"><i>${SPARK}</i>${modelName(S.st.model)}</span>`
+    : `<span class="mdl off"><i>${SPARK}</i>${L("Fixed-rule answers, no model connected", "Antworten nach festen Regeln, kein Modell")}</span>`;
   $("#log").innerHTML = (S.chat.length ? "" : `<div class="msg ai">${L(`Ask me about ${esc(nice(u))}: liquidity, a day, peers or results. I answer with figures from the Xetra engine and can open any page for you. I say what the data shows, not why.`, `Fragen Sie mich zu ${esc(nice(u))}: Liquidität, ein Tag, Peers oder Ergebnisse. Ich antworte mit Zahlen aus der Xetra-Engine und öffne jede Seite. Ich sage, was die Daten zeigen, nicht warum.`)}</div>`) +
     S.chat.map(m => m.typing ? `<div class="msg ai"><span class="typing" style="padding:4px 0"><i></i><i></i><i></i></span> <span class="muted" style="font-size:13px">${L("reading the engine output…", "liest die Engine-Ergebnisse…")}</span></div>` : m.me ? `<div class="msg me">${esc(m.t)}</div>` : msgAI(m)).join("");
   $("#sugg").innerHTML = sugg().map(q => `<button data-q="${esc(q)}">${esc(q)}</button>`).join("");
@@ -586,7 +593,7 @@ function drawChat() {
 }
 function msgAI(m) {
   const chk = m.check, bad = chk && chk.unsupported && chk.unsupported.length;
-  const src = m.source === "llm" ? esc(m.model || "LLM") + (m.cached ? L(" · saved answer", " · gespeicherte Antwort") : "") : m.source === "error" ? L("error", "Fehler") : L("fixed rules, no model", "feste Regeln, kein Modell") + (m.note ? L(" (model answer not used)", " (Modellantwort nicht verwendet)") : "");
+  const src = m.source === "llm" ? esc(modelName(m.model)) + (m.cached ? L(" · saved answer", " · gespeicherte Antwort") : "") : m.source === "error" ? L("error", "Fehler") : L("fixed rules, no model", "feste Regeln, kein Modell") + (m.note ? L(" (model answer not used)", " (Modellantwort nicht verwendet)") : "");
   return `<div class="msg ai">${m.steps && m.steps.length ? `<div class="steps">${m.steps.filter(s => s.tool !== "show").map(s => `<span>${esc(TOOLL()[s.tool] || s.tool)}${s.args && s.args.day ? " " + dS(s.args.day) : ""}</span>`).join("")}</div>` : ""}<div style="white-space:pre-line">${esc(m.t)}</div>
     ${m.actions && m.actions.length ? `<div class="acts">${m.actions.map(a => `<button class="btn sm" data-do="${esc(JSON.stringify(a))}">${esc(actL(a))}</button>`).join("")}</div>` : ""}
     <span class="src2 ${bad ? "warn" : ""}">${chk && chk.total ? (bad ? L(`${chk.unsupported.length} figure(s) not in the engine output`, `${chk.unsupported.length} Zahl(en) nicht in den Engine-Ergebnissen`) : L(`✓ all ${chk.total} figures from the engine`, `✓ alle ${chk.total} Zahlen aus der Engine`)) + " · " : ""}${src}</span></div>`;

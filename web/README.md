@@ -16,6 +16,11 @@ pip install -r requirements.txt
 python web/server.py            # → http://127.0.0.1:8600  (macOS: python3 or .venv/bin/python)
 ```
 
+**Without a terminal:** double-click `start.command` (macOS) or `start.bat` (Windows) in the repo folder. It checks for
+`data/`, installs the packages on the first start, starts the server and opens the browser. On another laptop in the same
+Wi-Fi the demo can be opened with `start.command --host 0.0.0.0` and then `http://<this laptop's IP>:8600` (the data is then
+reachable for everyone in that network, so only on a trusted network).
+
 The server needs the processed files in `data/` (from OneDrive, or rebuilt with the ingest scripts in the main README).
 It uses only the standard library on top of the existing requirements, so nothing new has to be installed.
 
