@@ -1,0 +1,385 @@
+{
+ "isin": "DE000ZAL1111",
+ "ticker": "ZAL",
+ "company": "Zalando",
+ "note": "Curated research pack for the demo. Every item paraphrases a cited, public source; dates are the publication day. Built 2026-11-12.",
+ "sources": {
+  "zal_q1_release": {
+   "publisher": "Zalando SE (EQS-News)",
+   "title": "Zalando delivers strong Q1 as artificial intelligence and ABOUT YOU integration drive growth and efficiencies",
+   "url": "https://corporate.zalando.com/en/node/10985",
+   "date": "2026-05-06",
+   "time": "07:00",
+   "type": "company"
+  },
+  "zal_q1_statement": {
+   "publisher": "Zalando SE",
+   "title": "Quarterly Statement Q1 2026",
+   "url": "https://corporate.zalando.com/sites/default/files/media-download/q1_26_zalando_se_eng_05052026_s.pdf",
+   "date": "2026-05-06",
+   "type": "company"
+  },
+  "zal_q1_stock3": {
+   "publisher": "stock3",
+   "title": "Zalando wächst dank About You – noch kein Schrei vor Glück",
+   "url": "https://stock3.com/news/zalando-waechst-dank-about-you-noch-kein-schrei-vor-glueck-17059004",
+   "date": "2026-05-06",
+   "type": "press"
+  },
+  "zal_q1_dpa": {
+   "publisher": "dpa-AFX (Börse Online)",
+   "title": "ROUNDUP: Zalando mit Zuwächsen zum Jahresstart – Aktie gibt aber nach",
+   "url": "https://www.boerse-online.de/dpa-afx/roundup-zalando-mit-zuwaechsen-zum-jahresstart-aktie-gibt-aber-nach-522555.html",
+   "date": "2026-05-06",
+   "time": "11:18",
+   "type": "press"
+  },
+  "zal_q1_reuters": {
+   "publisher": "Reuters (via Asharq Al-Awsat)",
+   "title": "Zalando Posts Higher Quarterly Growth on AI-driven Efficiency Gains",
+   "url": "https://english.aawsat.com/node/5270161",
+   "date": "2026-05-06",
+   "type": "press"
+  },
+  "zal_q1_preview": {
+   "publisher": "dpa-AFX (FashionUnited)",
+   "title": "Outlook: Zalando expects growth at start of year",
+   "url": "https://fashionunited.uk/news/business/outlook-zalando-expects-growth-at-start-of-year/2026050487823",
+   "date": "2026-05-04",
+   "type": "press"
+  },
+  "zal_barclays_jan": {
+   "publisher": "Reuters (via Stockopedia)",
+   "title": "Zalando climbs after Barclays raises to 'overweight'",
+   "url": "https://www.stockopedia.com/share-prices/zalando-se-ETR:ZAL/news/zalando-climbs-after-barclays-raises-to-apos-overweight-apos-019e6a03-ad20-7923-9051-301a4385973e/",
+   "date": "2026-01-13",
+   "type": "analyst"
+  },
+  "zal_ms_feb": {
+   "publisher": "Zonebourse (BFM Bourse)",
+   "title": "Zalando en net recul, Morgan Stanley s'inquiète de la menace TikTok",
+   "url": "https://www.tradingsat.com/actualites/informations-societes/zalando-en-net-recul-morgan-stanley-s-inquiete-de-la-menace-tiktok-1155700.html",
+   "date": "2026-02-03",
+   "type": "analyst"
+  },
+  "zal_fy_mar": {
+   "publisher": "dpa-AFX (MarketScreener)",
+   "title": "Figures and targets propel Zalando further from recent lows",
+   "url": "https://www.marketscreener.com/news/figures-and-targets-propel-zalando-further-from-recent-lows-ce7e5fddde8bf02d",
+   "date": "2026-03-12",
+   "type": "press"
+  },
+  "zal_bafin_jun": {
+   "publisher": "Zonebourse (Option Finance)",
+   "title": "Zalando chute en Bourse sur des soupçons d'irrégularités comptables",
+   "url": "https://www.optionfinance.fr/info-financiere-en-continu/d/2026-06-26-zalando-chute-en-bourse-sur-des-soupcons-dirregularites-comptables.html",
+   "date": "2026-06-26",
+   "type": "press"
+  },
+  "zal_h1_reuters": {
+   "publisher": "Reuters (via Euronext)",
+   "title": "Retailer Zalando sets record daily share price fall as growth outlook weighs",
+   "url": "https://live.euronext.com/en/financial-news/retailer-zalando-set-record-daily-share-price-fall-growth-outlook-weighs",
+   "date": "2026-08-04",
+   "type": "press"
+  },
+  "zal_h1_jefferies": {
+   "publisher": "Zonebourse (Boursorama)",
+   "title": "Zalando en forte baisse à Francfort après ses trimestriels et des objectifs révisés",
+   "url": "https://www.boursorama.com/bourse/actualites/zalando-en-forte-baisse-a-francfort-apres-ses-trimestriels-et-des-objectifs-revises-63cf23cf10b7b45c438af830561ad2fc",
+   "date": "2026-08-04",
+   "time": "09:50",
+   "type": "press"
+  },
+  "zal_stifel_sep": {
+   "publisher": "Zonebourse (Option Finance)",
+   "title": "Zalando repart à la baisse, Stifel prudent pour les prochains mois",
+   "url": "https://www.optionfinance.fr/info-financiere-en-continu/d/2026-09-25-zalando-repart-a-la-baisse-stifel-prudent-pour-les-prochains-mois.html",
+   "date": "2026-09-25",
+   "type": "analyst"
+  },
+  "zal_shein_sep": {
+   "publisher": "Zonebourse (Option Finance)",
+   "title": "Zalando profite des déboires de Shein, la menace Muse relativisée",
+   "url": "https://www.optionfinance.fr/info-financiere-en-continu/d/2026-09-30-zalando-profite-des-deboires-de-shein-la-menace-muse-relativisee.html",
+   "date": "2026-09-30",
+   "time": "16:12",
+   "type": "press"
+  },
+  "zal_insider_oct": {
+   "publisher": "Newsquawk",
+   "title": "Zalando (ZAL GY) seeing upside after supervisory board member purchased shares",
+   "url": "https://www.newsquawk.com/headlines/zalando-zal-gy-seeing-upside-after-supervisory-board-member-purchased-shares",
+   "date": "2026-10-23",
+   "type": "press"
+  },
+  "zal_preview_oct": {
+   "publisher": "Admiral Markets",
+   "title": "Zalando-Aktie erobert die 200-Tage-Linie zurück: Worauf es vor den Zahlen zum 3. Quartal ankommt",
+   "url": "https://admiralmarkets.com/de/wissen/articles/shares/zalando-aktie-q3-2026-zahlen-vorschau",
+   "date": "2026-10-13",
+   "type": "press"
+  }
+ },
+ "items": [
+  {
+   "id": "zal_barclays",
+   "date": "2026-01-13",
+   "kind": "analyst",
+   "dir": "pos",
+   "w": 2,
+   "src": [
+    "zal_barclays_jan"
+   ],
+   "en": "Barclays upgraded Zalando to overweight, saying the risk from AI shopping agents (agentic commerce) is smaller than feared.",
+   "de": "Barclays stufte Zalando auf Overweight hoch: Das Risiko durch KI-Einkaufsagenten (Agentic Commerce) sei geringer als befürchtet."
+  },
+  {
+   "id": "zal_tiktok",
+   "date": "2026-02-03",
+   "kind": "competition",
+   "dir": "neg",
+   "w": 2,
+   "src": [
+    "zal_ms_feb"
+   ],
+   "en": "Morgan Stanley warned of growing competition from TikTok Shop in Europe; the share was among the weakest in the STOXX Europe 600 that day.",
+   "de": "Morgan Stanley warnte vor wachsender Konkurrenz durch TikTok Shop in Europa; die Aktie gehörte an dem Tag zu den schwächsten im STOXX Europe 600."
+  },
+  {
+   "id": "zal_fy",
+   "date": "2026-03-12",
+   "kind": "guidance",
+   "dir": "pos",
+   "w": 3,
+   "event": "ZAL_FY_20260312",
+   "src": [
+    "zal_fy_mar"
+   ],
+   "en": "FY 2025 results: the 2026 operating-profit target was above the analyst consensus and Christmas GMV was stronger than expected; the share rose by almost 12% intraday.",
+   "de": "Jahreszahlen 2025: Das Ergebnisziel für 2026 lag über dem Analystenkonsens, das Weihnachts-GMV war stärker als erwartet; die Aktie stieg im Tagesverlauf um fast 12 %."
+  },
+  {
+   "id": "zal_q1_preview",
+   "date": "2026-05-04",
+   "kind": "expectations",
+   "dir": "neutral",
+   "w": 1,
+   "event": "ZAL_Q1_20260506",
+   "src": [
+    "zal_q1_preview"
+   ],
+   "en": "Before Q1, JPMorgan expected no surprises and unchanged annual targets; the consensus for 2026 adjusted EBIT was €699m, the middle of the guidance range.",
+   "de": "Vor Q1 rechnete JPMorgan nicht mit Überraschungen und mit unveränderten Jahreszielen; der Konsens für das bereinigte EBIT 2026 lag bei 699 Mio. €, mitten in der Prognosespanne."
+  },
+  {
+   "id": "zal_q1_numbers",
+   "date": "2026-05-06",
+   "kind": "company",
+   "dir": "pos",
+   "w": 2,
+   "event": "ZAL_Q1_20260506",
+   "src": [
+    "zal_q1_release"
+   ],
+   "en": "Q1: reported revenue +23.8% and adjusted EBIT €64.8m (+38.7%), helped by the ABOUT YOU acquisition; full-year guidance confirmed, not raised.",
+   "de": "Q1: berichteter Umsatz +23,8 % und bereinigtes EBIT 64,8 Mio. € (+38,7 %), gestützt durch die Übernahme von ABOUT YOU; Jahresprognose bestätigt, nicht angehoben."
+  },
+  {
+   "id": "zal_q1_proforma",
+   "date": "2026-05-06",
+   "kind": "company",
+   "dir": "neg",
+   "w": 3,
+   "event": "ZAL_Q1_20260506",
+   "src": [
+    "zal_q1_release"
+   ],
+   "en": "Without the acquisition (pro forma), revenue grew only 3.4% and GMV 6.0%: most of the headline growth came from buying ABOUT YOU.",
+   "de": "Ohne die Übernahme (pro forma) wuchs der Umsatz nur um 3,4 % und das GMV um 6,0 %: Der Großteil des Wachstums kam aus dem Kauf von ABOUT YOU."
+  },
+  {
+   "id": "zal_q1_consensus",
+   "date": "2026-05-06",
+   "kind": "expectations",
+   "dir": "neutral",
+   "w": 3,
+   "event": "ZAL_Q1_20260506",
+   "src": [
+    "zal_q1_stock3",
+    "zal_q1_dpa"
+   ],
+   "en": "Adjusted EBIT was slightly above the forecast of €63.8m; JPMorgan called the quarter in line with expectations and the confirmed outlook unsurprising.",
+   "de": "Das bereinigte EBIT lag leicht über der Prognose von 63,8 Mio. €; JPMorgan nannte das Quartal im Rahmen der Erwartungen und den bestätigten Ausblick wenig überraschend."
+  },
+  {
+   "id": "zal_q1_margin",
+   "date": "2026-05-06",
+   "kind": "analyst",
+   "dir": "neg",
+   "w": 2,
+   "event": "ZAL_Q1_20260506",
+   "src": [
+    "zal_q1_reuters"
+   ],
+   "en": "Analysts at Jefferies and JPMorgan said the gross margin missed expectations, partly because of investments.",
+   "de": "Analysten von Jefferies und JPMorgan sahen die Bruttomarge unter den Erwartungen, teils wegen Investitionen."
+  },
+  {
+   "id": "zal_q1_agentic",
+   "date": "2026-05-06",
+   "kind": "analyst",
+   "dir": "neg",
+   "w": 3,
+   "event": "ZAL_Q1_20260506",
+   "src": [
+    "zal_q1_reuters"
+   ],
+   "en": "JPMorgan said the share could drift lower for lack of new positives and because of the structural risk from AI shopping agents (agentic commerce).",
+   "de": "JPMorgan erwartete, dass die Aktie mangels neuer positiver Impulse und wegen des strukturellen Risikos durch KI-Einkaufsagenten (Agentic Commerce) nachgeben könnte."
+  },
+  {
+   "id": "zal_q1_loss",
+   "date": "2026-05-06",
+   "kind": "company",
+   "dir": "neg",
+   "w": 1,
+   "event": "ZAL_Q1_20260506",
+   "src": [
+    "zal_q1_statement",
+    "zal_q1_stock3"
+   ],
+   "en": "After €96.8m of restructuring costs, Zalando reported a net loss of €87.6m for the quarter.",
+   "de": "Nach 96,8 Mio. € Restrukturierungskosten wies Zalando für das Quartal einen Nettoverlust von 87,6 Mio. € aus."
+  },
+  {
+   "id": "zal_bafin",
+   "date": "2026-06-26",
+   "kind": "regulatory",
+   "dir": "neg",
+   "w": 2,
+   "src": [
+    "zal_bafin_jun"
+   ],
+   "en": "The share fell on reports of suspected accounting irregularities and a BaFin review of the accounts; one research house called the reaction excessive.",
+   "de": "Die Aktie fiel nach Berichten über mögliche Bilanzunregelmäßigkeiten und eine BaFin-Prüfung; ein Analysehaus nannte die Reaktion übertrieben."
+  },
+  {
+   "id": "zal_h1_guidance",
+   "date": "2026-08-04",
+   "kind": "guidance",
+   "dir": "neg",
+   "w": 3,
+   "event": "ZAL_H1_20260804",
+   "src": [
+    "zal_h1_reuters"
+   ],
+   "en": "With H1 results, Zalando said 2026 revenue and growth would land in the lower half of its range and narrowed the operating-profit outlook; Reuters reported a record daily share-price fall.",
+   "de": "Mit den Halbjahreszahlen erwartete Zalando Umsatz und Wachstum 2026 nur noch in der unteren Hälfte der Spanne und engte die Ergebnisprognose ein; Reuters meldete einen Rekord-Tagesverlust der Aktie."
+  },
+  {
+   "id": "zal_h1_mixed",
+   "date": "2026-08-04",
+   "kind": "analyst",
+   "dir": "neg",
+   "w": 2,
+   "event": "ZAL_H1_20260804",
+   "src": [
+    "zal_h1_jefferies",
+    "zal_h1_reuters"
+   ],
+   "en": "Jefferies called the second quarter mixed against expectations; weak consumer spending and low-price fast-fashion rivals such as Shein were cited as pressure.",
+   "de": "Jefferies nannte das zweite Quartal gemessen an den Erwartungen gemischt; als Belastung galten schwacher Konsum und Billig-Konkurrenz wie Shein."
+  },
+  {
+   "id": "zal_stifel",
+   "date": "2026-09-25",
+   "kind": "analyst",
+   "dir": "neg",
+   "w": 1,
+   "src": [
+    "zal_stifel_sep"
+   ],
+   "en": "Stifel was cautious for the coming months; the share was among the weakest in the DAX that day.",
+   "de": "Stifel äußerte sich für die kommenden Monate vorsichtig; die Aktie gehörte an dem Tag zu den schwächsten im DAX."
+  },
+  {
+   "id": "zal_shein",
+   "date": "2026-09-30",
+   "kind": "competition",
+   "dir": "pos",
+   "w": 3,
+   "src": [
+    "zal_shein_sep"
+   ],
+   "en": "Zalando was by far the best DAX stock after rival Shein reported slowing growth; the gain erased the losses since Meta presented its Muse AI agent on 8 September.",
+   "de": "Zalando war mit Abstand stärkster DAX-Wert, nachdem Konkurrent Shein eine Wachstumsverlangsamung meldete; damit waren die Verluste seit der Vorstellung von Metas KI-Agent Muse am 8. September aufgeholt."
+  },
+  {
+   "id": "zal_insider",
+   "date": "2026-10-23",
+   "kind": "management",
+   "dir": "pos",
+   "w": 2,
+   "src": [
+    "zal_insider_oct"
+   ],
+   "en": "The share rose after a supervisory board member bought Zalando shares.",
+   "de": "Die Aktie stieg, nachdem ein Aufsichtsratsmitglied Zalando-Aktien gekauft hatte."
+  },
+  {
+   "id": "zal_200day",
+   "date": "2026-10-09",
+   "kind": "market",
+   "dir": "pos",
+   "w": 1,
+   "src": [
+    "zal_preview_oct"
+   ],
+   "en": "The share closed back above its 200-day average on 9 October, which chart analysts read as easing selling pressure.",
+   "de": "Die Aktie schloss am 9. Oktober wieder über ihrer 200-Tage-Linie, was Chartanalysten als nachlassenden Verkaufsdruck werten."
+  },
+  {
+   "id": "zal_targets",
+   "date": "2026-10-13",
+   "kind": "analyst",
+   "dir": "pos",
+   "w": 1,
+   "src": [
+    "zal_preview_oct"
+   ],
+   "en": "The average analyst target of €35.70 (29 estimates) stood about 46% above the share price in mid-October.",
+   "de": "Das durchschnittliche Analystenziel von 35,70 € (29 Schätzungen) lag Mitte Oktober rund 46 % über dem Aktienkurs."
+  },
+  {
+   "id": "zal_q3_next",
+   "date": "2026-10-13",
+   "kind": "watch",
+   "dir": "neutral",
+   "w": 1,
+   "src": [
+    "zal_preview_oct"
+   ],
+   "en": "Q3 results were due on 3 November, the next catalyst after the period.",
+   "de": "Die Q3-Zahlen waren für den 3. November angekündigt, der nächste Termin nach dem Zeitraum."
+  }
+ ],
+ "events": {
+  "ZAL_Q1_20260506": {
+   "question_en": "Why did Zalando fall against the DAX on a strong-looking Q1?",
+   "question_de": "Warum fiel Zalando trotz scheinbar starker Q1-Zahlen gegenüber dem DAX zurück?",
+   "open_en": "How much each factor weighed is not measurable; sources describe sentiment, not the orders behind the move.",
+   "open_de": "Wie stark jeder Faktor wog, ist nicht messbar; die Quellen beschreiben die Stimmung, nicht die Aufträge hinter der Bewegung.",
+   "headline_en": "Good headline numbers, but nothing above expectations: profit only matched forecasts, the outlook was confirmed rather than raised, most growth came from the ABOUT YOU deal, and worries about AI shopping agents resurfaced.",
+   "headline_de": "Starke Schlagzeilen, aber nichts über den Erwartungen: Der Gewinn traf nur die Prognosen, der Ausblick wurde bestätigt statt angehoben, das Wachstum kam vor allem aus der ABOUT-YOU-Übernahme, und Sorgen um KI-Einkaufsagenten kehrten zurück."
+  },
+  "ZAL_H1_20260804": {
+   "question_en": "Why did Zalando fall so sharply on its H1 results?",
+   "question_de": "Warum fiel Zalando nach den Halbjahreszahlen so stark?",
+   "open_en": "The sources do not separate the guidance effect from the competition worries.",
+   "open_de": "Die Quellen trennen den Effekt der Prognose nicht von den Wettbewerbssorgen.",
+   "headline_en": "The outlook moved to the lower half of the range, at a time of weak consumer spending and pressure from low-price rivals.",
+   "headline_de": "Der Ausblick rutschte in die untere Hälfte der Spanne, in einem Umfeld aus schwachem Konsum und Druck durch Billig-Konkurrenten."
+  }
+ }
+}

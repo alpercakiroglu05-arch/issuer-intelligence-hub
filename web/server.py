@@ -396,6 +396,19 @@ def narrate(body: dict) -> dict:
             "cached": m.get("cached", False), "lang": lang}
 
 
+def intel_api(body: dict) -> dict:
+    """Market-intelligence layer (ai/intel.py): "why" from cited sources + engine figures. {"result": None} when the
+    share has no research pack (only the demo companies have one)."""
+    from ai import intel
+    lang, fresh = body.get("lang", "en"), bool(body.get("fresh"))
+    if body.get("kind") == "period":
+        r = intel.explain_period(body["isin"], body.get("period", "1m"), lang, fresh)
+    else:
+        ev = card_event(body["isin"], body.get("event_id"), None, body.get("day"))
+        r = intel.explain_event(body["isin"], body["day"], (ev or {}).get("event_id"), lang, fresh)
+    return clean({"result": r})
+
+
 def agent(body: dict) -> dict:
     from ai import agent as ag
     out = ag.run(body["question"], body["isin"], history=body.get("history") or [],
@@ -491,7 +504,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"error": "the request body is not valid JSON"}, 400)
         if not isinstance(body, dict):
             return self._json({"error": "the request body must be a JSON object"}, 400)
-        routes = {"/api/narrate": narrate, "/api/ask": ask, "/api/agent": agent, "/api/calendar": calendar}
+        routes = {"/api/narrate": narrate, "/api/ask": ask, "/api/agent": agent, "/api/calendar": calendar, "/api/intel": intel_api}
         if u.path in routes:
             return self._guard(routes[u.path], body)
         self._json({"error": "not found"}, 404)

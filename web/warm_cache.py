@@ -28,6 +28,7 @@ import server
 
 from ai import agent as ag
 from config import EXAMPLE_TICKERS, HERO_TICKERS
+from ai import intel
 from engine import baseline, data, market
 
 
@@ -37,13 +38,13 @@ def hub_period() -> dict:
     return {"period": "ytd", "from": ytd["start_close"], "to": ytd["to"]}
 
 DOCK = {  # the analyst's suggested questions (web/app.js sugg())
-    "dashboard": {"en": ["Has our liquidity improved?", "How do our spreads compare with our sector?",
+    "dashboard": {"en": ["What drove our share in this period?", "Has our liquidity improved?", "How do our spreads compare with our sector?",
                          "What were our biggest moves this year?", "How large an order can the book absorb?"],
-                  "de": ["Hat sich unsere Liquidität verbessert?", "Wie sind unsere Spreads im Sektorvergleich?",
+                  "de": ["Was hat unsere Aktie in diesem Zeitraum bewegt?", "Hat sich unsere Liquidität verbessert?", "Wie sind unsere Spreads im Sektorvergleich?",
                          "Was waren unsere größten Bewegungen dieses Jahr?", "Wie große Orders nimmt das Orderbuch auf?"]},
-    "card": {"en": ["Was this the market, or company-specific?", "Explain this card in two sentences",
+    "card": {"en": ["Why did the market react like this?", "Was this the market, or company-specific?", "Explain this card in two sentences",
                     "How does this rank against similar events?"],
-             "de": ["War das der Markt oder unternehmensspezifisch?", "Erklären Sie diese Karte in zwei Sätzen",
+             "de": ["Warum hat der Markt so reagiert?", "War das der Markt oder unternehmensspezifisch?", "Erklären Sie diese Karte in zwei Sätzen",
                     "Wie ordnet sich das gegenüber ähnlichen Ereignissen ein?"]},
 }
 
@@ -91,6 +92,27 @@ def main(tickers: list[str]) -> int:
                 if m["source"] != "llm":
                     rejected.append(f"{t} {day} {lang}: {m['rejected']}")
                 print(f"{t} {day} {lang} summary: {m['source']}", flush=True)
+        if intel.pack(isin):  # market intelligence (ai/intel.py): event explanations and period summaries
+            ev = data.events()
+            for event_id in intel.available(isin)["events"]:
+                day = str(pd.Timestamp(ev.loc[ev["event_id"] == event_id, "reaction_day"].iloc[0]).date())
+                for lang in ("en", "de"):
+                    r = server.intel_api({"kind": "event", "isin": isin, "day": day, "event_id": event_id, "lang": lang, "fresh": True})["result"]
+                    n += 1
+                    llm += r["source"] == "llm"
+                    if r["source"] != "llm":
+                        rejected.append(f"{t} why {event_id} {lang}: {r['rejected']}")
+                    print(f"{t} {event_id} {lang} why: {r['source']}", flush=True)
+            for p in market.periods():
+                if not p.get("available", True):
+                    continue
+                for lang in ("en", "de"):
+                    r = server.intel_api({"kind": "period", "isin": isin, "period": p["key"], "lang": lang, "fresh": True})["result"]
+                    n += 1
+                    llm += r["source"] == "llm"
+                    if r["source"] != "llm":
+                        rejected.append(f"{t} intel {p['key']} {lang}: {r['rejected']}")
+                    print(f"{t} {p['key']} {lang} market intelligence: {r['source']}", flush=True)
         asks = [({"page": "dashboard", **hub_period()}, DOCK["dashboard"])]
         card = top_card(isin)
         if card:
