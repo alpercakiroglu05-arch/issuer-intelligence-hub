@@ -10,7 +10,7 @@
 - [x] Part A dashboard on real data: turnover, XLM vs index, who trades, unusual days
 - [x] Part B impact card in one click, from an event or a notable day
 - [x] DE/EN summary (template now, LLM once the key is in `.env`) + HTML/PDF IR snapshot
-- [x] `events/events.csv` for the hero stocks, sourced, **with time of day** (80 events incl. the DAX H1 season)
+- [x] `events/events.csv` for the hero stocks, sourced, **with time of day** (82 events incl. the DAX H1 season)
 - [x] Intraday chart and news onset for every event stock (`ingest/build_intraday.py`, 44 stocks)
 - [ ] LLM connected (JAIF endpoint) with numbers check (C4; until then template texts)
 

@@ -32,7 +32,7 @@ cp .env.example .env                                   # optional: add LLM key
 ```bash
 python web/server.py           # demo UI (web front end) -> http://127.0.0.1:8600
 streamlit run app/Home.py      # backup UI / analyst view -> http://localhost:8501
-pytest                         # 205 tests incl. the web API (data tests skip if data/ is empty)
+pytest                         # 225 tests incl. the web API (data tests skip if data/ is empty)
 python web/warm_cache.py       # re-warm the demo caches (summaries + assistant) after any prompt, card or engine change
 ```
 
@@ -49,14 +49,14 @@ python ingest/build_intraday.py                  # ~3 min, every stock in events
 ## Architecture
 
 ```
- Raw DB excerpt (8.9 GB)              events/events.csv (80 sourced events)
+ Raw DB excerpt (8.9 GB)              events/events.csv (82 sourced events)
   XETRA_OHLC · FLOW_DYNAMICS ·                │
   XLM spreads · index_constituents ·          │
   XETRA_ONBOOK_TRADES                         │
           │  ingest/  (run once)              │
           ▼                                   ▼
   data/daily_features.parquet   data/intraday_bars.parquet   data/events.parquet
-  (174 stocks × 213 days)       (1-min bars, 44 event stocks) (80 events + timing, reaction_day)
+  (174 stocks × 213 days)       (1-min bars, 44 event stocks) (82 events + timing, reaction_day)
           └───────────────┬───────────────────┘
                           ▼
   engine/   baseline.py (Part A) · impact.py · onset.py · auctions.py (Part B) · compare.py · xlm.py  ← deterministic
@@ -78,9 +78,9 @@ futury-build-days-2026/
 ├── report/                template.html ✅ · export.py ✅
 ├── web/                   demo UI: server.py · index.html · app.js · app.css (C3)
 ├── app/                   backup UI (Streamlit): Home.py · pages/1_Dashboard · 2_Impact_Card · 3_Compare · 4_Assistant
-├── events/                events.csv (80 sourced events) · sectors.csv (174 stocks, Deutsche Börse sectors)
+├── events/                events.csv (82 sourced events) · sectors.csv (174 stocks, Deutsche Börse sectors)
 ├── docs/                  API_CONTRACT · SUBMISSION (data, model, logic) · REQUIREMENTS (brief → web page) · C2_ENGINE · SCOPE · PITCH · design/
-├── tests/                 205 tests: engine, data, web API over HTTP, PDF export, numbers and meaning check
+├── tests/                 225 tests: engine, data, web API over HTTP, PDF export, numbers and meaning check
 └── data/                  processed files (gitignored)
 ```
 
@@ -96,7 +96,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] News onset (`engine/onset.py`, PR #5): "the market started pricing the news at HH:MM" on the card; infers the timing when the announcement time is unknown; lists volatility interruptions
 - [x] Opening/closing auctions (`engine/auctions.py`, PR #6): volume vs normal and price formation, measured at the exact uncross minute (= 97.6–99.7 % of flow auction turnover)
 - [x] Intraday bars for all 44 stocks in `events.csv` (3.8M bars, ~170 MB; every ISIN of a ticker, FRE and QIA changed ISIN), read per stock with `engine.data.intraday(isin)`. Onset and auction volumes now work for the DAX H1 events too
-- [x] `events/events.csv`: 80 sourced events (the research team could not, so C1 took it over)
+- [x] `events/events.csv`: 82 sourced events (the research team could not, so C1 took it over)
 - [x] `build_intraday.py` without arguments builds every stock in `events.csv` (PR #16)
 - [x] `docs/SUBMISSION.md`: submission text (data, model, logic, validation)
 - [x] Trading cost by order size (`engine/xlm.py`) on the dashboard: XLM €10k–€10m vs peers, largest order the book absorbs
