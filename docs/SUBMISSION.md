@@ -21,7 +21,7 @@ All data is the Deutsche Börse excerpt for **2 Jan – 30 Oct 2026 (213 trading
 | **Xetra Flow Dynamics** | Who traded: agent (client), proprietary and market maker × aggressive / passive / auction × buy / sell, in EUR |
 | **XLM spreads** (`dax_mdax_sdax_liquid_spreads`) | Trading cost (Xetra Liquidity Measure, `Impact_bps`) for order sizes from EUR 10k to 30m; we headline EUR 25k |
 | **Index constituents** | Daily DAX (40) / MDAX (50) / SDAX (70) membership, used as the peer group of each day |
-| **Xetra on-book trades** (1.7 GB, every trade, ns timestamps) | 1-minute bars for the 44 stocks with events: **3.8 million bars**, used for intraday price path, news onset and exact auction volumes |
+| **Xetra on-book trades** (1.7 GB, every trade, ns timestamps) | 1-minute bars for the 44 stocks with events (46 ISINs: Fresenius and Qiagen changed ISIN): **3.8 million bars**, used for intraday price path, news onset and exact auction volumes |
 | **Public sources** (`events/events.csv`) | **80 corporate events**, each with a source link, and the release time when the source shows it |
 
 **Events.** We cover every 2026 event of the four focus stocks: CTS Eventim (EVD, MDAX), Evotec (EVT, SDAX), Heidelberger Druck (HDD, SDAX), and Gerresheimer (GXI) as a pitch story. We also cover the first H1/Q3 publication of **all 40 DAX members**. Two rules apply:
@@ -31,7 +31,7 @@ All data is the Deutsche Börse excerpt for **2 Jan – 30 Oct 2026 (213 trading
 **Not used, and why:**
 - **Eurex open interest:** single-stock options exist for our focus stocks, but the participant split (agent/prop/MM, long/short) is censored for more than 90 % of their series (sample day 25 Mar: EVD has participant data for 2 of 75 series, HDD for 1 of 38). It cannot show small-cap positioning.
 - **Eurex settlement prices, other Eurex data and ETP flows:** these cover derivatives and ETFs, not the issuer's share on Xetra.
-- **Xetra TES:** the brief focuses on order-book trading; see "what else" below.
+- **Xetra TES (off-book):** in the excerpt, but it holds only 4 trades in our 174 index stocks (SAP, EUR 559 in total); the rest are ETF request-for-quote trades. It cannot show block trades in these shares.
 
 **Data pitfalls handled in the ingest:**
 - **Flows:**
@@ -56,7 +56,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 
 ### Part A: the normal state
 - **Headline numbers** are 60-day medians of turnover, XLM (EUR 25k), auction share and agent share, each against the median stock of the same index.
-- **Xetra liquidity category (estimate):** category A if XLM (EUR 25k) ≤ 100 bps and turnover ≥ EUR 2.5m/day over about 4 months (the Designated Sponsor thresholds in the Being Public Guide). Otherwise a Designated Sponsor is needed.
+- **Xetra liquidity category (estimate):** category A if XLM (EUR 25k) ≤ 100 bps and order book turnover ≥ EUR 2.5m a day, both as the daily average of the last four months (Being Public Guide, p. 32). Otherwise category B, which needs a Designated Sponsor for continuous trading. A share without XLM (not a DAX, MDAX or SDAX member in that window) gets no category.
 - **Unusual days:** volume z ≥ 3, |abnormal return z| ≥ 3, or XLM ≥ 2× normal. Possible corporate actions (|return| > 40 %) are excluded. Consecutive unusual days are merged into one episode.
 - **Trading cost by order size:** XLM from €10k to €10m against the peer median, plus the largest order the Xetra book absorbed on most of the last 60 days. This is the live version of the XLM table in Deutsche Börse's monthly Stock Report.
 - **Liquidity trend** ("has our liquidity improved?"): the last 60 trading days against the 60 before, for the stock and for its index, with a ±10 % tolerance.
@@ -91,7 +91,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 - **Meaning check:** a sentence like "the share fell X %" must use the share's own move, not the stock-specific (abnormal) move; otherwise the template is shown. The numbers check alone cannot catch this mix-up, because both numbers are in the card.
 - **IR snapshot:** one click on the card (*Export IR report (PDF)*) gives the card plus its checked summary as a PDF, in DE or EN; the same button on the dashboard gives the Part A report (key figures vs peers, liquidity trend, cost by order size, unusual days).
 
-## 3. Validation (all reproducible, 69 automated tests)
+## 3. Validation (all reproducible, 175 automated tests)
 
 | Check | Result |
 |---|---|
@@ -131,7 +131,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 |---|---|---|
 | Index early warning | See an index exit coming (Gerresheimer left the SDAX on 9 Apr) | Index rules, free-float market cap, ranking lists |
 | Designated Sponsor monitor | Does our DS deliver the quote quality we pay for? | DS identity, quote and spread data per DS |
-| Block trades and placements | How much traded off the order book around an event | Xetra TES (off-book trades) |
+| Block trades and placements | How much traded off the order book around an event | Off-exchange and block trade reports (the Xetra TES excerpt has only 4 small trades in index stocks) |
 | Surprise vs consensus | Separate "the figures" from "the expectations" | Analyst consensus estimates |
 | Shareholder identification | Who sold after the results? | Share register, custody data |
 | Derivatives positioning | Hedging and short build-up before events | Eurex open interest (usable for large caps; censored for most small-cap series) |
@@ -143,6 +143,7 @@ pip install -r requirements.txt
 python ingest/build_daily.py <raw> data        # ~25 s
 python ingest/build_events.py
 python ingest/build_intraday.py                # ~3 min, every stock in events.csv
-streamlit run app/Home.py                      # http://localhost:8501
-pytest                                         # 69 tests
+python web/server.py                           # demo UI: http://127.0.0.1:8600
+streamlit run app/Home.py                      # backup UI: http://localhost:8501
+pytest                                         # 175 tests
 ```

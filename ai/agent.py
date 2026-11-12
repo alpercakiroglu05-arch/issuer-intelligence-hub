@@ -141,6 +141,7 @@ def company_overview(isin: str) -> dict:
         "median_auction_share": k["median_auction_share"], "median_agent_share": k["median_agent_share"],
         "xetra_liquidity_category_estimate": k["liquidity_check"]["category_estimate"],
         "avg_turnover_eur_4m": k["liquidity_check"]["avg_turnover_eur_4m"],
+        "avg_xlm_25k_bps_4m": k["liquidity_check"]["avg_xlm_25k_bps_4m"],
         "median_xlm_25k_bps_4m": k["liquidity_check"]["median_xlm_25k_bps_4m"],
         "liquidity_trend": {x: lt.get(x) for x in ("verdict", "summary", "xlm_25k_change_pct", "turnover_change_pct",
                                                      "index_xlm_25k_change_pct", "index_turnover_change_pct")},
@@ -697,8 +698,8 @@ def fallback(question: str, isin: str, context=None, lang: str = "en") -> dict:
         if de:
             v = {"improved": "verbessert", "worsened": "verschlechtert", "mixed": "gemischt", "stable": "stabil"}.get(lt["verdict"], "offen")
             text = (f"Liquidität {v}: Handelskosten {_pc(lt['xlm_25k_change_pct'], True)}, Umsatz {_pc(lt['turnover_change_pct'], True)} "
-                    f"(letzte 60 vs. vorherige 60 Handelstage). Xetra-Kategorie (Schätzung): {o['xetra_liquidity_category_estimate']}.")
+                    f"(letzte 60 vs. vorherige 60 Handelstage). Xetra-Kategorie (Schätzung): {o['xetra_liquidity_category_estimate'] or 'nicht bestimmbar (kein XLM)'}.")
         else:
-            text = lt["summary"] + f" Xetra liquidity category (estimate): {o['xetra_liquidity_category_estimate']}."
+            text = lt["summary"] + f" Xetra liquidity category (estimate): {o['xetra_liquidity_category_estimate'] or 'not available (no XLM)'}."
     return {"text": text, "source": "template", "model": None, "steps": steps, "actions": actions,
             "check": _check(text, outputs, question, context)}

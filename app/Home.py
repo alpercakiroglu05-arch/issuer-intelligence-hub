@@ -20,7 +20,7 @@ c = st.columns(4)
 c[0].metric("Stock", f"{k['ticker']} ({k['index']})")
 c[1].metric("Median daily turnover (60d)", eur(k["median_turnover_eur"]["stock"]),
             f"index median {eur(k['median_turnover_eur']['index_median'])}", delta_color="off")
-c[2].metric("Liquidity category (est.)", k["liquidity_check"]["category_estimate"])
+c[2].metric("Liquidity category (est.)", k["liquidity_check"]["category_estimate"] or "n/a")
 c[3].metric("Unusual days (60d)", k["anomaly_days_last_period"])
 
 st.divider()

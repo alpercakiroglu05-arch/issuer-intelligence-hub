@@ -268,3 +268,21 @@ def test_expiry_moves_to_previous_trading_day_on_holiday(monkeypatch):
         assert not any("month_end_review" in f for f in cal.values())   # no Feb/May/Aug/Nov in range
     finally:
         b._calendar_context.cache_clear()
+
+
+@needs_data
+def test_liquidity_category_follows_the_guide_and_is_unknown_without_xlm():
+    """Being Public Guide p. 32: daily average of the last four months. Gerresheimer left the SDAX on 9 Apr, so
+    it has no XLM in that window: the category is unknown, not "B" (it trades EUR 4.8m a day)."""
+    from config import DS_LOOKBACK_DAYS
+    from engine.baseline import kpis, liquidity_trend
+    from engine.data import isin_of, stock
+    gxi = kpis(isin_of("GXI"))["liquidity_check"]
+    assert gxi["category_estimate"] is None and gxi["xlm_days_4m"] == 0 and gxi["avg_xlm_25k_bps_4m"] is None
+    assert "cannot be estimated" in gxi["note"] and gxi["avg_turnover_eur_4m"] > 2.5e6
+    assert liquidity_trend(isin_of("GXI"))["ds_category"]["now"] is None
+    hdd = kpis(isin_of("HDD"))["liquidity_check"]
+    look = stock(isin_of("HDD")).tail(DS_LOOKBACK_DAYS)
+    assert hdd["avg_xlm_25k_bps_4m"] == pytest.approx(look["xlm_25k"].mean()) and hdd["xlm_days_4m"] == DS_LOOKBACK_DAYS
+    assert hdd["category_estimate"] == "B" and kpis(isin_of("EVD"))["liquidity_check"]["category_estimate"] == "A"
+
