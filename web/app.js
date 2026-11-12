@@ -10,7 +10,7 @@ const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const S = {lang: "en", uni: [], st: null, isin: null, iss: null, route: "overview", day: null, ev: null, metric: "price", tab: "summary",
   period: "ytd", dash: {}, dashNow: null,
   cards: {}, briefs: {}, ai: {}, tested: {}, cmp: {type: null, index: null, data: null, key: null}, chat: [], busy: false,
-  rep: {perf: true, profile: true, peers: true, liq: true, anom: true, card: true, words: true, key: null}, cal: null, addOpen: false};
+  rep: {perf: true, profile: true, peers: true, liq: true, anom: true, card: true, words: true, key: null}};
 const de = () => S.lang === "de", L = (en, d) => de() ? d : en;
 const NA = "–", isN = v => typeof v === "number" && !Number.isNaN(v) && v !== null;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -66,7 +66,6 @@ const keyOf = (isin, day, ev) => `${isin}|${day}|${ev || ""}`;
 /* ============================== own calendar (stored in this browser) ============================== */
 const UEV = "iih.userEvents";   /* same key as the previous UI, so dates added there stay */
 function userEvents(isin) { try { return (JSON.parse(localStorage.getItem(UEV) || "{}")[isin]) || []; } catch (e) { return (S._uev || {})[isin] || []; } }
-function saveUserEvents(isin, list) { S._uev = S._uev || {}; S._uev[isin] = list; try { const a = JSON.parse(localStorage.getItem(UEV) || "{}"); a[isin] = list; localStorage.setItem(UEV, JSON.stringify(a)); return true; } catch (e) { return false; } }
 function mergeUserEvents() { const own = userEvents(S.isin).map(e => ({...e, user: true})), ids = new Set(S.iss.events.map(e => e.event_id)); S.iss.events = S.iss.events.filter(e => !e.user).concat(own.filter(e => !ids.has(e.event_id))); }
 function cardURL(isin, day, ev, path = "/api/card") {
   let u = `${path}?isin=${isin}&day=${day}${ev ? `&event_id=${enc(ev)}` : ""}`;
@@ -91,7 +90,7 @@ async function loadIssuer(isin) {
   progress(true);
   try {
     const iss = await api(`/api/issuer?isin=${isin}`);
-    if (S.isin !== isin) { S.chat = []; S.rep.key = null; S.cal = null; S.addOpen = false; S.cmp = {type: null, index: null, data: null, key: null}; }
+    if (S.isin !== isin) { S.chat = []; S.rep.key = null; S.cmp = {type: null, index: null, data: null, key: null}; }
     S.dashNow = await loadDash(isin, S.period);
     S.isin = isin; S.iss = iss; mergeUserEvents();
     try { localStorage.setItem("iih.isin", isin); } catch (e) { /* ignore */ }
@@ -155,7 +154,7 @@ function render(stat = false) {
   $("#co").setAttribute("aria-label", L("Search shares", "Aktien suchen"));
   $$(".lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === S.lang));
   $(".ask-btn span").textContent = L("Ask", "Fragen");
-  $("#foot").innerHTML = (S.st.offline ? L("<b>Offline copy</b> of the showcase companies: saved answers, no free questions and no calendar import. ", "<b>Offline-Kopie</b> der Beispielunternehmen: gespeicherte Antworten, keine freien Fragen und kein Kalenderimport. ") : "") + L(`Xetra data to the close on ${dY(S.st.last_date)} · ${S.uni.length} DAX, MDAX and SDAX shares · minute data for ${S.st.intraday_stocks} · ${S.st.llm ? "AI connected" : "AI in template mode"}. Numbers come from the engine; words from the model, with every figure checked. Causes come only from the verified calendar. Concept prototype, not an official Deutsche Börse product. Not investment advice.`,
+  $("#foot").innerHTML = (S.st.offline ? L("<b>Offline copy</b> of the showcase companies: saved answers, no free questions. ", "<b>Offline-Kopie</b> der Beispielunternehmen: gespeicherte Antworten, keine freien Fragen. ") : "") + L(`Xetra data to the close on ${dY(S.st.last_date)} · ${S.uni.length} DAX, MDAX and SDAX shares · minute data for ${S.st.intraday_stocks} · ${S.st.llm ? "AI connected" : "AI in template mode"}. Numbers come from the engine; words from the model, with every figure checked. Causes come only from the verified calendar. Concept prototype, not an official Deutsche Börse product. Not investment advice.`,
     `Xetra-Daten bis Handelsschluss ${dY(S.st.last_date)} · ${S.uni.length} DAX-, MDAX- und SDAX-Aktien · Minutendaten für ${S.st.intraday_stocks} · ${S.st.llm ? "KI verbunden" : "KI im Vorlagenmodus"}. Zahlen aus der Engine; Texte vom Modell, jede Zahl geprüft. Ursachen nur aus dem geprüften Kalender. Konzept-Prototyp, kein offizielles Produkt der Deutschen Börse. Keine Anlageberatung.`);
   $("#main").innerHTML = `<div class="view ${stat ? "static" : ""}">${({overview: vOverview, events: vEvents, event: vEvent, compare: vCompare, report: vReport, ideas: vIdeas})[S.route]()}</div>`;
   after();
@@ -371,35 +370,18 @@ function rows(list) {
     <span class="a ${(r.abn || 0) < 0 ? "dn" : "up"} num">${pct(r.abn)}</span><span class="xr num">${X(r.vol)}</span><span class="golbl">${L("Impact card", "Impact Card")} ${CHEV}</span></button>`).join("")}</div>`;
 }
 function vEvents() {
-  const off = S.st.offline, all = timeline(), ann = all.filter(r => r.type), un = all.filter(r => !r.type), m = S.iss.meta;
+  const all = timeline(), ann = all.filter(r => r.type), un = all.filter(r => !r.type), m = S.iss.meta;
   return `<section class="wrap hero"><div class="eyebrow rv">${esc(nice(U(S.isin)))} · ${L("Events", "Ereignisse")}</div><h1 class="h-hero rv" style="--d:.05s">${L("Impact cards", "Impact Cards")}</h1>
     <p class="lede rv" style="--d:.1s">${L("Every announcement and every unusual trading day has an impact card: how the share reacted against its own normal and its peers. Choose one below, or create a card for any trading day.", "Jede Meldung und jeder auffällige Handelstag hat eine Impact Card: wie die Aktie gegenüber ihrem Normalzustand und ihren Peers reagierte. Unten auswählen oder eine Karte für jeden Handelstag erstellen.")}</p>
     <form class="card mkcard rv" id="anyday" style="--d:.15s" autocomplete="off"><div><b>${L("Create an impact card for any day", "Impact Card für einen beliebigen Tag")}</b><p class="note" style="margin-top:2px">${L(`Any trading day from ${dY(m.first_date)} to ${dY(m.last_date)}. A weekend or holiday opens the next trading day.`, `Jeder Handelstag vom ${dY(m.first_date)} bis ${dY(m.last_date)}. Ein Wochenende oder Feiertag öffnet den nächsten Handelstag.`)}</p></div>
       <div class="mkrow"><input type="date" id="anyday-d" min="${m.first_date}" max="${m.last_date}" required aria-label="${L("Trading day", "Handelstag")}"><button class="btn sm">${L("Create impact card", "Impact Card erstellen")}</button></div></form>
-    ${off ? "" : `<div class="rv" style="--d:.2s;margin-top:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ghost sm" data-act="add">${L("Add a date from your calendar", "Datum aus Ihrem Kalender")}</button><label class="btn ghost sm" style="cursor:pointer">${L("Import calendar (CSV, ICS)", "Kalender importieren (CSV, ICS)")}<input type="file" id="calfile" accept=".csv,.ics,.txt" hidden></label></div>`}
-    ${S.addOpen ? addForm() : ""}${calPreview()}</section>
+    </section>
   <section class="wrap" style="margin-top:44px"><div class="sec-head"><h2 class="h-sec rv">${L("Announcements", "Meldungen")} <span class="cnt">${ann.length}</span></h2></div>
-    ${ann.length ? rows(ann) : `<div class="card lead-empty">${L("No calendar entries for this share yet. Add a date or import your calendar above.", "Noch keine Kalendereinträge für diese Aktie. Oben ein Datum hinzufügen oder den Kalender importieren.")}</div>`}</section>
+    ${ann.length ? rows(ann) : `<div class="card lead-empty">${L("No researched calendar entries for this share yet. Create a card for any day above.", "Noch keine recherchierten Kalendereinträge für diese Aktie. Oben eine Karte für einen beliebigen Tag erstellen.")}</div>`}</section>
   <section class="wrap" style="margin-top:44px"><div class="sec-head"><h2 class="h-sec rv">${L("Unusual days without a calendar entry", "Auffällige Tage ohne Kalendereintrag")} <span class="cnt">${un.length}</span></h2></div>
     ${un.length ? rows(un) : `<div class="card lead-empty">${L("None in 2026.", "Keine in 2026.")}</div>`}
     <p class="note">${L("Each row: stock-specific move · turnover vs normal (median of trading days t−65 to t−6). The data shows that something happened, not why.", "Je Zeile: titelspezifische Bewegung · Umsatz vs. normal (Median der Handelstage t−65 bis t−6). Die Daten zeigen, dass etwas passiert ist, nicht warum.")}</p></section>`;
 }
-const EVTYPES = ["FY", "Q1", "H1", "Q3", "ADHOC", "GUIDANCE", "DIVIDEND_EX", "AGM", "CMD", "MA", "OTHER"];
-function addForm() {
-  const m = S.iss.meta;
-  return `<div class="card" style="margin-top:20px"><b>${L("Add a date", "Datum hinzufügen")}</b><p class="note" style="margin-top:4px">${L("The time decides the reaction day: after the 17:35 closing auction it is the next trading day.", "Die Uhrzeit bestimmt den Reaktionstag: nach der Schlussauktion um 17:35 ist es der nächste Handelstag.")}</p>
-    <form class="form" id="addf"><input type="date" id="f-d" min="${m.first_date}" max="${m.last_date}" required aria-label="${L("Date", "Datum")}"><input type="time" id="f-t" aria-label="${L("Time", "Uhrzeit")}">
-    <select class="sel" id="f-y" aria-label="${L("Type", "Typ")}">${EVTYPES.map(t => `<option value="${t}">${TYPE(t)}</option>`).join("")}</select><input type="text" id="f-n" maxlength="160" placeholder="${L("Title, e.g. Q3 trading statement", "Titel, z. B. Q3-Mitteilung")}"><button class="btn sm">${L("Build impact card", "Impact Card erstellen")}</button></form></div>`;
-}
-function calPreview() {
-  const c = S.cal; if (!c) return "";
-  if (c.error) return `<div class="card prev" style="margin-top:20px"><b>${esc(c.file)}</b><p class="dn">${esc(c.error)}</p><button class="btn ghost sm" data-act="calx">${L("Close", "Schließen")}</button></div>`;
-  const ok = c.rows.filter(r => r.status === "matched"), ST = st => ({matched: L("matched", "zugeordnet"), before_data: L("before the data", "vor Datenbeginn"), after_data: L("after the data", "nach Datenende"), invalid: L("skipped", "übersprungen")}[st] || st);
-  return `<div class="card prev" style="margin-top:20px"><b>${L("Preview", "Vorschau")} · ${esc(c.file)}</b><p class="note" style="margin-top:4px">${L(`${ok.length} of ${c.rows.length} entries match a trading day. Nothing is saved until you confirm.`, `${ok.length} von ${c.rows.length} Einträgen passen zu einem Handelstag. Gespeichert wird erst nach Bestätigung.`)}</p>
-    <ol>${c.rows.map(r => `<li><span class="st ${r.status === "matched" ? "matched" : "other"}">${ST(r.status)}</span><span><b>${/^\d{4}-\d{2}-\d{2}$/.test(r.date || "") ? dY(r.date) : esc(r.date || "?")}${r.time_local || r.time ? " " + esc(r.time_local || r.time) : ""}</b> ${esc(String(r.title || "").slice(0, 70))}${r.status === "matched" ? `<br><small class="muted">→ ${L("reaction", "Reaktion")} ${dS(r.reaction_day)} · ${esc(r.rule || "")}${r.note ? " · " + esc(r.note) : ""}</small>` : r.note ? `<br><small class="muted">${esc(r.note)}</small>` : ""}</span></li>`).join("")}</ol>
-    <div style="display:flex;gap:10px">${ok.length ? `<button class="btn sm" data-act="calok">${L(`Add ${ok.length} events`, `${ok.length} Ereignisse hinzufügen`)}</button>` : ""}<button class="btn ghost sm" data-act="calx">${L("Cancel", "Abbrechen")}</button></div></div>`;
-}
-
 /* ---------- impact card ---------- */
 function vEvent() {
   const r = timeline().find(x => x.day === S.day && (x.ev || "") === (S.ev || "")) || timeline().find(x => x.day === S.day) || {day: S.day, abn: null, vol: null, title: L("Trading day", "Handelstag")};
@@ -704,62 +686,6 @@ function themeBtn() {
 }
 function setLang(l) { S.lang = l; try { localStorage.setItem("iih.lang", l); } catch (e) { /* ignore */ } render(true); }
 
-/* ============================== calendar import (CSV / ICS) ============================== */
-const guessType = t => { t = String(t).toLowerCase(); return /hauptversammlung|agm|annual general/.test(t) ? "AGM" : /dividend|ex-tag/.test(t) ? "DIVIDEND_EX" : /\bq1\b|first quarter|1\. quartal/.test(t) ? "Q1" : /\bh1\b|half|halbjahr/.test(t) ? "H1" : /\bq3\b|third quarter|9m|nine months|9 monate/.test(t) ? "Q3" : /annual|full.year|geschäftsjahr|fy\b|jahresergebnis/.test(t) ? "FY" : /ad.hoc/.test(t) ? "ADHOC" : /guidance|prognose|outlook/.test(t) ? "GUIDANCE" : /capital markets day|kapitalmarkttag|cmd\b/.test(t) ? "CMD" : "OTHER"; };
-function csvRows(text) {
-  const first = text.split(/\r?\n/)[0] || "", sep = [";", "\t", ","].sort((a, b) => first.split(b).length - first.split(a).length)[0];
-  const out = []; let row = [], cell = "", q = false;
-  for (let i = 0; i < text.length; i++) { const ch = text[i];
-    if (q) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') q = false; else cell += ch; }
-    else if (ch === '"') q = true; else if (ch === sep) { row.push(cell.trim()); cell = ""; }
-    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell.trim()); cell = ""; if (row.some(c => c)) out.push(row); row = []; } else cell += ch; }
-  row.push(cell.trim()); if (row.some(c => c)) out.push(row); return out;
-}
-function zoneToBerlin(date, time, tz) {
-  const fmt = (z, ms) => Object.fromEntries(new Intl.DateTimeFormat("en-GB", {timeZone: z, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"}).formatToParts(new Date(ms)).map(x => [x.type, x.value]));
-  const want = Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10), +time.slice(0, 2), +time.slice(3, 5)); let ms = want;
-  for (let k = 0; k < 2; k++) { const p = fmt(tz, ms); ms += want - Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute); }
-  const b = fmt("Europe/Berlin", ms); return [`${b.year}-${b.month}-${b.day}`, `${b.hour}:${b.minute}`];
-}
-function parseCalendar(text) {
-  const out = [];
-  if (/BEGIN:VEVENT/.test(text)) {
-    text.replace(/\r?\n[ \t]/g, "").split("BEGIN:VEVENT").slice(1).forEach(b => {
-      const line = b.match(/^DTSTART([^:\r\n]*):([^\r\n]+)/m) || [], sum = ((b.match(/^SUMMARY[^:]*:(.*)$/m) || [])[1] || "").trim().replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\n/gi, " ");
-      const v = (line[2] || "").trim(), m = v.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})\d{0,2}(Z)?)?$/);
-      if (!m) { out.push({date: "", time: "", type: guessType(sum), title: sum, issue: L("no readable DTSTART", "kein lesbares DTSTART")}); return; }
-      let date = `${m[1]}-${m[2]}-${m[3]}`, time = m[4] ? `${m[4]}:${m[5]}` : "", note = ""; const tz = ((line[1] || "").match(/TZID=([^;:]+)/) || [])[1];
-      try { if (time && m[6]) [date, time] = zoneToBerlin(date, time, "UTC"); else if (time && tz && tz !== "Europe/Berlin") { [date, time] = zoneToBerlin(date, time, tz.replace(/"/g, "")); note = L(`converted from ${tz}`, `umgerechnet aus ${tz}`); } else if (time && !tz) note = L("no time zone: read as Berlin time", "keine Zeitzone: als Berliner Zeit gelesen"); }
-      catch (e) { note = L(`unknown time zone ${tz}: read as Berlin time`, `unbekannte Zeitzone ${tz}: als Berliner Zeit gelesen`); }
-      out.push({date, time, type: guessType(sum), title: sum, note}); });
-    return out;
-  }
-  const rs = csvRows(text); if (!rs.length) return out;
-  const head = rs[0].map(h => h.toLowerCase()), has = head.some(h => ["date", "datum"].includes(h)), ix = ks => head.findIndex(h => ks.includes(h));
-  const iD = has ? ix(["date", "datum"]) : 0, iT = has ? ix(["time", "zeit", "uhrzeit"]) : 1, iY = has ? ix(["type", "typ", "art"]) : 2, iN = has ? ix(["title", "titel", "event", "name", "ereignis", "beschreibung"]) : 3;
-  rs.slice(has ? 1 : 0).forEach(c => {
-    let d = c[iD] || ""; const g = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/); if (g) d = `${g[3]}-${g[2].padStart(2, "0")}-${g[1].padStart(2, "0")}`;
-    const title = iN >= 0 ? c[iN] || "" : "", ty = iY >= 0 ? (c[iY] || "").toUpperCase() : ""; let time = iT >= 0 ? (c[iT] || "").replace(".", ":") : ""; if (/^\d:\d\d$/.test(time)) time = "0" + time;
-    const row = {date: d.slice(0, 10), time: /^\d\d:\d\d/.test(time) ? time.slice(0, 5) : "", type: EVTYPES.includes(ty) ? ty : guessType(title), title};
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date) || isNaN(Date.parse(row.date))) row.issue = L(`date “${c[iD] || ""}” not readable: use YYYY-MM-DD or DD.MM.YYYY`, `Datum „${c[iD] || ""}“ nicht lesbar: JJJJ-MM-TT oder TT.MM.JJJJ`);
-    else if (time && !row.time) row.note = L(`time “${time}” ignored`, `Uhrzeit „${time}“ ignoriert`);
-    out.push(row); });
-  return out;
-}
-async function importCalendar(file) {
-  let evs; try { evs = parseCalendar(await file.text()); } catch (e) { evs = []; }
-  if (!evs.length) { S.cal = {file: file.name, error: L("No events found. Expected a CSV with date,time,type,title (header optional) or an .ics calendar.", "Keine Ereignisse gefunden. Erwartet: CSV mit date,time,type,title (Kopfzeile optional) oder eine .ics-Datei."), rows: []}; render(true); return; }
-  const ok = evs.filter(e => !e.issue); let matched = [];
-  if (ok.length) { try { matched = (await post("/api/calendar", {isin: S.isin, events: ok})).events; } catch (e) { S.cal = {file: file.name, error: L("Matching failed: ", "Zuordnung fehlgeschlagen: ") + e.message, rows: []}; render(true); return; } }
-  let k = 0; S.cal = {file: file.name, rows: evs.map(e => e.issue ? {...e, status: "invalid", note: e.issue} : {...matched[k++], note: [e.note, matched[k - 1] && matched[k - 1].note].filter(Boolean).join("; ")})}; S.addOpen = false; render(true);
-}
-function commitEvents(ok) {
-  const saved = saveUserEvents(S.isin, userEvents(S.isin).filter(e => !ok.some(n => n.event_id === e.event_id)).concat(ok));
-  mergeUserEvents(); S.cal = null; S.addOpen = false;
-  toast(L(`${ok.length} event(s) added${saved ? "" : " for this session only"}`, `${ok.length} Ereignis(se) hinzugefügt${saved ? "" : " nur für diese Sitzung"}`));
-  if (ok.length) { const e = ok[ok.length - 1]; openEvent(S.isin, e.reaction_day, e.event_id); } else render(true);
-}
-
 /* ============================== events ============================== */
 document.addEventListener("click", ev => {
   if (ev.target.closest("#theme")) { setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"); return; }
@@ -786,13 +712,9 @@ document.addEventListener("click", ev => {
   else if (a === "cmpidx") { S.cmp.index = t.dataset.index; $("#cmpbody").innerHTML = `<div class="skel" style="height:420px"></div>`; fillCompare(); }
   else if (a === "cmpthis") { S.cmp.type = t.dataset.type; S.cmp.index = ["DAX", "MDAX", "SDAX"].includes(t.dataset.index) ? t.dataset.index : "ALL"; S.cmp.data = null; go("compare"); }
   else if (a === "print") print();
-  else if (a === "add") { S.addOpen = !S.addOpen; S.cal = null; render(true); }
-  else if (a === "calok") commitEvents(S.cal.rows.filter(r => r.status === "matched"));
-  else if (a === "calx") { S.cal = null; render(true); }
 });
 document.addEventListener("change", ev => {
   const el = ev.target;
-  if (el.id === "calfile" && el.files[0]) { importCalendar(el.files[0]); el.value = ""; return; }
   if (el.dataset.cmp) { S.cmp[el.dataset.cmp] = el.value; $("#cmpbody").innerHTML = `<div class="skel" style="height:420px"></div>`; fillCompare(); return; }
   const k = el.dataset.rep; if (!k) return;
   if (k === "key") { S.rep.key = el.value; render(true); return; }
@@ -812,9 +734,6 @@ document.addEventListener("submit", async ev => {
     if (day !== want) toast(L(`${dL(want)} was not a trading day: showing ${dL(day)}.`, `${dL(want)} war kein Handelstag: ${dL(day)} wird gezeigt.`));
     const r = timeline().find(x => x.day === day); openEvent(S.isin, day, r ? r.ev : null); return;
   }
-  if (f.id === "addf") {
-    try { const r = await post("/api/calendar", {isin: S.isin, events: [{date: $("#f-d").value, time: $("#f-t").value, type: $("#f-y").value, title: $("#f-n").value}]}), e = r.events[0];
-      if (!e || e.status !== "matched") { toast(e ? (e.note || e.status) : L("Not added", "Nicht hinzugefügt")); return; } commitEvents([e]); } catch (err) { toast(err.message); } }
 });
 document.addEventListener("input", ev => { if (ev.target.id === "palq") { PL.sel = 0; palList(); } });
 document.addEventListener("keydown", ev => {

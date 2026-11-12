@@ -113,7 +113,7 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 
 ### C3 · Frontend. Owner: Alper
 - [x] **Web front end** (`web/`, PR #27; Windows/NaN fixes in #30): the **demo UI**. Issuer Services look, ISIN entry, dashboard (volume, spread, auctions over time; peers; liquidity verdict; cost by order size; unusual days), impact card (minute chart with onset, auctions, who traded, aftershocks, AI summary with numbers check), compare, report (Part A + B, DE/EN) and ideas. Every brief item has one page (`docs/REQUIREMENTS.md`)
-- [x] IR analyst dock on every page, own calendar (add event, CSV/ICS import; brief VI), market context in *Unusual days*, cost by order size (PR #36)
+- [x] IR analyst dock on every page, impact cards for every calendar event and any trading day (brief VI), market context in *Unusual days*, cost by order size (PR #36)
 - [x] **One-click PDF** on every impact card and on the dashboard (`/api/export`, PR #41)
 - [x] Streamlit (`app/`, backup UI): liquidity trend, episodes with events and market context, Compare with Index / Sector / Size, cost by order size, Part A report button (PRs #19–#29)
 

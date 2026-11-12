@@ -140,7 +140,7 @@ Done on `main`:
   **After ANY prompt, card or engine change run `python web/warm_cache.py`** (~4 min).
 - **Web (`web/`) = demo UI:** share search, overview (1M/3M/YTD), dashboard (trading over time, peers, liquidity trend, cost by order
   size, unusual days with calendar and market context), impact card, compare, report, ideas, IR analyst dock.
-  Own calendar (brief VI): add an event or import CSV/ICS on the card page (`/api/calendar`, #36).
+  Brief VI: the ingested event calendar (events.csv) on the Events page "Impact cards"; the calendar upload UI was removed (`/api/calendar` stays).
   **One-click PDF** (#41): *Export IR report (PDF)* on every card (snapshot + checked summary) and on the
   dashboard (Part A), DE/EN.
 - **Streamlit (`app/`) = backup and analyst view.** Deleted by a direct push to main (2bd0c3c), restored in #39.

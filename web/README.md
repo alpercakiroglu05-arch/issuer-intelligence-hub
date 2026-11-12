@@ -65,12 +65,12 @@ next. Below it, IR can **test an explanation** before telling the board ("it was
 and gets a verdict (supported / contradicted / partly / not testable with this data) plus a more defensible wording.
 No language model is involved, so it also works offline; the assistant uses the same check (`check_explanation`).
 
-### Own calendar import
+### Impact cards (Events page)
 
-CSV (quoted fields, `;` `,` or tab, EN/DE headers, `YYYY-MM-DD` or `DD.MM.YYYY`) or ICS (UTC, `TZID` converted to
-Berlin time, floating times read as Berlin time). The import shows a **preview** first: every row with its status
-(matched → reaction day and the rule used; before / after the data; skipped with the reason). Nothing is saved until the
-user confirms; if browser storage is blocked the events are kept for the session and the message says so.
+Every calendar event (`events/events.csv`, researched with sources, matched to the reaction day) and every unusual day
+without an entry is listed with its impact card, and "Create an impact card for any day" builds one for any trading day of
+the data (a weekend or holiday opens the next trading day). `POST /api/calendar` (match your own dates to trading days)
+stays in the API; the UI no longer offers a calendar upload.
 
 ## Offline copy to share
 
@@ -80,7 +80,7 @@ python web/snapshot.py          # -> ~/Desktop/Issuer-Intelligence-Hub.html (EVD
 
 One HTML file that opens with a double click, without Python or `data/`. It contains the answers for the showcase shares
 (dashboards, every impact card with its evidence brief, comparisons, AI summaries, the analyst's suggested questions).
-The page marks itself as an offline copy; typed questions and the calendar import are disabled with an explanation,
+The page marks itself as an offline copy; typed questions are disabled with an explanation,
 the explanation check works. `--llm` writes the AI texts
 with the model in `.env`. It contains processed Deutsche Börse data: share it inside the team only, never commit it.
 
