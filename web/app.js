@@ -541,7 +541,7 @@ function afterChart(d) {
 
 /* ---------- evidence brief + explanation check (engine/evidence.py): deterministic, works offline ---------- */
 const VERD = v => ({supported: [L("Supported by the data", "Von den Daten gestützt"), "ok", "✓"], contradicted: [L("Contradicted by the data", "Von den Daten widerlegt"), "no", "✕"],
-  partly: [L("Partly supported", "Teilweise gestützt"), "part", "◐"], not_testable: [L("Not testable with this data", "Mit diesen Daten nicht prüfbar"), "na", "?"]}[v] || [v, "na", "?"]);
+  partly: [L("Partly supported", "Teilweise gestützt"), "part", "◐"], no_evidence: [L("No sign in the data", "In den Daten nicht erkennbar"), "na", "–"], not_testable: [L("Not testable with this data", "Mit diesen Daten nicht prüfbar"), "na", "?"]}[v] || [v, "na", "?"]);
 /* which checks a free-text explanation touches (EN/DE keywords); the checks themselves run on the engine's figures */
 const CLAIM_RX = {
   market: /\b(whole|overall|broad|general|entire) market|market[- ](sell-?off|fell|fall|drop|decline|weak|was down|rout|turmoil)|it was the market|was (this|it) (just )?the market|war das (nur )?der markt|sector|industry|macro|interest rate|peers (fell|dropped|were down)|everyone|all stocks|gesamtmarkt|marktschwäche|markt (fiel|brach|war schwach)|sektor|branche|konjunktur|zinsen|lag am markt/i,

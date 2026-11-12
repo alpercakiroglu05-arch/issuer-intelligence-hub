@@ -42,7 +42,7 @@ Jury criteria: **Idea, Execution, Relevance, Pitch.** Prize: a ticket to DB's ca
 
 ```bash
 pip install -r requirements.txt
-python web/server.py                      # demo UI (web front end, C3): http://127.0.0.1:8600
+python web/server.py                      # demo UI (web/hub, C3): http://127.0.0.1:8600 (previous UI: /index.html)
 streamlit run app/Home.py                 # backup UI and analyst view: http://localhost:8501
 pytest                                    # 146 tests (incl. web API); data tests skip if data/ is empty
 python web/warm_cache.py                  # re-warm the demo caches (summaries + assistant) after ANY prompt, card or engine change
