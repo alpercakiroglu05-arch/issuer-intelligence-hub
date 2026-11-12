@@ -12,7 +12,7 @@ import re
 
 from ai import llm
 from ai.checks import meaning_errors, unsupported_numbers
-from report.fmt import formatters, group_label
+from report.fmt import formatters, group_label, normalize_en
 
 SYSTEM = """You are an investor-relations analyst writing for the IR team of a listed company.
 You receive ONE JSON object with pre-computed trading statistics for one event day.
@@ -36,10 +36,10 @@ Write 4-5 short sentences in {language}:
 6) if comparison is set: how this event ranks among comparable events (percentiles, group size); write the rank
    exactly as 'rank <rank_abs_abn_ret> of <rank_of> (incl. this day)' (German: 'Rang <r> von <rank_of> (inkl. dieses Tages)').
 Rules: use ONLY numbers that appear in the JSON. You may round them, write a share as a percent
-(0.939 -> 93.9 %) and EUR amounts in millions (14521000 -> EUR 14.5m). NEVER compute a new number:
+(0.939 -> 93.9%) and EUR amounts in millions (14521000 -> €14.5m). NEVER compute a new number:
 no differences, sums or averages, and no complements such as 'top 6 %' from a 0.939 percentile;
 write 'bigger than 93 % of them' instead. Never invent causes; no investment advice; no predictions;
-plain factual tone. Ratios: 'x times normal'."""
+plain factual tone. English number style: '−23.2%', '€25k', '€4.6m', '8.6× normal'."""
 
 LANG = {"en": "English", "de": "German"}
 
@@ -69,6 +69,8 @@ def narrate_with_meta(card: dict, lang: str = "en", fresh: bool = False) -> dict
         if re.search(r"\bspreads?\b", text, flags=re.I):  # XLM is a round-trip trading cost, not the bid-ask spread
             bad.append("'spread' used for the XLM trading cost")
         if text and not bad:
+            if lang != "de":
+                text = normalize_en(text)   # house style; the numbers stay the same (checked above)
             return {"text": text, "source": "llm", "model": llm.model_name(), "rejected": [],
                     "cached": bool(getattr(msg, "cached", False))}
         meta["rejected"] = bad
@@ -110,16 +112,16 @@ def template_narrative(card: dict, lang: str = "en") -> str:
         return t
     t = (f"{card['name']} moved {_p(p['ret'])} on {card['event']['reaction_day']} while its {card['index']} peers "
          f"moved {_p(p['peer_ret'])} (stock-specific: {_p(p['abn_ret'])}). "
-         f"Turnover was {(v['ratio'] or 0):.1f}x its normal level. ")
+         f"Turnover was {(v['ratio'] or 0):.1f}× its normal level. ")
     if l["ratio"]:
-        t += f"Trading cost (XLM 25k) was {l['xlm_25k_bps']:.0f} bps ({l['ratio']:.1f}x normal). "
+        t += f"Trading cost (XLM 25k) was {l['xlm_25k_bps']:.0f} bps ({l['ratio']:.1f}× normal). "
     if a["agent_aggr_imbalance"] is not None:
         side = "selling" if a["agent_aggr_imbalance"] < 0 else "buying"
         t += f"Agent (client) orders were net {side}: imbalance {abs(a['agent_aggr_imbalance']) * 100:.0f}%."
     if o.get("time"):
         t += f" The market started pricing the news at {o['time']} ({_p(o['ret_at_onset'])} vs. previous close)."
     if au.get("close_auction_ratio") is not None:
-        t += (f" The closing auction was {au['close_auction_ratio']:.1f}x its normal size and moved the price "
+        t += (f" The closing auction was {au['close_auction_ratio']:.1f}× its normal size and moved the price "
               f"{_p(au['close_auction_move'])} vs. the last trade.")
     if cmp and cmp.get("abs_abn_ret_pctile") is not None:
         move = ("the biggest of them" if cmp["abs_abn_ret_pctile"] == 1.0

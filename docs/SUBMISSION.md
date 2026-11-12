@@ -99,7 +99,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 - **Meaning check:** a sentence like "the share fell X %" must use the share's own move, not the stock-specific (abnormal) move; otherwise the template is shown. The numbers check alone cannot catch this mix-up, because both numbers are in the card.
 - **IR snapshot:** one click on the card (*Export IR report (PDF)*) gives the card plus its checked summary as a PDF, in DE or EN; the same button on the overview gives the Part A report (key figures vs peers, liquidity trend, cost by order size, unusual days). The *Report* page builds a one-page board snapshot from sections the user ticks (share price, trading profile, peers, liquidity, unusual days, one impact card, the summary); the preview is exactly what is saved as PDF.
 
-## 3. Validation (all reproducible, 224 automated tests)
+## 3. Validation (all reproducible, 225 automated tests)
 
 | Check | Result |
 |---|---|
@@ -157,5 +157,5 @@ python ingest/build_intraday.py                # ~3 min, every stock in events.c
 python web/warm_cache.py                       # optional, with a model key: saves the AI texts of the showcase shares
 python web/server.py                           # demo UI: http://127.0.0.1:8600
 streamlit run app/Home.py                      # backup UI: http://localhost:8501
-pytest                                         # 224 tests
+pytest                                         # 225 tests
 ```

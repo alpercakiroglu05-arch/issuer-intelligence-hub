@@ -31,7 +31,7 @@ def test_template_narrative_works_without_llm():
         "volume": {"ratio": 20.1}, "liquidity": {"xlm_25k_bps": 48.0, "ratio": 1.0},
         "participants": {"agent_aggr_imbalance": -0.44},
     }
-    assert "-30.0%" in narrate(card, "en")
+    assert "−30.0%" in narrate(card, "en")
     assert "unternehmensspezifisch" in narrate(card, "de")
 
 
@@ -157,7 +157,7 @@ def test_events_csv_is_clean():
     import pandas as pd
     from config import EVENTS_CSV
     e = pd.read_csv(EVENTS_CSV, dtype=str).fillna("")
-    types = {"FY", "Q1", "H1", "Q3", "DIVIDEND_EX", "AGM", "ADHOC", "GUIDANCE", "MA", "CMD", "INDEX"}
+    types = {"FY", "Q1", "H1", "Q3", "DIVIDEND_EX", "AGM", "ADHOC", "GUIDANCE", "MA", "CMD", "INDEX", "NEWS"}
     assert set(e["type"]) <= types
     assert (e["source_url"].str.startswith("http")).all()
     assert pd.to_datetime(e["date"], format="%Y-%m-%d").notna().all()

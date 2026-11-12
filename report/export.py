@@ -203,11 +203,11 @@ def _summary_de(t: dict) -> str:
 
 
 def _size_label(label: str | None, lang: str) -> str:
-    """Order-size label from engine.xlm ('€2.5m', '€100k') in the report style: EN 'EUR 2.5m', DE '2,5 Mio. EUR'."""
+    """Order-size label from engine.xlm ('€2.5m', '€100k') in the report style: EN '€2.5m', DE '2,5 Mio. EUR'."""
     if not label:
         return "n/a"
     if lang != "de":
-        return label.replace("€", "EUR ")
+        return label
     v = label.lstrip("€")
     unit = " Mio. EUR" if v.endswith("m") else " Tsd. EUR"
     return v[:-1].replace(".", ",") + unit

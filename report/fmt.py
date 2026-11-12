@@ -5,23 +5,25 @@ Number and date formatting for texts and reports, EN and DE.  OWNER: C4 (report)
 
     | name   | EN          | DE              |
     |--------|-------------|-----------------|
-    | pct    | -23.2%      | −23,2 %         |  signed, 1 decimal
+    | pct    | −23.2%      | −23,2 %         |  signed, 1 decimal
     | pct0   | 63%         | 63 %            |  0 decimals
-    | spct0  | -33%        | −33 %           |  signed, 0 decimals
+    | spct0  | −33%        | −33 %           |  signed, 0 decimals
     | pct1   | 1.5%        | 1,5 %           |  unsigned, 1 decimal
     | pctile | 99%         | 99 %            |  rounded down, so 0.995 never shows as 100%
-    | x      | 8.6x        | 8,6-fach        |
+    | x      | 8.6×        | 8,6-fach        |
     | bps    | 21 bps      | 21 bps          |
-    | eur    | EUR 2.5m    | 2,5 Mio. EUR    |  k: EUR 561k | 561 Tsd. EUR
+    | eur    | €2.5m       | 2,5 Mio. EUR    |  k: €561k | 561 Tsd. EUR
     | date   | 2026-03-27  | 27.03.2026      |  accepts str / date / Timestamp
     | dt     | 2026-03-26 17:45 | 26.03.2026 17:45 |
     | month_range | Jan – Oct 2026 | Jan.–Okt. 2026 |
     | rank(3, 215) | rank 3 of 215 (incl. this day) | Rang 3 von 215 (inkl. dieses Tages) |
 
-DE uses the real minus sign (U+2212) and a no-break space before "%"; report.export.to_pdf maps them to
-ASCII for the PDF font. ai/checks.py understands both styles.
+Both languages use the real minus sign (U+2212); DE also a no-break space before "%". report.export.to_pdf maps
+the minus to ASCII for the PDF font. ai/checks.py understands both styles. normalize_en() brings model text into
+the EN style ("-23.2 %" -> "−23.2%", "EUR 25 k" -> "€25k", "8.6x" -> "8.6×") without changing a number.
 """
 import math
+import re
 
 import pandas as pd
 
@@ -39,8 +41,8 @@ def formatters(lang: str = "en") -> dict:
     de = lang == "de"
 
     def num(v: float, dec: int, sign: bool = False) -> str:
-        s = f"{v:+.{dec}f}" if sign else f"{v:.{dec}f}"
-        return s.replace("-", MINUS).replace(".", ",") if de else s
+        s = (f"{v:+.{dec}f}" if sign else f"{v:.{dec}f}").replace("-", MINUS)
+        return s.replace(".", ",") if de else s
 
     def per(s: str) -> str:
         return f"{s}{NBSP}%" if de else f"{s}%"
@@ -50,7 +52,7 @@ def formatters(lang: str = "en") -> dict:
     def spct0(v): return "n/a" if _na(v) else per(num(v * 100, 0, sign=True))
     def pct1(v): return "n/a" if _na(v) else per(num(v * 100, 1))
     def pctile(v): return "n/a" if _na(v) else per(str(math.floor(round(v * 100, 6))))
-    def x(v): return "n/a" if _na(v) else (f"{num(v, 1)}-fach" if de else f"{v:.1f}x")
+    def x(v): return "n/a" if _na(v) else (f"{num(v, 1)}-fach" if de else f"{v:.1f}×")
     def bps(v): return "n/a" if _na(v) else f"{v:.0f} bps"
 
     def eur(v):
@@ -58,7 +60,7 @@ def formatters(lang: str = "en") -> dict:
             return "n/a"
         if de:
             return f"{num(v / 1e6, 1)} Mio. EUR" if v >= 1e6 else f"{num(v / 1e3, 0)} Tsd. EUR"
-        return f"EUR {v / 1e6:.1f}m" if v >= 1e6 else f"EUR {v / 1e3:.0f}k"
+        return f"€{v / 1e6:.1f}m" if v >= 1e6 else f"€{v / 1e3:.0f}k"
 
     def date(v):
         if _na(v) or v == "":
@@ -86,6 +88,24 @@ def formatters(lang: str = "en") -> dict:
 
     return dict(rank=rank, pct=pct, pct0=pct0, spct0=spct0, pct1=pct1, pctile=pctile, x=x, bps=bps, eur=eur, date=date,
                 dt=dt, month_range=month_range)
+
+
+_EUR_UNIT = {"k": "k", "m": "m", "M": "m", "mn": "m", "million": "m", "bn": "bn", "billion": "bn"}
+
+
+def normalize_en(text: str) -> str:
+    """English model text in the house style, numbers unchanged: "-23.2 %" -> "−23.2%", "EUR 25 k" / "EUR 4.6
+    million" -> "€25k" / "€4.6m", "8.6x" -> "8.6×". Dates (2026-03-27), "t-65" and clock times are left alone."""
+    if not text:
+        return text
+    t = re.sub(r"(\d)\s+%", r"\1%", text)                                      # 23.2 % -> 23.2%
+    t = re.sub(r"(?<![\w.\-−])-(?=\d)", MINUS, t)                              # -23.2 -> −23.2 (not 2026-03, t-65)
+    t = re.sub(r"\bEUR\s?(\d+(?:[.,]\d+)?)\s?(k|mn|m|M|million|bn|billion)\b",
+               lambda m: f"€{m.group(1)}{_EUR_UNIT[m.group(2)]}", t)               # EUR 25 k -> €25k
+    t = re.sub(r"\bEUR\s?(\d)", r"€\1", t)                                       # EUR 1,628 -> €1,628
+    t = re.sub(r"€\s+(\d)", r"€\1", t)
+    t = re.sub(r"(\d(?:\.\d+)?)\s?x\b", r"\1×", t)                                # 8.6x / 8.6 x -> 8.6×
+    return t
 
 
 def group_label(cmp: dict, lang: str = "en") -> str:

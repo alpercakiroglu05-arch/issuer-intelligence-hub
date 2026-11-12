@@ -19,7 +19,7 @@ import pytest
 EVENTS_CSV = Path(__file__).resolve().parent.parent / "events" / "events.csv"
 
 EXPECTED_COLUMNS = ["ticker", "isin", "type", "date", "time_local", "title", "source_url", "verified"]
-ALLOWED_TYPES = {"FY", "Q1", "H1", "Q3", "DIVIDEND_EX", "AGM", "ADHOC", "GUIDANCE", "MA", "CMD", "INDEX"}
+ALLOWED_TYPES = {"FY", "Q1", "H1", "Q3", "DIVIDEND_EX", "AGM", "ADHOC", "GUIDANCE", "MA", "CMD", "INDEX", "NEWS"}
 DATE_MIN = date(2026, 1, 2)
 DATE_MAX = date(2026, 10, 30)
 
