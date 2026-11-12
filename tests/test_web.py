@@ -104,3 +104,33 @@ def test_web_one_click_export(base, query, name):
     else:  # xhtml2pdf missing: the same report as HTML
         assert ctype.startswith("text/html") and f'filename="{name}.html"' in disp
 
+
+
+@needs_data
+@pytest.mark.parametrize("period", ["3m", "6m", "all"])
+def test_web_dashboard_in_one_call(base, period):
+    """The simple UI draws the whole dashboard from /api/dashboard; the browser computes nothing."""
+    d = get(base, f"/api/dashboard?isin={EVD}&period={period}")
+    assert d["index"] == "MDAX" and d["sector"] == "Media & Telecom" and d["liquidity_category"] in ("A", "B")
+    vm = d["versus_market"]
+    for k in ("price", "turnover_eur", "xlm_25k"):
+        assert vm[k]["of"] == 50 and 1 <= vm[k]["rank"] <= 50 and vm[k]["stock"] is not None and vm[k]["index"] is not None
+    assert d["tiles"]["price"] == vm["price"] and len(d["timeline"]["date"]) == d["days"]
+    assert 1 <= len(d["market_days"]) <= 10 and all(r["index_ret"] is not None for r in d["market_days"])
+    if period == "all":
+        fy = next(e for e in d["events"] if e["event_id"] == "EVD_FY_20260326")
+        assert fy["published"] == "2026-03-26" and fy["day"] == "2026-03-27" and fy["time"] == "17:45"   # publication date, not the reaction day
+        assert fy["unusual"] and fy["vol_ratio"] == 8.55 and d["tiles"]["unusual_days"] == 6
+
+
+@needs_data
+def test_web_card_compare_and_examples_agree(base):
+    """One rounded value and one rank everywhere: card 8.55x = compare table 8.55x; rank 3 of 215 in both."""
+    c = get(base, f"/api/card?isin={EVD}&day=2026-03-27&event_id=EVD_FY_20260326")
+    assert c["card"]["volume"]["ratio"] == 8.55 and c["rank"]["en"]["rank"] == "rank 3 of 215 (incl. this day)"
+    assert len(c["bars"]["ret"]) == len(c["bars"]["t"])
+    t = get(base, "/api/compare?type=NOTABLE_DAY&index=MDAX")
+    row = next(r for r in t["rows"] if r["isin"] == EVD and r["reaction_day"][:10] == "2026-03-27")
+    assert row["vol_ratio"] == 8.55 and row["rank"] == 3 and t["n"] == 215 and row["display"].startswith("CTS Eventim")
+    ex = sorted((u["example"], u["index"]) for u in get(base, "/api/universe") if u.get("example") is not None)
+    assert [i for _, i in ex] == ["DAX", "MDAX", "SDAX"]   # one example company per index on the first screen

@@ -41,6 +41,9 @@ NAMES_CSV = REPO_ROOT / "events" / "names.csv"   # readable company names for th
 #   HDD  Heidelberger Druck (SDAX): small cap, ~EUR 1.3m/day, XLM ~90 bps -> liquidity story
 #   (GXI Gerresheimer: -31% on 11 Feb, left the SDAX on 9 Apr -> no XLM data afterwards; pitch story only)
 HERO_TICKERS = ["EVD", "EVT", "HDD"]
+# first screen of the web UI: one example per index (DAX, MDAX, SDAX). Zalando = the DAX member with the
+# largest H1 reaction among the 40 DAX stocks, which all have one calendar event and full minute data.
+EXAMPLE_TICKERS = ["ZAL", "EVD", "HDD"]
 DEFAULT_TICKER = "EVD"
 
 # Event study windows (trading days, relative to the reaction day t=0)

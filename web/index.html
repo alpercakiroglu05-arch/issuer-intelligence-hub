@@ -4,80 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Issuer Intelligence Hub</title>
-<meta name="description" content="Decode your share price: Xetra trading insights and event impact cards for listed companies.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<meta name="description" content="How your share trades on Xetra, and what changed around each announcement.">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-
-<!-- ISIN entry: the first thing an IR user sees -->
-<section id="gate" aria-label="Enter your ISIN">
-  <svg class="bg" id="gate-bg" preserveAspectRatio="none" aria-hidden="true"></svg>
-  <div class="g-top">
-    <div class="g-brand">
-      <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" fill="#fff"/><polyline points="5,23 12,23 15,11 19,28 22,18 31,18" fill="none" stroke="#000099" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
-      <span class="word"><span>Issuer Intelligence</span><span>Hub <em>· Issuer Services</em></span></span>
-    </div>
-    <span class="lang"><button data-act="lang" data-v="de">DE</button>/<button data-act="lang" data-v="en">EN</button></span>
-  </div>
-  <div class="g-main">
-    <div class="g-kicker" id="g-kicker"></div>
-    <h1 class="g-title" id="g-title"></h1>
-    <p class="g-sub" id="g-sub"></p>
-    <form class="g-form" id="g-form" autocomplete="off">
-      <div class="g-field">
-        <span class="lbl" aria-hidden="true">ISIN · TICKER · NAME</span>
-        <input id="g-in" spellcheck="false" aria-label="ISIN, ticker or company name" aria-autocomplete="list" aria-controls="g-sugg">
-        <button class="pill" id="g-go" type="submit"><span id="g-go-t"></span> <svg class="arr" width="16" height="16" viewBox="0 0 16 16"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
-      </div>
-      <ul class="sugg" id="g-sugg" role="listbox"></ul>
-      <div class="anat" id="g-anat" aria-hidden="true"></div>
-      <div class="g-err" id="g-err" role="alert"></div>
-    </form>
-    <div class="g-picks" id="g-picks"></div>
-  </div>
-  <div class="tape" id="g-tape" aria-hidden="true"></div>
-  <div class="loader" id="g-load" aria-live="polite"><div class="box"><div class="nm" id="gl-nm"></div><ol id="gl-steps"></ol><div class="bar"><i id="gl-bar"></i></div></div></div>
-</section>
-
-<!-- Company workspace -->
-<div id="ws" class="hidden">
-  <div class="util"><div class="wrap">
-    <span class="stamp" id="stamp"></span>
-    <span class="ai" id="ai-dot"><i></i><span></span></span>
-    <span class="clock" id="clock"></span>
-    <span class="lang"><button data-act="lang" data-v="de">DE</button>/<button data-act="lang" data-v="en">EN</button></span>
-  </div></div>
-  <header class="top"><div class="wrap">
-    <div class="hdr">
-      <a class="brand" href="#" data-go="dashboard" aria-label="Dashboard">
-        <svg viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" fill="#000099"/><polyline points="5,23 12,23 15,11 19,28 22,18 31,18" fill="none" stroke="#0099ff" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
-        <span class="word"><span>Issuer Intelligence</span><span>Hub <em>· Issuer Services</em></span></span>
-      </a>
-      <div class="co" id="co"></div>
-    </div>
-    <nav class="main" id="nav" aria-label="Main"></nav>
-  </div></header>
-  <main id="app"></main>
-  <footer><div class="wrap" id="foot"></div></footer>
-</div>
-
-<!-- IR analyst: the agent (ai/agent.py), on every page -->
-<aside id="dock" class="dock hidden" aria-label="IR analyst">
-  <button class="dock-fab" id="dock-fab" data-act="dock" aria-controls="dock-panel"></button>
-  <div class="dock-panel" id="dock-panel" role="dialog" aria-labelledby="dock-head">
-    <header class="dock-head" id="dock-head"></header>
-    <div class="dock-ctx" id="dock-ctx"></div>
-    <div class="dock-log" id="dock-log" aria-live="polite"></div>
-    <div class="dock-sugg" id="dock-sugg"></div>
-    <form class="dock-in" id="dockf" autocomplete="off"><input id="dockq" aria-label="Question" maxlength="1000"><button type="submit" aria-label="Ask"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 8h11M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2"/></svg></button></form>
-  </div>
-</aside>
-
-<div id="tip" role="tooltip"></div>
-<div id="toast" role="status"></div>
+<header id="top"></header>
+<main id="main"></main>
+<aside id="dock" hidden></aside>
 <script src="app.js"></script>
 </body>
 </html>
