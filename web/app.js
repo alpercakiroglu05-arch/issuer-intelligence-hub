@@ -425,6 +425,15 @@ async function fillSummary(fresh = false) {
   $("#ic-sum").innerHTML = `<div class="ai">${SPARK}</div><div><p>${esc(r.text)}</p><div class="meta">${chk ? (chk.bad ? `<span class="dn">${L(`${chk.bad} of ${chk.total} figures not found in the card`, `${chk.bad} von ${chk.total} Zahlen nicht in der Karte`)}</span>` : `<span class="ok">✓ ${L(`All ${chk.total} figures match the card`, `Alle ${chk.total} Zahlen stimmen mit der Karte überein`)}</span>`) : ""}<span>${esc(who)}</span>
     ${S.st.llm && !S.st.offline ? `<button class="link" data-act="regen">${L("Ask the model again", "Modell neu fragen")}</button>` : ""}<button class="link" data-act="ask-card">${L("Ask about this day", "Zu diesem Tag fragen")} ${CHEV}</button></div></div>`;
 }
+/* the rank in words: the first and the last of the group by name, everything else as "bigger than X%" */
+function rankLabel(cm, of, w) {
+  const grp = cm.group_type === "NOTABLE_DAY" ? L("unusual days", "auffälligen Tagen") : de() ? TYPE(cm.group_type) : TYPE(cm.group_type).toLowerCase();
+  const ix = cm.group_index === "DAX+MDAX+SDAX" ? L("DAX, MDAX and SDAX", "DAX, MDAX und SDAX") : cm.group_index;
+  if (cm.rank_abs_abn_ret === 1) return L(`Largest of ${of} ${grp} (${ix})`, `Größte Bewegung von ${of} · ${grp} (${ix})`);
+  if (cm.rank_abs_abn_ret === of) return L(`Smallest of ${of} ${grp} (${ix})`, `Kleinste Bewegung von ${of} · ${grp} (${ix})`);
+  const pc = Math.floor(w * 100);   /* rounded down, so a rank below the first never reads "100%" */
+  return L(`Bigger than ${pc}% of ${grp} (${ix})`, `Größer als ${pc} % der ${cm.group_type === "NOTABLE_DAY" ? "auffälligen Tage" : TYPE(cm.group_type)} (${ix})`);
+}
 function panel(d, b) {
   const c = d.card, v = c.volume, l = c.liquidity, a = c.auctions || {}, pa = c.participants, cm = c.comparison;
   if (S.tab === "summary") {
@@ -435,7 +444,7 @@ function panel(d, b) {
     const rk = cm ? (Number.isInteger(cm.rank_of) ? cm.rank_of : cm.n + 1) : null, w = cm ? cm.abs_abn_ret_pctile : 0;
     return `<div class="grid g4">${T.map(([kk, vv, ss], i) => `<div class="card tile rv in" style="--d:${i * .05}s"><span class="cap">${kk}</span><div class="v num">${vv}</div><div class="s">${ss}</div></div>`).join("")}</div>
       ${cm ? `<div class="card" style="margin-top:16px"><div class="rank"><div class="of num">#${cm.rank_abs_abn_ret}<small> ${L("of", "von")} ${rk}</small></div>
-      <div class="meter in"><div class="cap" style="margin-bottom:10px">${L(`Bigger than ${Math.round(w * 100)}% of ${cm.group_type === "NOTABLE_DAY" ? "unusual days" : TYPE(cm.group_type)} (${cm.group_index})`, `Größer als ${Math.round(w * 100)} % der ${cm.group_type === "NOTABLE_DAY" ? "auffälligen Tage" : TYPE(cm.group_type)} (${cm.group_index})`)}</div><div class="trk"><i style="--w:${w}"></i></div><div class="lb"><span>${L("smallest", "kleinste")}</span><span>${L("largest", "größte")}</span></div></div></div>
+      <div class="meter in"><div class="cap" style="margin-bottom:10px">${rankLabel(cm, rk, w)}</div><div class="trk"><i style="--w:${w}"></i></div><div class="lb"><span>${L("smallest", "kleinste")}</span><span>${L("largest", "größte")}</span></div></div></div>
       ${cm.group_type !== c.event.type && c.event.type !== "NOTABLE_DAY" ? `<p class="note">${L(`Fewer than 5 ${TYPE(c.event.type)} with data, so this ranks among unusual trading days: a broader group, not like-for-like.`, `Weniger als 5 ${TYPE(c.event.type)} mit Daten, daher Einordnung unter auffälligen Handelstagen: eine breitere Gruppe.`)}</p>` : ""}</div>` : ""}`;
   }
   if (S.tab === "day") {
