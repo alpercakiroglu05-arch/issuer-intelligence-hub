@@ -139,11 +139,11 @@ VS_WORD = {"en": {"stock-specific": "stock-specific", "market-wide": "market-wid
            "de": {"stock-specific": "aktienspezifisch", "market-wide": "marktweit", "sector-wide": "sektorweit"}}
 TREND_HELP_DE = {
     "improved": "Der Handel wurde günstiger und/oder es wurde mehr gehandelt, und nichts verschlechterte sich um "
-                "mehr als 10 %. Eine gute Nachricht für den Vorstand; prüfen, ob sich der ganze Index ebenso bewegte.",
+                "mehr als 10 %. Die Index-Spalte zeigt, ob sich der ganze Markt ebenso bewegte.",
     "worsened": "Der Handel wurde teurer und/oder es wurde weniger gehandelt, und nichts verbesserte sich um mehr "
-                "als 10 %. Anlass für ein Gespräch mit dem Designated Sponsor oder für mehr Investor-Outreach.",
+                "als 10 %. Die Index-Spalte zeigt, ob sich der ganze Markt ebenso bewegte.",
     "mixed": "Der Handel wurde günstiger, aber es wurde weniger gehandelt (oder umgekehrt). "
-             "Beides prüfen, bevor man dem Vorstand eine bessere Liquidität meldet.",
+             "Beide Werte gehören zur Beschreibung der Veränderung.",
     "stable": "Handelskosten und Umsatz blieben beide innerhalb von 10 % der Vorperiode.",
     None: "Noch nicht genug Handelshistorie für einen Vergleich.",
 }

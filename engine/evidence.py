@@ -73,7 +73,13 @@ def _facts(isin: str, day: str, card: dict) -> dict:
     pre = canon.iloc[max(0, i - PRE_DAYS): i] if i is not None else canon.iloc[0:0]
     # a busy day the market explains (option expiry, index change or review, market-wide volume) is no hint of
     # early news: EVD 20 Mar 2026 (quarterly expiry) had 2.0x normal turnover a week before the FY results
-    own = pre[[not baseline.market_context(isin, str(t.date())) for t in pre.index]] if len(pre) else pre
+    # ... and neither is a day with the company's own earlier announcement (HDD 15 Apr 2026: 17.1x after the
+    # report of 14 Apr and before the guidance cut published that evening)
+    ev = data.events()
+    ev = ev[ev["isin"] == isin]
+    known = {pd.Timestamp(x).normalize() for col in ("date", "reaction_day") for x in ev[col].dropna()}
+    own = pre[[not baseline.market_context(isin, str(t.date())) and t.normalize() not in known
+               for t in pre.index]] if len(pre) else pre
     pk = own["vol_ratio"].idxmax() if len(own) and own["vol_ratio"].notna().any() else None
     post_days = len(dates) - 1 - i if i is not None else 0
     return {
@@ -271,13 +277,13 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
         nxt.append(T(f"Check news wires, analyst notes and the ad hoc archive for {_d(day, lang)} and the evening before.",
                      f"Nachrichten, Analystenkommentare und Ad-hoc-Archiv für den {_d(day, lang)} und den Vorabend prüfen."))
     if _ok(lag) and lag < 0:
-        nxt.append(T("Trading moved before the published time: review who knew what before publication.",
-                     "Der Handel reagierte vor der Veröffentlichung: Informationsfluss vor der Meldung prüfen."))
+        nxt.append(T("Trading moved before the published time in the calendar: check that time against the source.",
+                     "Der Handel reagierte vor der Zeit im Kalender: diese Zeit mit der Quelle abgleichen."))
     if _ok(fx["pre_max_vol_ratio"]) and fx["pre_max_vol_ratio"] >= PRE_VOL_FLAG:
         nxt.append(T(f"Turnover was already {f['x'](fx['pre_max_vol_ratio'])} normal on {_d(fx['pre_max_vol_day'], lang)}, "
-                     "before this day: check whether news or rumours came out earlier.",
+                     "before this day: check whether earlier public news explains it.",
                      f"Der Umsatz lag schon am {_d(fx['pre_max_vol_day'], lang)} beim {f['x'](fx['pre_max_vol_ratio'])}en "
-                     "des Normalwerts: prüfen, ob Nachrichten oder Gerüchte früher kamen."))
+                     "des Normalwerts: prüfen, ob frühere öffentliche Nachrichten das erklären."))
     if _ok(imb) and abs(imb) >= 0.25:
         nxt.append(T("Ask your brokers and the Designated Sponsor which client groups drove the "
                      f"{'selling' if imb < 0 else 'buying'}; exchange data cannot name them.",
@@ -383,11 +389,13 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
     # leak / pre-news trading
     pre = fx["pre_max_vol_ratio"]
     if _ok(lag) and lag < 0:
-        put("leak", "supported", T(f"Trading reacted {abs(lag)} min before the published time {pub_time}.",
-                                   f"Der Handel reagierte {abs(lag)} Min. vor der veröffentlichten Zeit {pub_time}."))
+        put("leak", "supported", T(f"Trading reacted {abs(lag)} min before the time in the calendar ({pub_time}). "
+                                   "Check that time against the source; the data does not show why.",
+                                   f"Der Handel reagierte {abs(lag)} Min. vor der Zeit im Kalender ({pub_time}). "
+                                   "Diese Zeit mit der Quelle abgleichen; die Daten zeigen nicht, warum."))
     elif _ok(pre) and pre >= PRE_VOL_FLAG:
-        put("leak", "partly", T(f"Turnover reached {f['x'](pre)} normal on {_d(fx['pre_max_vol_day'], lang)}, in the {fx['pre_days']} days before. Unusual, but not proof of a leak.",
-                                f"Der Umsatz erreichte am {_d(fx['pre_max_vol_day'], lang)} das {f['x'](pre)}e des Normalwerts, in den {fx['pre_days']} Tagen davor. Auffällig, aber kein Beleg."))
+        put("leak", "partly", T(f"Turnover reached {f['x'](pre)} normal on {_d(fx['pre_max_vol_day'], lang)}, in the {fx['pre_days']} days before, with no announcement or market event on that day. The data does not show why.",
+                                f"Der Umsatz erreichte am {_d(fx['pre_max_vol_day'], lang)} das {f['x'](pre)}e des Normalwerts, in den {fx['pre_days']} Tagen davor, ohne Meldung oder Marktereignis an diesem Tag. Die Daten zeigen nicht, warum."))
     elif _ok(pre):
         put("leak", "contradicted", T(f"In the {fx['pre_days']} trading days before, turnover stayed at most {f['x'](pre)} normal"
                                       + (", and trading reacted after the published time." if _ok(lag) else "."),

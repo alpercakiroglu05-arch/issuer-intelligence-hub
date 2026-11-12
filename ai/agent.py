@@ -56,6 +56,8 @@ Rules:
 - Whether an explanation of a move holds ("was it the market?", "did funds sell?", "was it an overreaction?",
   "was there a leak?"): call check_explanation and report its verdict and evidence; say "consistent with",
   never "caused by". If the verdict is not_testable, say what the data cannot show.
+  Never write "leak", "insider" or "rumour" yourself: say "unusual trading before the announcement" and that
+  the data does not show why.
 - When the user wants to see, open, create or export something (impact card, comparison, report, dashboard),
   call show() so the UI offers a one-click button. ALWAYS also answer the question in text with the key figures;
   never reply only that a view is ready. Do not write links or placeholders like [VIEW CARD]: the UI shows

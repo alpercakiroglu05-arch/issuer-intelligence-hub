@@ -121,3 +121,21 @@ def test_pre_event_volume_ignores_days_the_market_explains():
     en = evidence.brief(EVD, "2026-03-27", _event(EVD, EVD_FY))["en"]
     assert not any("20 Mar" in p for s in en["sections"] for p in s["points"])
 
+
+
+
+def test_pre_event_volume_ignores_days_with_own_announcements_and_wording_is_neutral():
+    """HDD 15 Apr 2026 (17x) follows the company's own news of 14 Apr: not 'unusual trading before the news'.
+    No brief of any calendar event uses leak / insider / rumour wording."""
+    import re
+    from engine import data, evidence
+    hdd = data.isin_of("HDD")
+    assert evidence._facts(hdd, "2026-04-16", None)["pre_max_vol_day"] != "2026-04-15"
+    bad = re.compile(r"leak|insider|rumou?r|who knew|Gerücht|Informationsfluss", re.I)
+    for r in data.events().to_dict("records"):
+        b = evidence.brief(r["isin"], str(r["reaction_day"])[:10], r)
+        for lang in ("en", "de"):
+            text = " ".join(p for s in b[lang]["sections"] for p in s["points"])
+            text += " ".join(c["text"] + (c.get("better") or "") + c["label"] for c in b[lang]["claims"].values())
+            assert not bad.search(text), (r["event_id"], lang, bad.search(text).group())
+
