@@ -110,3 +110,14 @@ def test_calendar_statuses():
     assert ev[0]["reaction_day"] == "2026-03-27" and "after the 17:35" in ev[0]["rule"]
     assert ev[4]["time_local"] == "" and ev[4]["reaction_day"] == "2026-03-27"   # bad time ignored, not guessed
     assert pd.Timestamp(ev[0]["reaction_day"]).day_of_week < 5
+
+
+def test_pre_event_volume_ignores_days_the_market_explains():
+    """EVD 20 Mar 2026 was a quarterly expiry with market-wide volume: not a hint of early news for 27 Mar."""
+    from engine import baseline, evidence
+    assert baseline.market_context(EVD, "2026-03-20")          # the expiry day is flagged
+    fx = evidence._facts(EVD, "2026-03-27", None)
+    assert fx["pre_max_vol_day"] != "2026-03-20"
+    en = evidence.brief(EVD, "2026-03-27", _event(EVD, EVD_FY))["en"]
+    assert not any("20 Mar" in p for s in en["sections"] for p in s["points"])
+

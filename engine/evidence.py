@@ -71,7 +71,10 @@ def _facts(isin: str, day: str, card: dict) -> dict:
     dates = list(canon.index)
     i = dates.index(d) if d in dates else None
     pre = canon.iloc[max(0, i - PRE_DAYS): i] if i is not None else canon.iloc[0:0]
-    pk = pre["vol_ratio"].idxmax() if len(pre) and pre["vol_ratio"].notna().any() else None
+    # a busy day the market explains (option expiry, index change or review, market-wide volume) is no hint of
+    # early news: EVD 20 Mar 2026 (quarterly expiry) had 2.0x normal turnover a week before the FY results
+    own = pre[[not baseline.market_context(isin, str(t.date())) for t in pre.index]] if len(pre) else pre
+    pk = own["vol_ratio"].idxmax() if len(own) and own["vol_ratio"].notna().any() else None
     post_days = len(dates) - 1 - i if i is not None else 0
     return {
         "context": baseline.market_context(isin, day),
