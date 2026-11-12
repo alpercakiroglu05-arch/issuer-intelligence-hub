@@ -16,6 +16,7 @@ Number and date formatting for texts and reports, EN and DE.  OWNER: C4 (report)
     | date   | 2026-03-27  | 27.03.2026      |  accepts str / date / Timestamp
     | dt     | 2026-03-26 17:45 | 26.03.2026 17:45 |
     | month_range | Jan – Oct 2026 | Jan.–Okt. 2026 |
+    | rank(3, 215) | rank 3 of 215 (incl. this day) | Rang 3 von 215 (inkl. dieses Tages) |
 
 DE uses the real minus sign (U+2212) and a no-break space before "%"; report.export.to_pdf maps them to
 ASCII for the PDF font. ai/checks.py understands both styles.
@@ -80,7 +81,10 @@ def formatters(lang: str = "en") -> dict:
         sep = "–" if de else " – "
         return f"{m[a.month - 1]}{sep}{m[b.month - 1]} {b.year}"
 
-    return dict(pct=pct, pct0=pct0, spct0=spct0, pct1=pct1, pctile=pctile, x=x, bps=bps, eur=eur, date=date,
+    def rank(r, of):
+        return (f"Rang {r} von {of} (inkl. dieses Tages)" if de else f"rank {r} of {of} (incl. this day)")
+
+    return dict(rank=rank, pct=pct, pct0=pct0, spct0=spct0, pct1=pct1, pctile=pctile, x=x, bps=bps, eur=eur, date=date,
                 dt=dt, month_range=month_range)
 
 

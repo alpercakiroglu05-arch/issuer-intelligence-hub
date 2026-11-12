@@ -9,12 +9,14 @@ prompt glossary from the v1 dry run with the live JAIF model).
         steps     [{"tool", "args"}]  engine functions that produced the numbers, in order
         actions   [{"view", "isin", "day", "event_id", "event_type", "index"}]  buttons the UI shows
         check     {"total", "unsupported": [...]}  numbers check of the answer against the tool outputs
+        rejected  figures of a model answer that failed the check (then text/source are the deterministic answer)
     ask(question, isin) -> str   v1 signature, kept for the Streamlit page
 
 How it works: the model gets the TOOLS below (OpenAI function calling, works with the JAIF / hessian.AI
 gateway). It decides which engine functions to call, reads their JSON and writes the answer. It never sees
 raw data and never computes figures itself: every number must come from a tool output, which ai/checks.py
-verifies after the fact. Causes come only from the event calendar (events.csv, with sources).
+verifies after the fact; an answer with an unverified figure is replaced by the deterministic answer (same rule
+as the card summary). Causes come only from the event calendar (events.csv, with sources).
 Without a key, or if the model fails, a deterministic router answers from the same tools, so the demo
 never breaks. Answers are cached in data/agent_cache.json (LLM_CACHE, same switch as ai/llm.py).
 """
@@ -286,7 +288,7 @@ TOOLS = [
     _fn("find_company", "Find a DAX/MDAX/SDAX share by name, ticker or ISIN.", {"query": {"type": "string"}}, ["query"]),
     _fn("company_overview", "Normal state of the share over the last 60 trading days vs index/sector/size medians, "
         "liquidity trend (last 60 vs previous 60 days) and the Xetra liquidity category estimate.", {"isin": _ISIN}, ["isin"]),
-    _fn("peer_benchmark", "Compare the share with a peer group: index, sector or size (turnover cohort).",
+    _fn("peer_benchmark", "Compare the share with a peer group: index, sector or size (the 10 stocks closest in turnover).",
         {"isin": _ISIN, "by": {"type": "string", "enum": ["index", "sector", "size"]}}, ["isin"]),
     _fn("trading_cost_curve", "Trading cost (XLM) by order size from EUR 10k to 10m vs peers, and the largest order "
         "the order book absorbs on most days.", {"isin": _ISIN}, ["isin"]),
@@ -398,18 +400,24 @@ def _run_llm(question, isin, history, context, lang):
             msgs.append({"role": h["role"], "content": str(h["content"])[:2000]})
     msgs.append({"role": "user", "content": question})
     steps, actions, outputs, text = [], [], [], ""
-    repaired = False
+    repaired, draft = False, ""
     t0 = time.monotonic()
     for _ in range(MAX_ROUNDS):
         if time.monotonic() - t0 > BUDGET_S:
             raise TimeoutError(f"agent took longer than {BUDGET_S} s")
-        msg = llm.chat(msgs, tools=TOOLS, tool_choice="auto", temperature=0.1, max_tokens=MAX_TOKENS)
+        try:
+            msg = llm.chat(msgs, tools=TOOLS, tool_choice="auto", temperature=0.1, max_tokens=MAX_TOKENS)
+        except Exception:  # noqa: BLE001  the repair round failed: judge the first draft (it is rejected below)
+            if not repaired:
+                raise
+            text = draft
+            break
         calls = getattr(msg, "tool_calls", None) or []
         if not calls:
             text = re.sub(r"<think>.*?</think>", "", msg.content or "", flags=re.S).strip()
             bad = _check(text, outputs, question, context)["unsupported"]
             if bad and not repaired:  # one repair round: the model must fetch the figures or drop them
-                repaired = True
+                repaired, draft = True, text
                 msgs += [{"role": "assistant", "content": text},
                          {"role": "user", "content": f"These figures are not in any tool result: {', '.join(bad[:8])}. "
                                                      "Call the tools you need, then answer again using only figures "
@@ -440,10 +448,23 @@ def _run_llm(question, isin, history, context, lang):
     if check["unsupported"]:  # still invented figures: never show them; the template answers with the same tools
         fb = fallback(question, isin, context, lang)
         fb["actions"] = fb["actions"] or actions
+        fb["rejected"] = check["unsupported"]
         fb["note"] = f"model answer rejected by the numbers check: {', '.join(check['unsupported'][:5])}"
         return fb
     return {"text": text, "source": "llm", "model": llm.model_name(), "steps": steps, "actions": actions,
             "check": check}
+
+
+def _checked(out: dict, question: str, isin: str, context, lang: str) -> dict:
+    """Same rule as the card summary: a model answer with a figure that is not in the tool outputs is not shown;
+    the deterministic answer from the same tools is shown instead, and `rejected` says which figures failed."""
+    bad = (out.get("check") or {}).get("unsupported") or []
+    if not bad:
+        return out
+    fb = fallback(question, isin, context, lang)
+    fb["rejected"] = bad
+    fb["note"] = f"model answer not shown: {len(bad)} figure(s) not in the engine output ({', '.join(bad[:3])})"
+    return fb
 
 
 def run(question: str, isin: str, history=(), context=None, lang: str = "en") -> dict:
@@ -454,13 +475,13 @@ def run(question: str, isin: str, history=(), context=None, lang: str = "en") ->
         key = hashlib.sha256(json.dumps([CACHE_VERSION, llm.model_name(), SYSTEM, TOOLS, question, isin, context, lang, list(history or [])[-6:]],
                                         sort_keys=True, default=str).encode()).hexdigest()
         if _cache_on() and (hit := _cache(key)):
-            return {**hit, "cached": True}  # the UI says "saved answer", never "fresh analysis"
+            return _checked({**hit, "cached": True}, question, isin, context, lang)  # labelled "saved answer"
         try:
             out = _run_llm(question, isin, history, context, lang)
             if out["text"]:
                 if _cache_on() and out["source"] == "llm" and not out["check"]["unsupported"]:
                     _cache(key, out)  # only clean model answers are replayed in the demo
-                return out
+                return _checked(out, question, isin, context, lang)
         except Exception as e:  # noqa: BLE001  network, quota, model without tool support -> template
             fb = fallback(question, isin, context, lang)
             fb["note"] = f"model error: {type(e).__name__}"

@@ -87,8 +87,9 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
 
 ### AI and export
 - **Summary text (DE/EN):** the model gets only the card JSON and is told to use only its numbers, never invent causes, and give no advice. A **numbers check** (`ai/checks.py`) then compares every figure in the text with the JSON, allowing for percent, EUR m and rounding. Any unknown figure means the template text is shown instead, and the card says which one it is. Model: an open model through the JAIF gateway (OpenAI-compatible), swappable in `.env`. Answers are cached so the live demo does not depend on the network.
-- **Assistant (v1):** answers IR questions from the stock's KPIs and unusual days.
-- **IR snapshot:** the card plus the summary as HTML and PDF.
+- **IR analyst (dock on every page):** the model calls engine functions as tools (company overview, peer benchmark, trading cost curve, unusual days, event calendar, impact card, comparison) and answers from their outputs only. Every number in the answer is checked against the tool outputs; an answer with a figure that cannot be traced is replaced by the deterministic answer, the same rule as the card summary. Without a model key a deterministic router answers from the same tools.
+- **Meaning check:** a sentence like "the share fell X %" must use the share's own move, not the stock-specific (abnormal) move; otherwise the template is shown. The numbers check alone cannot catch this mix-up, because both numbers are in the card.
+- **IR snapshot:** one click on the card (*Export IR report (PDF)*) gives the card plus its checked summary as a PDF, in DE or EN; the same button on the dashboard gives the Part A report (key figures vs peers, liquidity trend, cost by order size, unusual days).
 
 ## 3. Validation (all reproducible, 69 automated tests)
 
@@ -122,7 +123,7 @@ raw Deutsche Börse files ──ingest (DuckDB, pandas)──▶ parquet ──e
   - Every screen, the report and the assistant use one peer benchmark (median over the peers of each peer's 60-day median).
   - Market capitalisation is not in the data, so the size groups are turnover-based, not market-cap-based.
   - The impact card's abnormal return still uses index peers.
-- **AI text:** the numbers check catches invented figures with decimals or large values; a small integer could match an unrelated value by chance. Without a model key the texts come from templates.
+- **AI text:** the numbers check catches invented figures with decimals or large values; a small integer could match an unrelated value by chance. The meaning check covers only the share's own move. Without a model key the texts come from templates.
 
 ## 5. What else IR teams need, and which data
 

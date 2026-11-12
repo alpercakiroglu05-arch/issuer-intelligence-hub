@@ -242,6 +242,7 @@ function dashBand(u, name) {
   return `<section class="band"><div class="wrap band-in">
     <div class="kicker">${u.index} · ISIN <b>${u.isin}</b> · Xetra${u.sector ? " · " + esc(u.sector) : ""}</div>
     <h1>${esc(name)}</h1><p class="lede">${lede}</p>
+    <p class="band-acts">${exportBtn(`/api/export?isin=${u.isin}&lang=${S.lang}`, "pill")}</p>
     <dl class="facts">
       <div><dt>${L("Closing auction", "Schlussauktion")} · ${dL(S.iss.meta.last_date)}</dt><dd>${PX(last)}</dd></div>
       <div><dt>${L("Since 2 Jan", "Seit 2. Jan.")}</dt><dd>${P(last / first - 1)}</dd></div>
@@ -447,7 +448,7 @@ function cardHTML(d) {
   /* rank counts this event, n counts only the others: the group is n + 1 (rank_of from the engine once it exists) */
   const rankOf = cm ? (Number.isInteger(cm.rank_of) ? cm.rank_of : cm.n + 1) : null;
   const cmpBlock = cm ? `<div><div class="big-cap">${L("How it ranks", "Einordnung")}</div>
-      <p style="margin:0 0 10px;font-size:15px">${L(`Rank ${cm.rank_abs_abn_ret} of ${rankOf} ${cm.group_type === "NOTABLE_DAY" ? "unusual days" : TYPE(cm.group_type)} (${cm.group_index}, this day included). Bigger than:`, `Rang ${cm.rank_abs_abn_ret} von ${rankOf} ${cm.group_type === "NOTABLE_DAY" ? "auffälligen Tagen" : TYPE(cm.group_type)} (${cm.group_index}, inkl. dieses Tages). Größer als:`)}</p>
+      <p style="margin:0 0 10px;font-size:15px">${L(`Rank ${cm.rank_abs_abn_ret} of ${rankOf} (incl. this day) among ${cm.group_type === "NOTABLE_DAY" ? "unusual days" : TYPE(cm.group_type)} (${cm.group_index}). Bigger than:`, `Rang ${cm.rank_abs_abn_ret} von ${rankOf} (inkl. dieses Tages) unter ${cm.group_type === "NOTABLE_DAY" ? "auffälligen Tagen" : TYPE(cm.group_type)} (${cm.group_index}). Größer als:`)}</p>
       ${cm.group_type !== e.type && !notable ? `<p class="m" style="margin:-4px 0 10px;font-size:13px">${L(`Fewer than 5 ${TYPE(e.type)} with data in reach, so this ranks among unusual trading days: a broader group, not like-for-like.`, `Weniger als 5 ${TYPE(e.type)} mit Daten, daher Einordnung unter auffälligen Handelstagen: eine breitere Gruppe, kein direkter Vergleich.`)}</p>` : ""}
       ${pct(L("Stock-specific move", "Titelspezifische Bewegung"), cm.abs_abn_ret_pctile)}${pct(L("Turnover vs normal", "Umsatz vs. normal"), cm.vol_ratio_pctile)}${pct(L("Trading cost vs normal", "Handelskosten vs. normal"), cm.xlm_ratio_pctile)}
       <button class="link" data-act="cmpthis" data-type="${esc(cm.group_type)}" data-index="${esc(cm.group_index)}" style="margin-top:8px">${L("See all of them", "Alle ansehen")} ${ARR}</button></div>` : `<div class="m">${L("No comparison group yet.", "Noch keine Vergleichsgruppe.")}</div>`;
@@ -470,7 +471,8 @@ function cardHTML(d) {
   return `<article class="card rv in" id="thecard">
     <div class="card-head"><div><div class="ttl">${L("Impact card", "Impact Card")}</div><div class="id">${esc(id)}</div></div><div class="timing">${timing}</div></div>
     <div class="card-title"><div><span class="tag">${esc(e.type)}</span><h2 style="margin-top:8px">${esc(notable ? L("Unusual trading day", "Auffälliger Handelstag") : e.title)}</h2>
-      <div class="src"><span>${ver}</span>${e.source_url ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">${L("Source", "Quelle")} ↗</a>` : ""}</div></div></div>
+      <div class="src"><span>${ver}</span>${e.source_url ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">${L("Source", "Quelle")} ↗</a>` : ""}</div></div>
+      ${exportBtn(exportURL(c.isin, e.reaction_day, e.event_id), "pill pill--sm")}</div>
     <div class="card-sec card-top">
       <div><div class="big-cap">${L("Stock-specific move (abnormal return)", "Titelspezifische Bewegung (abnormale Rendite)")}</div>
         <div class="big" style="color:${col}"><span class="count" data-to="${p.abn_ret}">${P(p.abn_ret)}</span></div>
@@ -777,6 +779,13 @@ function cardURL(isin, day, ev) {
   if (own) u += `&date=${own.date}&time=${enc(own.time_local || "")}&type=${enc(own.type)}&title=${enc(own.title)}`;
   return u;
 }
+// one-click IR report (PDF) for this card: same event parameters as the card itself
+/* the PDF is rendered by the server; the offline copy prints the IR snapshot page instead */
+function exportBtn(href, cls) {
+  return S.status && S.status.offline ? `<button class="${cls}" data-go="report">${L("IR snapshot (print to PDF)", "IR-Snapshot (als PDF drucken)")} ${ARR}</button>`
+    : `<a class="${cls}" href="${href}" download>${L("Export IR report (PDF)", "IR-Report exportieren (PDF)")} ↓</a>`;
+}
+function exportURL(isin, day, ev) { return cardURL(isin, day, ev).replace("/api/card?", "/api/export?") + `&lang=${S.lang}`; }
 const EVTYPES = ["FY", "Q1", "H1", "Q3", "ADHOC", "GUIDANCE", "DIVIDEND_EX", "AGM", "CMD", "MA", "OTHER"];
 function evForm() {
   return `<form class="ev-form" id="evform"><div class="r2"><input id="ev-d" type="date" min="${S.iss.meta.first_date}" max="${S.iss.meta.last_date}" required aria-label="${L("Date", "Datum")}"><input id="ev-t" type="time" aria-label="${L("Time (CET)", "Uhrzeit (MEZ)")}"></div>

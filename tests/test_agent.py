@@ -82,6 +82,38 @@ def test_invented_figures_are_never_shown(monkeypatch):
 
 
 @needs_data
+def test_answer_with_unverified_figure_falls_back(monkeypatch):
+    """Same rule as the card summary: an invented figure means the deterministic answer is shown."""
+    from ai import agent, llm
+    call = lambda i, name, args: SimpleNamespace(id=f"c{i}", function=SimpleNamespace(name=name, arguments=json.dumps(args)))
+    script = [
+        SimpleNamespace(content="", tool_calls=[call(1, "impact_card", {"day": "2026-03-27", "event_id": "EVD_FY_20260326"})]),
+        SimpleNamespace(content="The share fell 23.2% on 8.6x normal turnover; 99.9% made up.", tool_calls=None),
+    ]
+    monkeypatch.setattr(llm, "available", lambda: True)
+    monkeypatch.setattr(llm, "model_name", lambda: "test-model")
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: script.pop(0))
+    r = agent.run("What happened on 27 March?", EVD, context={"page": "dashboard"})
+    assert r["source"] == "template" and r["rejected"] == ["99.9"] and "99.9" not in r["text"]
+    assert not r["check"]["unsupported"]          # the deterministic answer passes its own check
+
+
+@needs_data
+def test_answer_that_passes_the_check_is_shown(monkeypatch):
+    from ai import agent, llm
+    call = lambda i, name, args: SimpleNamespace(id=f"c{i}", function=SimpleNamespace(name=name, arguments=json.dumps(args)))
+    script = [
+        SimpleNamespace(content="", tool_calls=[call(1, "impact_card", {"day": "2026-03-27", "event_id": "EVD_FY_20260326"})]),
+        SimpleNamespace(content="The share moved -23.2% on 8.6x normal turnover.", tool_calls=None),
+    ]
+    monkeypatch.setattr(llm, "available", lambda: True)
+    monkeypatch.setattr(llm, "model_name", lambda: "test-model")
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: script.pop(0))
+    r = agent.run("What happened on 27 March?", EVD, context={"page": "dashboard"})
+    assert r["source"] == "llm" and "rejected" not in r
+
+
+@needs_data
 def test_model_error_falls_back_to_template(monkeypatch):
     from ai import agent, llm
     monkeypatch.setattr(llm, "available", lambda: True)

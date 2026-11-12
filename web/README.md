@@ -30,7 +30,8 @@ Without a key, the AI summary and the analyst use deterministic templates over t
 `ai/agent.py` gives the model ten tools over the engine (`company_overview`, `peer_benchmark`, `trading_cost_curve`,
 `unusual_days`, `event_calendar`, `impact_card`, `compare_events`, `check_explanation`, `find_company`, `show`). The model picks the tools, reads
 their JSON and answers; `show` becomes a one-click button in the UI (open card, compare, report). Every number in the answer is
-checked against the tool outputs (`ai/checks.py`) and the result is shown under the answer. Causes come only from the event calendar.
+checked against the tool outputs (`ai/checks.py`); an answer with an unverified figure is replaced by the deterministic
+answer from the same tools (the dock then says "fixed rules"). Causes come only from the event calendar.
 Answers are cached in `data/agent_cache.json` for the live demo (`LLM_CACHE`); a replayed answer is labelled
 "saved answer", never presented as a fresh analysis. Each model call times out after 45 s (`LLM_TIMEOUT`) and the
 whole tool loop after 75 s; then the deterministic answer is shown, so the demo never hangs.
@@ -82,6 +83,6 @@ with the model in `.env`. It contains processed Deutsche Börse data: share it i
    wording to use instead. Click "Funds / short sellers sold" → **Not testable with this data** (Xetra does not identify investors).
 4. (0:55) "See all of them" → **Compare**: rank 3 of 215 unusual MDAX days.
 5. (1:05) Press **A** → "Was this the market, or company-specific?" → the analyst runs the same check and cites the figures.
-6. (1:20) **IR snapshot** → main finding, limits, next step, explanations checked → Print / save as PDF.
+6. (1:20) **IR snapshot** → main finding, limits, next step, explanations checked → Print / save as PDF. (Each card also has **Export IR report (PDF)**, one click.)
 
 URLs are shareable: `#/<ISIN>/<page>[/<day>/<event_id>]`, e.g. `#/DE0005470306/card/2026-03-27/EVD_FY_20260326`.

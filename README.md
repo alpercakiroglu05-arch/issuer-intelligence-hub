@@ -32,7 +32,7 @@ cp .env.example .env                                   # optional: add LLM key
 ```bash
 python web/server.py           # demo UI (web front end) -> http://127.0.0.1:8600
 streamlit run app/Home.py      # backup UI / analyst view -> http://localhost:8501
-pytest                         # 137 tests incl. the web API (data tests skip if data/ is empty)
+pytest                         # 146 tests incl. the web API (data tests skip if data/ is empty)
 python web/warm_cache.py       # re-warm the demo caches (summaries + assistant) after any prompt, card or engine change
 ```
 
@@ -80,7 +80,7 @@ futury-build-days-2026/
 ├── app/                   backup UI (Streamlit): Home.py · pages/1_Dashboard · 2_Impact_Card · 3_Compare · 4_Assistant
 ├── events/                events.csv (80 sourced events) · sectors.csv (174 stocks, Deutsche Börse sectors)
 ├── docs/                  API_CONTRACT · SUBMISSION (data, model, logic) · REQUIREMENTS (brief → web page) · C2_ENGINE · SCOPE · PITCH · design/
-├── tests/                 108 tests: engine, data, Streamlit pages, web API over HTTP, numbers check
+├── tests/                 146 tests: engine, data, web API over HTTP, PDF export, numbers and meaning check
 └── data/                  processed files (gitignored)
 ```
 
@@ -112,9 +112,10 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] Index-day context in `anomalies()` (expiry Fridays, index reviews, market-wide days; use the `INDEX` rows of `events.csv`)
 
 ### C3 · Frontend. Owner: Alper
-- [x] **Web front end** (`web/`, PR #27; Windows/NaN fixes in #30): the **demo UI**. Issuer Services look, ISIN entry, dashboard (volume, spread, auctions over time; peers; liquidity verdict; unusual days), impact card (minute chart with onset, auctions, who traded, aftershocks, AI summary with numbers check), compare, assistant, report (Part A + B, DE/EN, PDF) and ideas. Every brief item has one page (`docs/REQUIREMENTS.md`)
+- [x] **Web front end** (`web/`, PR #27; Windows/NaN fixes in #30): the **demo UI**. Issuer Services look, ISIN entry, dashboard (volume, spread, auctions over time; peers; liquidity verdict; cost by order size; unusual days), impact card (minute chart with onset, auctions, who traded, aftershocks, AI summary with numbers check), compare, report (Part A + B, DE/EN) and ideas. Every brief item has one page (`docs/REQUIREMENTS.md`)
+- [x] IR analyst dock on every page, own calendar (add event, CSV/ICS import; brief VI), market context in *Unusual days*, cost by order size (PR #36)
+- [x] **One-click PDF** on every impact card and on the dashboard (`/api/export`, PR #41)
 - [x] Streamlit (`app/`, backup UI): liquidity trend, episodes with events and market context, Compare with Index / Sector / Size, cost by order size, Part A report button (PRs #19–#29)
-- [ ] Web: show Kaan's market context (index days, expiries, MSCI) in *Unusual days*; optional: the cost-by-order-size block (`engine.xlm`). Agree with Kaan before building
 
 ### C4 · AI + report. Owner: AskingAtlas (no commits so far; C1 and C2 took the items over)
 - [x] **Part A report** (brief: the dashboard result "can be exported as a short report"): web Report tab (C3) and Streamlit button (C2, PR #29)
@@ -123,7 +124,10 @@ Everyone works on their own files, so merge conflicts are rare. Contracts betwee
 - [x] **Answer cache** (`LLM_CACHE`, PR #28) so the live demo survives Wi-Fi/API outages
 - [x] **German formatting** in the DE texts, snapshot, Part A report and the model prompt: `−23,2 %`, `27.03.2026`, `8,6-fach`, `2,5 Mio. EUR` (one place: `report/fmt.py`); the comparison group label is German too (`report.fmt.group_label`). EN output unchanged (Kaan, PR #33)
 - [x] **JAIF**: gateway `https://hip-gw.hessian.ai/v1`, model `hIP_1.0-Mistral/Mistral-Medium-3.5-128B` (accurate, 5–7 s, good German; Kolibri-1 made meaning errors). The key is at the top of the JAIF Model Handbook HTML in Discord. The demo texts are pre-cached
-- [ ] Optional: `agent.py` v2 with tool calling
+- [x] `agent.py` v2 with tool calling over the engine (Alper, PR #36)
+- [x] **Meaning check** ("the share fell X %" must be the share's own move) and one rank text everywhere (Kaan, PR #38); German short dates and English thousands understood by the numbers check (PR #40)
+- [x] **Cache warm-up** `python web/warm_cache.py` (PR #37): summaries + assistant answers; run after any prompt, card or engine change
+- [x] Assistant answers that fail the numbers check fall back to the deterministic answer, the same rule as the card summary
 
 ### Non-code (research and pitch team)
 - **Please spot-check the hero rows of `events/events.csv`** (source link, time) before the pitch.
@@ -146,6 +150,7 @@ All schemas (`daily_features`, `intraday_bars`, `events.csv`, `impact_card` JSON
 ## Conventions
 See **[CONTRIBUTING.md](CONTRIBUTING.md)**. In short:
 - `main` must always run: `python web/server.py`, `streamlit run app/Home.py` and `pytest`. Use branches `feat/<name>-<topic>` and small PRs.
+- **Never push to `main` directly.** A direct push on Wed night deleted the Streamlit app (restored in PR #39).
 - Paths and thresholds go in `config.py` only. Never commit data or `.env`.
 - Engine functions return plain dicts and DataFrames, never Streamlit objects.
 - No investment advice in any text. The tool explains the past and does not predict.

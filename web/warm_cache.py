@@ -94,16 +94,16 @@ def main(tickers: list[str]) -> int:
                 for q in questions:
                     out = server.agent({"isin": isin, "question": q, "history": [], "context": ctx, "lang": lang})
                     n += 1
-                    bad = (out.get("check") or {}).get("unsupported") or []
+                    bad = out.get("rejected") or (out.get("check") or {}).get("unsupported") or []
                     if bad:
                         flagged.append(f"{t} {ctx['page']} {lang} '{q}': {bad}")
                     print(f"{t} {ctx['page']} {lang} ask: {out['source']}{' FLAGGED ' + str(bad) if bad else ''}", flush=True)
     print(f"\n{n} texts warmed in {time.time() - t0:.0f} s; summaries from the model: {llm}, template: {len(rejected)}; "
-          f"assistant answers with figures not found: {len(flagged)}")
+          f"assistant answers that fall back (figures not found): {len(flagged)}")
     for r in rejected:
         print("  summary shows the template:", r)
     for f in flagged:
-        print("  assistant answer flagged:", f)
+        print("  assistant shows the deterministic answer:", f)
     return 0
 
 

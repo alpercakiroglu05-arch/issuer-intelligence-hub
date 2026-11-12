@@ -17,6 +17,8 @@ API (all GET unless noted, JSON):
     /api/compare?type=&index=             same-type events (engine.compare)
     /api/evidence?isin=&day=&event_id=    evidence brief + explanation check for one card (engine/evidence.py)
     POST /api/calendar {isin,events:[{date,time,type,title}]}  match the company's own calendar to trading days
+    GET  /api/export?isin=&day=&event_id=&lang=  one-click IR report as a PDF file: with day = the impact card
+                                          snapshot (report/template.html), without day = Part A (dashboard)
     POST /api/narrate {isin,day,event_id,lang}   AI summary (LLM or template fallback)
     POST /api/agent {isin,question,history,context,lang}  IR analyst agent (ai/agent.py: tool calling over the engine)
     POST /api/ask {isin,question,lang}           same agent, short answer (v1 contract)
@@ -237,8 +239,8 @@ def calendar(body: dict) -> dict:
     return {"events": out, "first_date": str(days[0].date()), "last_date": str(days[-1].date())}
 
 
-def _event(isin: str, event_id: str | None, user: dict | None = None) -> dict | None:
-    """The calendar event behind a card: events.csv, or the user's own entry (passed in the query)."""
+def card_event(isin: str, event_id: str | None, user: dict | None = None) -> dict | None:
+    """The calendar event of a card: from events.csv, else the company's own entry (typed in the browser)."""
     ev = find_event(isin, event_id)
     if ev is None and user and user.get("date"):
         t = (user.get("time") or "").strip()[:5]
@@ -250,11 +252,11 @@ def _event(isin: str, event_id: str | None, user: dict | None = None) -> dict | 
 
 def evidence_brief(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
     """Evidence brief + explanation check (engine/evidence.py), EN and DE, for one card."""
-    return clean(evidence.brief(isin, day, _event(isin, event_id, user)))
+    return clean(evidence.brief(isin, day, card_event(isin, event_id, user)))
 
 
 def card(isin: str, day: str, event_id: str | None, user: dict | None = None) -> dict:
-    ev = _event(isin, event_id, user)
+    ev = card_event(isin, event_id, user)
     c = impact.impact_card(isin, day, ev)
     s = data.stock(isin)
     i = int(s.index[s["date"] == pd.Timestamp(day)][0])
@@ -298,6 +300,30 @@ def llm_model() -> str | None:
         return llm.model_name() if llm.available() else None
     except Exception:  # noqa: BLE001
         return None
+
+
+def export_file(q: dict) -> tuple[bytes, str, str]:
+    """One-click IR report (brief: "one click ... including an exportable short report").
+    With `day`: the impact-card snapshot with its checked summary; without: the Part A report of the dashboard.
+    Returns (bytes, content type, file name); PDF when xhtml2pdf is installed, else the same report as HTML."""
+    from ai import narrate as nar
+    from report.export import part_a_html, to_html, to_pdf
+    isin = q["isin"]
+    lang = "de" if q.get("lang") == "de" else "en"
+    ticker = data.ticker_of(isin)
+    if q.get("day"):
+        user = {k: q[k] for k in ("date", "time", "type", "title") if k in q} or None
+        c = impact.impact_card(isin, q["day"], card_event(isin, q.get("event_id"), user))
+        html = to_html(c, nar.narrate_with_meta(c, lang)["text"], lang)
+        name = f"IR_snapshot_{ticker}_{q['day']}_{lang.upper()}"
+    else:
+        by = q.get("peer_by") if q.get("peer_by") in ("index", "sector", "size") else "index"
+        html = part_a_html(isin, lang, peer_by=by)
+        name = f"IR_report_{ticker}_{lang.upper()}"
+    pdf = to_pdf(html)
+    if pdf:
+        return pdf, "application/pdf", name + ".pdf"
+    return html.encode("utf-8"), "text/html; charset=utf-8", name + ".html"
 
 
 def narrate(body: dict) -> dict:
@@ -353,6 +379,25 @@ class Handler(SimpleHTTPRequestHandler):
             traceback.print_exc()
             self._json({"error": f"{type(e).__name__}: {e}"}, 500)
 
+    def _file(self, fn, q):
+        """A download (PDF/HTML) instead of JSON; errors stay JSON like every other route."""
+        try:
+            raw, ctype, name = fn(q)
+        except KeyError as e:
+            return self._json({"error": f"unknown: {e}"}, 404)
+        except ValueError as e:
+            return self._json({"error": str(e)}, 400)
+        except Exception as e:  # noqa: BLE001
+            traceback.print_exc()
+            return self._json({"error": f"{type(e).__name__}: {e}"}, 500)
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Disposition", f'attachment; filename="{name}"')
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
     def do_GET(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
@@ -371,6 +416,8 @@ class Handler(SimpleHTTPRequestHandler):
         }
         if u.path in routes:
             return self._guard(routes[u.path])
+        if u.path == "/api/export":
+            return self._file(export_file, q)
         if u.path == "/":
             self.path = "/index.html"
         return super().do_GET()
