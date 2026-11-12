@@ -267,7 +267,7 @@ def evidence_brief(isin: str, day: str, event_id: str | None, user: dict | None 
 
 
 def dashboard(isin: str, period: str = "3m") -> dict:
-    """Everything the dashboard shows, from the engine (engine.market); the browser only formats."""
+    """Dashboard data in one call, from the engine (engine.market). Optional: the current web UI uses /api/issuer."""
     d = market.dashboard(isin, period)
     d["cost_curve"] = (cost_curve(isin) or {}).get("summary")
     return clean(d)
@@ -306,7 +306,7 @@ def _card(isin: str, day: str, event_id: str | None, user: dict | None = None) -
                     "low": [r(x) for x in b["low"]], "high": [r(x) for x in b["high"]],
                     "eur": [r(x, 0) for x in b["volume_eur"]], "auction": [bool(x) for x in b["is_auction"]],
                     "buy": [r(x, 0) for x in b["aggr_buy_eur"]], "sell": [r(x, 0) for x in b["aggr_sell_eur"]]}
-            if prev_close:  # move vs the previous close per minute, so the browser computes nothing
+            if prev_close:  # move vs the previous close per minute, ready to plot
                 bars["ret"] = [r(x / prev_close - 1) for x in b["close"]]
     cm = c.get("comparison")
     rank = None
