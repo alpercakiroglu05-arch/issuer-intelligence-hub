@@ -52,7 +52,7 @@ CTX_WORDS = {
     "quarterly_expiry": ("a quarterly options and futures expiry", "ein großer Verfallstag"),
     "monthly_expiry": ("a monthly options expiry", "ein monatlicher Verfallstag"),
     "month_end_review": ("an index review date", "ein Index-Review-Tag"),
-    "market_wide_volume": ("a market-wide high-volume day (at least a quarter of all shares traded 2x normal)",
+    "market_wide_volume": ("a market-wide high-volume day (at least a quarter of all shares traded 2× normal)",
                            "ein marktweiter Umsatztag (mindestens ein Viertel aller Aktien mit doppeltem Umsatz)"),
 }
 TECHNICAL = {"index_event", "index_change", "quarterly_expiry", "monthly_expiry", "month_end_review"}
@@ -139,7 +139,7 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
     if _ok(ret):
         changed.append(T(f"The share closed {f['pct'](ret)} (closing auction vs the previous close); the other {idx} "
                          f"members moved {f['pct'](peer)} (equal-weighted average). Stock-specific move: {f['pct'](abn)}"
-                         + (f", {abs(z):.1f}x its normal daily stock-specific move." if _ok(z) else "."),
+                         + (f", {abs(z):.1f}× its normal daily stock-specific move." if _ok(z) else "."),
                          f"Die Aktie schloss {f['pct'](ret)} (Schlussauktion vs. Vortag); die übrigen {idx}-Werte "
                          f"bewegten sich um {f['pct'](peer)} (gleichgewichteter Durchschnitt). Titelspezifisch: {f['pct'](abn)}"
                          + (f", das {abs(z):.1f}-Fache der normalen Tagesbewegung.".replace(".", ",", 1) if _ok(z) else ".")))
@@ -153,7 +153,7 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
                   f" Nach {li['days_to_normal']} Handelstag(en) wieder normal.") if _ok(li.get("days_to_normal"))
                 else T(" Not back to normal within 20 trading days (or the data ends first).",
                        " Innerhalb von 20 Handelstagen nicht wieder normal (oder die Daten enden vorher)."))
-        changed.append(T(f"Cost of a round trip of EUR 25k (XLM, spread plus price impact): {f['bps'](li['xlm_25k_bps'])} "
+        changed.append(T(f"Cost of a round trip of €25k (XLM, spread plus price impact): {f['bps'](li['xlm_25k_bps'])} "
                          f"vs {f['bps'](li['xlm_25k_baseline_bps'])} normal ({f['x'](li['ratio'])}).",
                          f"Kosten für Kauf und Verkauf von 25 T€ (XLM, Spread plus Preiseinfluss): "
                          f"{f['bps'](li['xlm_25k_bps'])} vs. normal {f['bps'](li['xlm_25k_baseline_bps'])} "
@@ -216,7 +216,7 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
                          f"(normal {f['spct0'](ib)}), netto {f['eur'](abs(pa.get('agent_aggr_net_eur') or 0))}."))
     if on.get("time"):
         s = T(f"Trading reaction detected at {on['time']} (inferred from trades: price beyond 2 sigma and turnover "
-              f"3x normal for the time of day).",
+              f"3× normal for the time of day).",
               f"Handelsreaktion erkannt um {on['time']} (aus den Trades abgeleitet: Kurs jenseits 2 Sigma und Umsatz "
               f"3-fach normal für die Tageszeit).")
         if pub_time and _ok(lag):

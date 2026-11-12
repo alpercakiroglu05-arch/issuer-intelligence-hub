@@ -223,7 +223,7 @@ def test_assistant_meaning_check_rejects_the_wrong_move(monkeypatch):
                                    "The share fell 21.7% on 8.6x normal turnover."))
     r = agent.run("What happened on 27 March?", EVD, context={"page": "dashboard"})
     assert r["source"] == "template" and r["rejected"] and "21.7" in r["rejected"][0]
-    assert "-23.2%" in r["text"]
+    assert "−23.2%" in r["text"]          # EN house style (report.fmt): real minus sign
     _fake_llm(monkeypatch, _script("The share fell 23.2% (stock-specific -21.7%) on 8.6x normal turnover."))
     ok = agent.run("What happened on 27 March?", EVD, context={"page": "dashboard"})
     assert ok["source"] == "llm" and ok["check"]["unsupported"] == []

@@ -34,6 +34,7 @@ from ai import llm
 from ai.checks import meaning_errors, unsupported_numbers
 from config import COMPARE_MIN_GROUP, DATA_DIR
 from engine import baseline, compare, data, evidence, impact, market
+from report.fmt import normalize_en
 
 MAX_ROUNDS = 6
 CACHE_VERSION = 5  # bump when the agent logic changes, so old cached answers are not replayed
@@ -533,6 +534,13 @@ def _checked(out: dict, question: str, isin: str, context, lang: str) -> dict:
 
 
 def run(question: str, isin: str, history=(), context=None, lang: str = "en") -> dict:
+    out = _run(question, isin, history, context, lang)
+    if lang != "de" and out.get("text"):   # English house style (report.fmt): "−23.2%", "€25k", "8.6×"
+        out = {**out, "text": normalize_en(out["text"])}
+    return out
+
+
+def _run(question: str, isin: str, history=(), context=None, lang: str = "en") -> dict:
     question = str(question or "").strip()[:1000]
     if not question:
         raise ValueError("empty question")
@@ -608,7 +616,7 @@ def _nearest_trading_day(isin, day):
 def _pc(x, de, sign=True):
     if x is None:
         return "–"
-    v = f"{x * 100:+.1f}" if sign else f"{x * 100:.1f}"
+    v = (f"{x * 100:+.1f}" if sign else f"{x * 100:.1f}").replace("-", "−")
     return (v.replace(".", ",") + " %") if de else (v + "%")
 
 

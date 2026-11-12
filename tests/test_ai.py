@@ -52,7 +52,7 @@ def test_template_narrative_de_uses_german_number_and_date_format():
     assert "auffälligen Handelstagen, MDAX, Jan.–Okt. 2026" in de and "unusual" not in de
     assert unsupported_numbers(de, card) == []      # the numbers check understands the German style
     en = template_narrative(card, "en")
-    assert "-21.7%" in en and "2026-03-27" in en and "unusual trading days, MDAX, Jan – Oct 2026" in en
+    assert "−21.7%" in en and "8.6×" in en and "2026-03-27" in en and "unusual trading days, MDAX, Jan – Oct 2026" in en
 
 
 def test_numbers_check_understands_german_units():
@@ -147,3 +147,18 @@ def test_numbers_check_reads_english_thousands_in_titles():
     payload = {"title": "incoming orders down to EUR 1,628m"}
     assert unsupported_numbers("Auftragseingang 1,628 Mrd. EUR.", payload) == []
     assert unsupported_numbers("Auftragseingang 1,734 Mrd. EUR.", payload) == ["1,734"]
+
+
+def test_english_number_style_and_model_text_normaliser():
+    """EN: "−23.2%", "€25k", "€4.6m", "8.6×" from report.fmt; model text is brought into that style, numbers unchanged."""
+    from ai.checks import unsupported_numbers
+    from report.fmt import formatters, normalize_en
+    f = formatters("en")
+    assert (f["pct"](-0.232), f["eur"](25000), f["eur"](4.6e6), f["x"](8.6)) == ("−23.2%", "€25k", "€4.6m", "8.6×")
+    raw = "The share moved -23.2 %, peers -1.5 %. Turnover 8.6x normal, closing auction EUR 25.6 million, a EUR 25 k order, 2026-03-27, t-65."
+    out = normalize_en(raw)
+    assert out == ("The share moved −23.2%, peers −1.5%. Turnover 8.6× normal, closing auction €25.6m, a €25k order, "
+                   "2026-03-27, t-65.")
+    payload = {"price": {"ret": -0.232, "peer_ret": -0.015}, "volume": {"ratio": 8.6}, "auction_eur": 25600000,
+               "notional": 25000, "day": "2026-03-27", "window": "t-65"}
+    assert unsupported_numbers(out, payload) == unsupported_numbers(raw, payload) == []

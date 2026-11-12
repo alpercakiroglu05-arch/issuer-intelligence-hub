@@ -95,7 +95,7 @@ def test_part_a_impact_card_template_still_renders():
     from engine.impact import impact_card
     from report.export import to_html
     card = impact_card(_isin("EVD"), "2026-03-27")
-    assert "-21.7%" in to_html(card, "text", "en")
+    assert "−21.7%" in to_html(card, "text", "en")
     de = to_html(card, "text", "de")
     assert "−21,7 %" in de and "27.03.2026" in de and "-21.7%" not in de
     assert "auffälligen Handelstagen, MDAX, Jan.–Okt. 2026" in de
