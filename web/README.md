@@ -1,11 +1,10 @@
 # Web front end (C3)
 
-Two front ends on the same server and API:
-
-| URL | Files | What |
-|---|---|---|
-| `/` | `web/hub/` (`index.html`, `app.css`, `app.js`) | **The Issuer Intelligence Hub UI.** Opens straight on the dashboard of the last company (CTS Eventim the first time). Overview with periods 1M / 3M / YTD / 1Y, events, impact card (at a glance, the day, who traded, evidence), compare, report, IR analyst drawer, ⌘K search. Light theme by default, dark on request (remembered). |
-| `/index.html` | `web/index.html`, `app.css`, `app.js` | The previous UI (DB family look, ISIN entry, ideas page). `web/snapshot.py` still builds the offline copy from it. |
+The Issuer Intelligence Hub UI (`web/index.html`, `app.css`, `app.js`, served at `/`). It opens straight on the dashboard
+of the last company (CTS Eventim the first time): Overview with the periods 1M / 3M / YTD (price, turnover, trading cost
+and auction share over time, who trades, trading cost by order size, peers, unusual days), Events, the impact card (at a
+glance, the day minute by minute, who traded, evidence), Compare, Report and Ideas, plus the IR analyst drawer and a share
+search (⌘K). Light theme by default, dark on request (remembered). The earlier UI was replaced by this one.
 Every number comes from the engine (`engine/`) through a small JSON API. Words come from `ai/` (LLM or template fallback).
 The page map and the challenge items each page covers are listed in [`docs/REQUIREMENTS.md`](../docs/REQUIREMENTS.md).
 
@@ -48,9 +47,10 @@ whole tool loop after 75 s; then the deterministic answer is shown, so the demo 
 The UI sends the selected period (`period`, `from`, `to`) with every question, so "how did we do?" uses the period on screen;
 `share_performance` returns an error for a period the data does not cover (1Y), and the analyst says so.
 
-### Periods (web/hub)
+### Periods
 
-1M = last 21 trading days, 3M = 63, YTD = this calendar year, 1Y = 252 (engine.market, `GET /api/dashboard?period=`).
+1M = last 21 trading days, 3M = 63, YTD = this calendar year (engine.market, `GET /api/dashboard?period=`); 1Y (252)
+exists in the engine but is not offered, because the data starts on 2 Jan 2026.
 The return runs from the close of the trading day before the window to the last close (closing-auction prices, not adjusted
 for dividends; ex-dividend days in the window are listed). The excerpt starts on 2 Jan 2026, so YTD starts at the 2 Jan close
 (the 31 Dec 2025 close is not in the data, the page says so) and 1Y is disabled with the reason. "Index" = the equal-weighted
@@ -89,20 +89,20 @@ with the model in `.env`. It contains processed Deutsche Börse data: share it i
 | File | What |
 |---|---|
 | `server.py` | static files + `/api/universe`, `/api/issuer`, `/api/card`, `/api/evidence`, `/api/compare`, `/api/status`, `POST /api/calendar`, `POST /api/narrate`, `POST /api/agent`, `POST /api/ask` |
-| `index.html` | shell: ISIN entry (gate) and the company workspace |
-| `app.css` | DB tokens (navy `#000099`, sky `#0099ff`, News Gothic → Archivo), layout, transitions |
-| `app.js` | pages, charts (hand-written SVG), AI numbers check, report builder, analyst dock |
+| `index.html` | shell: top bar, page, analyst drawer, search; sets the theme before the first paint |
+| `app.css` | theme tokens (light by default, `:root[data-theme=dark]`), layout, transitions |
+| `app.js` | pages, charts (hand-written SVG), periods, AI numbers check, evidence statuses, report builder, analyst |
 | `snapshot.py` | builds the offline single-file copy |
 
 ## Demo path (90 seconds)
 
-1. (0:00) Click **EVD CTS Eventim** → dashboard: €11.8m a day, 21.1 bps for €25k, liquidity stable, category A.
-2. (0:15) "Most unusual day this year: 27 March" → **Open its impact card**: −23.2 %, peers −1.5 %, stock-specific −21.7 %,
+1. (0:00) The page opens on **CTS Eventim** (YTD): price vs MDAX peers, turnover, trading cost, category A.
+2. (0:15) "Most unusual day · YTD: 27 March" → **Open impact card**: −23.2 %, peers −1.5 %, stock-specific −21.7 %,
    8.6× turnover, closing auction €25.6m (3.6×), reaction detected in trading at 09:03.
-3. (0:35) **Evidence brief** → type "The whole market sold off that day" → **Contradicted by the data**, with the
+3. (0:35) Tab **Evidence** → type "The whole market sold off that day" → **Contradicted by the data**, with the
    wording to use instead. Click "Funds / short sellers sold" → **Not testable with this data** (Xetra does not identify investors).
-4. (0:55) "See all of them" → **Compare**: rank 3 of 215 unusual MDAX days.
+4. (0:55) **Compare with similar days** → rank 3 of 215 unusual MDAX days.
 5. (1:05) Press **A** → "Was this the market, or company-specific?" → the analyst runs the same check and cites the figures.
-6. (1:20) **IR snapshot** → main finding, limits, next step, explanations checked → Print / save as PDF. (Each card also has **Export IR report (PDF)**, one click.)
+6. (1:20) **Add to report** → choose the sections (checkboxes) → Save as PDF. (Each card also has **Export IR report (PDF)**, one click.)
 
-URLs are shareable: `#/<ISIN>/<page>[/<day>/<event_id>]`, e.g. `#/DE0005470306/card/2026-03-27/EVD_FY_20260326`.
+URLs are shareable: `#/<ISIN>/<page>[/<day>/<event_id>]`, e.g. `#/DE0005470306/event/2026-03-27/EVD_FY_20260326`.

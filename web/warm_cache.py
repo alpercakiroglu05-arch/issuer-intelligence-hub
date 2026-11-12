@@ -32,11 +32,11 @@ from engine import baseline, data, market
 
 
 def hub_period() -> dict:
-    """The period fields the UI (web/hub) adds to every assistant context; YTD is its default period."""
+    """The period fields the UI (web/app.js) adds to every assistant context; YTD is its default period."""
     ytd = next(p for p in market.periods() if p["key"] == "ytd")
     return {"period": "ytd", "from": ytd["start_close"], "to": ytd["to"]}
 
-DOCK = {  # the analyst's suggested questions (web/hub/app.js sugg(); the previous UI web/app.js has the same chips)
+DOCK = {  # the analyst's suggested questions (web/app.js sugg())
     "dashboard": {"en": ["Has our liquidity improved?", "How do our spreads compare with our sector?",
                          "What were our biggest moves this year?", "How large an order can the book absorb?"],
                   "de": ["Hat sich unsere Liquidität verbessert?", "Wie sind unsere Spreads im Sektorvergleich?",

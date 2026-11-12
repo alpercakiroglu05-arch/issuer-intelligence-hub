@@ -8,7 +8,7 @@ server (teammates, mentors, the jury). It opens with a double click, no Python, 
     python web/snapshot.py --llm                # AI texts from the language model in .env (slower), not templates
 
 What is inside: the page (index.html + app.css + app.js inlined) and the JSON answers of every API call the demo
-makes for the chosen shares: dashboard, every impact card (calendar events and unusual days), comparisons,
+makes for the chosen shares: the overview for 1M / 3M / YTD, every impact card (calendar events and unusual days), comparisons,
 AI summaries (EN/DE) and the analyst's suggested questions. A small fetch() shim answers from that JSON.
 Also inside: the evidence brief of every card; the explanation check runs in the browser, so it works offline.
 Not inside: other shares, typed analyst questions and the own-calendar import (they need the live server);
@@ -40,20 +40,18 @@ def load_server(llm: bool):
 
 
 def suggestions() -> dict:
-    """The analyst's suggested questions per page, read from app.js so the keys always match the UI."""
+    """The analyst's suggested questions per page, read from app.js (sugg()) so the keys always match the UI.
+    sugg() lists the impact card's questions first, then the comparison's, then the default (dashboard) ones."""
     js = (WEB / "app.js").read_text(encoding="utf-8")
-    body = js[js.index("function dockSugg()"):js.index("function dockMsg(")]
-    pages = {}
-    for page, block in re.findall(r"(card|compare|report):\s*\[(.*?)\]", body, flags=re.S):
-        pages[page] = re.findall(r'L\("([^"]+)",\s*"([^"]+)"\)', block)
-    default = body[body.index("||"):]
-    pages["dashboard"] = re.findall(r'L\("([^"]+)",\s*"([^"]+)"\)', default)
-    return pages
+    body = js[js.index("function sugg()"):js.index("function ctx()")]
+    blocks = re.findall(r"return \[(.*?)\];", body, flags=re.S)
+    q = [re.findall(r'L\("([^"]+)",\s*"([^"]+)"\)', b) for b in blocks]
+    return {"card": q[0], "compare": q[1], "dashboard": q[2], "report": q[2]}
 
 
 def build(tickers, llm: bool, out: Path):
     srv = load_server(llm)
-    from engine import compare, data
+    from engine import compare, data, market
 
     t0 = time.time()
     isins = [data.isin_of(t) for t in tickers]
@@ -62,7 +60,9 @@ def build(tickers, llm: bool, out: Path):
     status = {**srv.clean({"stocks": len(uni), "intraday_stocks": len(uni), "llm": bool(llm and srv.llm_available()),
                            "model": srv.llm_model() if llm else None,
                            "first_date": str(data.daily()["date"].min().date()),
-                           "last_date": str(data.daily()["date"].max().date())}), "offline": True}
+                           "last_date": str(data.daily()["date"].max().date()),
+                           "periods": market.periods()}), "offline": True}
+    periods = [p for p in market.periods() if p["available"]]
     snap["/api/status"], snap["/api/universe"] = status, uni
     sugg = suggestions()
     types = compare.event_types()
@@ -72,6 +72,8 @@ def build(tickers, llm: bool, out: Path):
     for isin in isins:
         iss = srv.issuer(isin)
         snap[f"/api/issuer?isin={isin}"] = iss
+        for p in periods:
+            snap[f"/api/dashboard?isin={isin}&period={p['key']}"] = srv.dashboard(isin, p["key"])
         sel = {(str(e["reaction_day"])[:10], e["event_id"]) for e in iss["events"] if e.get("reaction_day")}
         sel |= {(a["peak_date"], None) for a in iss["anomalies"]}
         for day, ev in sorted(sel, key=lambda x: (x[0], x[1] or "")):

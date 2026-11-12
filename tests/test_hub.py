@@ -1,4 +1,4 @@
-"""The web UI's data contracts (web/hub): periods 1M / 3M / YTD / 1Y, the comparison counts, the evidence statuses,
+"""The web UI's data contracts (web/index.html, app.js): periods 1M / 3M / YTD (1Y unavailable), the comparison counts, the evidence statuses,
 the agent's period tool and the summary wording. No real LLM is called."""
 import importlib.util
 from pathlib import Path
@@ -61,11 +61,12 @@ def test_issuer_series_carries_the_peer_move():
     assert s["peer_ret"][i] == pytest.approx(raw[pd.Timestamp(s["date"][i])], abs=1e-6)
 
 
-def test_status_lists_the_periods_and_root_is_the_hub():
+def test_status_lists_the_periods_and_the_page_is_the_new_ui():
     srv = _server()
-    assert (srv.WEB / "hub" / "index.html").exists()
+    html = (srv.WEB / "index.html").read_text(encoding="utf-8")
+    assert 'src="app.js"' in html and 'data-theme="light"' in html and not (srv.WEB / "hub").exists()
     src = (Path(srv.__file__)).read_text(encoding="utf-8")
-    assert '"/hub/index.html"' in src and '"periods": market.periods()' in src
+    assert '"periods": market.periods()' in src
 
 
 def test_evidence_missing_evidence_is_not_a_contradiction():

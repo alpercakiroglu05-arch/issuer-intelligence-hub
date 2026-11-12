@@ -479,8 +479,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._guard(routes[u.path])
         if u.path == "/api/export":
             return self._file(export_file, q)
-        if u.path == "/":  # the Issuer Intelligence Hub UI (web/hub); the previous UI stays at /index.html
-            self.path = "/hub/index.html"
+        if u.path == "/":
+            self.path = "/index.html"
         return super().do_GET()
 
     def do_POST(self):

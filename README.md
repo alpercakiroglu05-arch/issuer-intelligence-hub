@@ -63,8 +63,8 @@ python ingest/build_intraday.py                  # ~3 min, every stock in events
                           ▼  JSON
   ai/       narrate.py (DE/EN text) · checks.py (numbers check) · agent.py (Q&A)  ← LLM sees JSON only
                           ▼
-  web/      demo UI: server.py (JSON API) + app.js (Issuer Services look): ISIN entry · Dashboard ·
-            Impact card · Compare · Assistant · Report (Part A + B) · Ideas
+  web/      demo UI: server.py (JSON API) + index.html/app.js: Overview (1M/3M/YTD) · Events ·
+            Impact card · Compare · Report (Part A + B) · Ideas · IR analyst
   app/      backup UI / analyst view (Streamlit): Dashboard · Impact card · Compare · Assistant
   report/   IR snapshot HTML/PDF (impact card + Part A report)
 ```
