@@ -1,0 +1,234 @@
+{
+ "isin": "DE0005470306",
+ "ticker": "EVD",
+ "company": "CTS Eventim",
+ "note": "Curated research pack for the demo. Every item paraphrases a cited, public source; dates are the publication day. Built 2026-11-12.",
+ "sources": {
+  "evd_fy_goldesel": {
+   "publisher": "goldesel",
+   "title": "CTS Eventim überschreitet 2025 erstmals 3 Mrd. € Umsatz: Wachstum bleibt profitabel – Dividende sinkt",
+   "url": "https://goldesel.de/aktien/news/cts-eventim-uberschreitet-2025-erstmals-3-mrd-umsatz-wachstum-bleibt-profitabel-dividende-sinkt",
+   "date": "2026-03-26",
+   "type": "press"
+  },
+  "evd_fy_release": {
+   "publisher": "CTS Eventim (EQS-News)",
+   "title": "CTS EVENTIM exceeds EUR 3 billion in revenue for the first time, sustaining profitable growth",
+   "url": "https://app.boersengefluester.de/de/newswire/DE0005470306/cts-eventim-ag-co-kgaa/cts-eventim-exceeds-eur-3-billion-in-revenue-for-the-first-time-sustaining-profitable-growth-2298732",
+   "date": "2026-03-26",
+   "time": "17:45",
+   "type": "company"
+  },
+  "evd_fy_stock3": {
+   "publisher": "stock3",
+   "title": "CTS Eventim: 15 % Kurssturz nach Zahlen",
+   "url": "https://stock3.com/news/cts-eventim-15-kurssturz-nach-zahlen-16999445",
+   "date": "2026-03-27",
+   "type": "press"
+  },
+  "evd_fy_lynx": {
+   "publisher": "LYNX (Ronald Gehrt)",
+   "title": "CTS Eventim: Stop Loss-Lawine?",
+   "url": "https://www.lynxbroker.de/boerse/boerse-kurse/aktien/cts-eventim-aktie/cts-eventim-analyse/",
+   "date": "2026-03-30",
+   "type": "analyst"
+  },
+  "evd_q1_dpa": {
+   "publisher": "dpa-AFX (extraETF)",
+   "title": "ROUNDUP: CTS Eventim startet mit Schwung ins Jahr – Aktie steigt deutlich",
+   "url": "https://extraetf.com/de/news/dpa-afx/roundup-cts-eventim-startet-mit-schwung-ins-jahr-aktie-steigt-deutlich--1780041028-02356-1780041027198",
+   "date": "2026-05-29",
+   "type": "press"
+  },
+  "evd_exane": {
+   "publisher": "Börse Express",
+   "title": "CTS Eventim Aktie kaufen oder verkaufen? Prognose 2026",
+   "url": "https://www.boerse-express.com/analyse/cts-eventim-aktie-kaufen-oder-verkaufen",
+   "date": "2026-06-08",
+   "type": "analyst"
+  },
+  "evd_h1": {
+   "publisher": "sharedeals",
+   "title": "CTS Eventim-Aktie: Kommt jetzt Drive in die Kursentwicklung?",
+   "url": "https://www.sharedeals.de/?p=239479",
+   "date": "2026-10-27",
+   "type": "press"
+  },
+  "evd_msci": {
+   "publisher": "MSCI",
+   "title": "MSCI August 2026 index review (calendar entry)",
+   "url": "https://app2.msci.com/eqb/gimi/stdindex/MSCI_Aug26_STPublicList.pdf",
+   "date": "2026-08-31",
+   "type": "index"
+  },
+  "evd_cfo": {
+   "publisher": "goldesel",
+   "title": "CTS Eventim & Aktie: CFO-Abgang löst Kursrutsch auf 51 Euro aus",
+   "url": "https://goldesel.de/aktien/news/cts-eventim-aktie-cfo-abgang-lost-kursrutsch-auf-51-euro-aus",
+   "date": "2026-09-30",
+   "type": "press"
+  },
+  "evd_ananym": {
+   "publisher": "sharedeals",
+   "title": "CTS Eventim-Aktie: Fast 25% Plus in einem Monat, geht das weiter?",
+   "url": "https://www.sharedeals.de/?p=240283",
+   "date": "2026-10-20",
+   "type": "press"
+  }
+ },
+ "items": [
+  {
+   "id": "evd_fy_numbers",
+   "date": "2026-03-26",
+   "kind": "company",
+   "dir": "pos",
+   "w": 1,
+   "event": "EVD_FY_20260326",
+   "src": [
+    "evd_fy_release"
+   ],
+   "en": "FY 2025 results after the close: revenue above €3 billion for the first time and higher operating earnings.",
+   "de": "Jahreszahlen 2025 nach Börsenschluss: Umsatz erstmals über 3 Mrd. € und höheres operatives Ergebnis."
+  },
+  {
+   "id": "evd_fy_outlook",
+   "date": "2026-03-26",
+   "kind": "guidance",
+   "dir": "neg",
+   "w": 3,
+   "event": "EVD_FY_20260326",
+   "src": [
+    "evd_fy_goldesel",
+    "evd_fy_stock3"
+   ],
+   "en": "The 2026 outlook only promised an increase in revenue and adjusted EBITDA, with no figures; the market read it as weak.",
+   "de": "Der Ausblick 2026 versprach nur einen Anstieg von Umsatz und bereinigtem EBITDA, ohne Zahlen; der Markt wertete ihn als schwach."
+  },
+  {
+   "id": "evd_fy_dividend",
+   "date": "2026-03-26",
+   "kind": "company",
+   "dir": "neg",
+   "w": 3,
+   "event": "EVD_FY_20260326",
+   "src": [
+    "evd_fy_goldesel",
+    "evd_fy_stock3"
+   ],
+   "en": "The dividend was cut from €1.66 to €1.44 per share as reported net profit fell.",
+   "de": "Die Dividende wurde von 1,66 € auf 1,44 € je Aktie gekürzt, weil der ausgewiesene Überschuss sank."
+  },
+  {
+   "id": "evd_fy_eps",
+   "date": "2026-03-30",
+   "kind": "analyst",
+   "dir": "neg",
+   "w": 2,
+   "event": "EVD_FY_20260326",
+   "src": [
+    "evd_fy_lynx"
+   ],
+   "en": "A later analysis pointed to a larger-than-expected fall in earnings per share and an outlook conditional on geopolitics, the economy and energy prices.",
+   "de": "Eine spätere Analyse verwies auf einen stärker als erwarteten Rückgang des Gewinns je Aktie und einen Ausblick unter Vorbehalt von Geopolitik, Konjunktur und Energiepreisen."
+  },
+  {
+   "id": "evd_q1",
+   "date": "2026-05-29",
+   "kind": "company",
+   "dir": "pos",
+   "w": 2,
+   "event": "EVD_Q1_20260528",
+   "src": [
+    "evd_q1_dpa"
+   ],
+   "en": "Q1 revenue rose 23% to €613.5m and the share rose clearly; dpa-AFX noted the cautious March outlook had caused the earlier slump.",
+   "de": "Der Q1-Umsatz stieg um 23 % auf 613,5 Mio. € und die Aktie legte deutlich zu; dpa-AFX verwies darauf, dass der vorsichtige März-Ausblick den Kurseinbruch ausgelöst hatte."
+  },
+  {
+   "id": "evd_exane",
+   "date": "2026-06-08",
+   "kind": "analyst",
+   "dir": "neg",
+   "w": 2,
+   "src": [
+    "evd_exane"
+   ],
+   "en": "Exane BNP Paribas downgraded to underperform (target €54), citing market-share losses at large events and a more capital-intensive model.",
+   "de": "Exane BNP Paribas stufte auf Underperform ab (Kursziel 54 €) und nannte Marktanteilsverluste bei Großveranstaltungen sowie ein kapitalintensiveres Modell."
+  },
+  {
+   "id": "evd_h1",
+   "date": "2026-08-20",
+   "kind": "company",
+   "dir": "pos",
+   "w": 1,
+   "event": "EVD_H1_20260820",
+   "src": [
+    "evd_h1"
+   ],
+   "en": "H1 revenue rose 16.9% to €1.5 billion and adjusted EBITDA 12.4% to €225.4m.",
+   "de": "Im ersten Halbjahr stieg der Umsatz um 16,9 % auf 1,5 Mrd. €, das bereinigte EBITDA um 12,4 % auf 225,4 Mio. €."
+  },
+  {
+   "id": "evd_msci",
+   "date": "2026-08-31",
+   "kind": "index",
+   "dir": "neg",
+   "w": 2,
+   "event": "EVD_INDEX_20260831",
+   "src": [
+    "evd_msci"
+   ],
+   "en": "The share was deleted from the MSCI Germany index at the close of 31 August, so index funds tracking it had to sell.",
+   "de": "Die Aktie wurde zum Schluss am 31. August aus dem MSCI-Germany-Index genommen; Indexfonds mussten verkaufen."
+  },
+  {
+   "id": "evd_cfo",
+   "date": "2026-09-30",
+   "kind": "management",
+   "dir": "neg",
+   "w": 3,
+   "event": "EVD_ADHOC_20260930",
+   "src": [
+    "evd_cfo"
+   ],
+   "en": "CFO William Willms left with immediate effect after nine months, without a reason given; the share slid to about €51.",
+   "de": "Finanzvorstand William Willms ging nach neun Monaten mit sofortiger Wirkung, ohne Begründung; die Aktie rutschte auf rund 51 €."
+  },
+  {
+   "id": "evd_ananym",
+   "date": "2026-10-20",
+   "kind": "investor",
+   "dir": "pos",
+   "w": 3,
+   "src": [
+    "evd_ananym",
+    "evd_h1"
+   ],
+   "en": "US investor Ananym Capital disclosed a stake and called CTS Eventim undervalued.",
+   "de": "Der US-Investor Ananym Capital machte seinen Einstieg öffentlich und nannte CTS Eventim unterbewertet."
+  },
+  {
+   "id": "evd_q3_next",
+   "date": "2026-10-27",
+   "kind": "watch",
+   "dir": "neutral",
+   "w": 1,
+   "src": [
+    "evd_h1"
+   ],
+   "en": "Q3 results were scheduled for 19 November.",
+   "de": "Die Q3-Zahlen waren für den 19. November angesetzt."
+  }
+ ],
+ "events": {
+  "EVD_FY_20260326": {
+   "question_en": "Why did CTS Eventim lose a fifth of its value after record revenue?",
+   "question_de": "Warum verlor CTS Eventim nach einem Rekordumsatz ein Fünftel seines Werts?",
+   "open_en": "The sources agree on the outlook and the dividend; how much each weighed, and who sold, the data cannot show.",
+   "open_de": "Die Quellen nennen übereinstimmend Ausblick und Dividende; wie stark beides wog und wer verkaufte, zeigen die Daten nicht.",
+   "headline_en": "Record revenue mattered less than what came with it: a vague 2026 outlook without figures and a lower dividend.",
+   "headline_de": "Der Rekordumsatz zählte weniger als das, was dazukam: ein vager Ausblick 2026 ohne Zahlen und eine niedrigere Dividende."
+  }
+ }
+}

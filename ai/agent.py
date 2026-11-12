@@ -37,7 +37,7 @@ from engine import baseline, compare, data, evidence, impact, market
 from report.fmt import normalize_en
 
 MAX_ROUNDS = 6
-CACHE_VERSION = 5  # bump when the agent logic changes, so old cached answers are not replayed
+CACHE_VERSION = 6  # bump when the agent logic changes, so old cached answers are not replayed
 # GLM-5.3-Flash reasons before it answers; a small budget can end with no visible answer (model handbook)
 MAX_TOKENS = 4096
 BUDGET_S = 75  # whole tool loop; past this the deterministic answer is shown instead of a spinner
@@ -79,6 +79,10 @@ Rules:
   cover (e.g. 1 year) returns an error: say so and name the period the data does cover; never substitute silently.
 - "Has liquidity improved?": use the liquidity_trend verdict and summary (last 60 vs previous 60 trading days,
   stock vs index). Never compare a 60-day median with a 4-month average.
+- WHY questions ("why did we fall/rise", "what drove the share", "warum"): call explain_reaction (the day, or the period)
+  and, for a day, check_explanation. If explain_reaction is available, answer with its headline and its main drivers and
+  name each source by publisher and date ("JPMorgan via Reuters, 6 May"); keep "consistent with", never "caused by".
+  If it is not available, say that no external reporting is connected for this share and answer from the trading data.
 - If the calendar lists an announcement for a day, name it; never say there is no context when there is one.
 - Do not mention internal field names, z-scores or severity scores.
   XLM = Xetra Liquidity Measure: round-trip cost of a EUR 25k order (spread + price impact) in basis points.
@@ -302,6 +306,26 @@ def check_explanation(isin: str, day: str, explanation: str, event_id: str | Non
                                "not_testable = the data cannot answer it"})
 
 
+def explain_reaction(isin: str, day: str | None = None, event_id: str | None = None, period: str | None = None) -> dict:
+    """WHY a share moved: cited external reporting (expectations, guidance, analysts, ...) next to the trading figures
+    (ai/intel.py). Only shares with a research pack (the demo companies) have it."""
+    from ai import intel
+    if day:
+        td = _day(day)
+        ev = _event_on(isin, td, event_id)
+        r = intel.explain_event(isin, td, (ev or {}).get("event_id"), "en")
+    else:
+        r = intel.explain_period(isin, period or "1m", "en")
+    if not r:
+        return {"available": False, "note": "No cited external reporting is connected for this share/day; "
+                                            "only the trading data can answer (use check_explanation)."}
+    return _clean({"available": True, "question": r.get("question"), "headline": r["headline"], "reaction": r.get("reaction"),
+                   "drivers": [{"text": d["text"], "sources": [f"{x['publisher']}, {x['date']}" for x in d["sources"]],
+                                "timing": d["timing"]} for d in r["drivers"]],
+                   "trading": r["trading"], "assessment": r.get("assessment"), "watch": r.get("watch"),
+                   "note": "External sources are curated; association, not proof."})
+
+
 def show(view: str, isin: str, day: str | None = None, event_id: str | None = None,
          event_type: str | None = None, index: str | None = None) -> dict:
     if view not in ("dashboard", "card", "compare", "report"):
@@ -350,6 +374,11 @@ TOOLS = [
         "no_evidence (no sign, cannot be ruled out) / not_testable, the evidence and a more "
         "defensible wording.", {"isin": _ISIN, "day": _DAY, "explanation": {"type": "string"},
                                 "event_id": {"type": "string"}}, ["isin", "day", "explanation"]),
+    _fn("explain_reaction", "WHY the share moved: cited external reporting (expectations vs results, guidance, analyst "
+        "views, competition) next to the trading figures, for one event day or a period (1m, 3m, ytd). Use it for "
+        "'why did we fall/rise', 'what drove the share'. available=false means no external reporting is connected.",
+        {"isin": _ISIN, "day": _DAY, "event_id": {"type": "string"},
+         "period": {"type": "string", "enum": ["1m", "3m", "ytd", "1y"]}}, ["isin"]),
     _fn("show", "Offer the user a one-click button that opens a view: the impact card of a day, the comparison "
         "page, the IR snapshot report or the dashboard.",
         {"view": {"type": "string", "enum": ["dashboard", "card", "compare", "report"]}, "isin": _ISIN, "day": _DAY,
@@ -360,9 +389,9 @@ IMPL = {"find_company": find_company, "company_overview": company_overview, "sha
         "peer_benchmark": peer_benchmark,
         "trading_cost_curve": trading_cost_curve, "unusual_days": unusual_days, "event_calendar": event_calendar,
         "impact_card": impact_card, "compare_events": compare_events, "check_explanation": check_explanation,
-        "show": show}
+        "explain_reaction": explain_reaction, "show": show}
 _NEEDS_ISIN = {"company_overview", "share_performance", "peer_benchmark", "trading_cost_curve", "unusual_days", "event_calendar",
-               "impact_card", "check_explanation", "show"}
+               "impact_card", "check_explanation", "explain_reaction", "show"}
 
 
 def call_tool(name: str, args: dict, isin: str, context: dict | None = None) -> dict:
@@ -701,6 +730,23 @@ def fallback(question: str, isin: str, context=None, lang: str = "en") -> dict:
         "market", "markt", "fund", "fonds", "short", "leak", "insider", "overreact", "übertr", "thin", "dünn",
         "investor", "anleger", "index", "expir", "verfall", "revers", "erhol", "why", "warum", "because", "weil",
         "explanation", "erklärung") else []
+    if has("why", "warum", "drove", "driver", "treiber", "reason", "grund", "bewegt") and not peerq:
+        from ai import intel
+        if intel.pack(isin):
+            wd = _nearest_trading_day(isin, day or ctx.get("day")) if (day or ctx.get("day")) else None
+            weid = ctx.get("event_id") if wd and wd == ctx.get("day") else None
+            r = use("explain_reaction", day=wd, event_id=weid) if wd else use("explain_reaction", period=ctx.get("period") or "1m")
+            if r.get("available"):
+                lr = intel.explain_event(isin, wd, (_event_on(isin, wd, weid) or {}).get("event_id"), lang) if wd else \
+                    intel.explain_period(isin, ctx.get("period") or "1m", lang)
+                if lr:
+                    outputs.append(lr)
+                    drv = " ".join(f"{d['text']} ({d['sources'][0]['publisher']}, {d['sources'][0]['date']})" for d in lr["drivers"][:2])
+                    text = f"{lr['headline']} {drv} {lr['trading']}".strip()
+                    if wd:
+                        act("card", day=wd, event_id=weid or (_event_on(isin, wd, weid) or {}).get("event_id"))
+                    return {"text": text, "source": "template", "model": None, "steps": steps, "actions": actions,
+                            "check": _check(text, outputs, question, context)}
     td = _nearest_trading_day(isin, day or ctx.get("day")) if claim_ids and not peerq else None
     if td:
         eid = ctx.get("event_id") if td == ctx.get("day") else None

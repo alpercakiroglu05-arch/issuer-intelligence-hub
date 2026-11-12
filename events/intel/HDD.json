@@ -1,0 +1,199 @@
+{
+ "isin": "DE0007314007",
+ "ticker": "HDD",
+ "company": "Heidelberger Druckmaschinen",
+ "note": "Curated research pack for the demo. Every item paraphrases a cited, public source; dates are the publication day. Built 2026-11-12.",
+ "sources": {
+  "hdd_apr": {
+   "publisher": "Trading-Treff",
+   "title": "Heidelberger Druck: 6,6 % EBITDA-Marge statt 7,1 %",
+   "url": "https://trading-treff.de/trading/heidelberger-druck-66-ebitda-marge-statt-71",
+   "date": "2026-04-16",
+   "type": "press"
+  },
+  "hdd_onberg": {
+   "publisher": "Börse Express",
+   "title": "Heidelberger Druckmaschinen Aktie: ONBERG mit Ondas gegründet",
+   "url": "https://www.boerse-express.com/news/articles/heidelberger-druckmaschinen-aktie-onberg-mit-ondas-gegruendet-926813",
+   "date": "2026-07-10",
+   "type": "press"
+  },
+  "hdd_jul": {
+   "publisher": "Börse Express",
+   "title": "Heidelberger Druckmaschinen Aktie: 450 Stellen weg, Drohnenabwehr rauf",
+   "url": "https://www.boerse-express.com/news/articles/heidelberger-druckmaschinen-aktie-450-stellen-weg-drohnenabwehr-rauf-927502",
+   "date": "2026-07-13",
+   "type": "press"
+  },
+  "hdd_q1": {
+   "publisher": "Kapitalmarktexperten",
+   "title": "Heidelberger Druck: Umsatz fällt auf 404 Millionen",
+   "url": "https://www.kapitalmarktexperten.de/heidelberger-druck-umsatz-faellt-auf-404-millionen/",
+   "date": "2026-08-19",
+   "type": "press"
+  },
+  "hdd_adhoc": {
+   "publisher": "MS Aktuell",
+   "title": "Heidelberg senkt Margenziel",
+   "url": "https://ms-aktuell.de/?p=172992",
+   "date": "2026-10-29",
+   "time": "12:00",
+   "type": "press"
+  },
+  "hdd_drweb": {
+   "publisher": "Dr. Web",
+   "title": "Heidelberger Druckmaschinen senkt Margenziel",
+   "url": "https://www.drweb.de/heidelberger-druckmaschinen-prognose-marge/",
+   "date": "2026-10-29",
+   "type": "press"
+  },
+  "hdd_dpa": {
+   "publisher": "dpa-AFX (Börse Online)",
+   "title": "ROUNDUP: Heidelberger Druck senkt Gewinnprognose – Kurseinbruch bei Aktie",
+   "url": "https://www.boerse-online.de/dpa-afx/roundup-heidelberger-druck-senkt-gewinnprognose-kurseinbruch-bei-aktie-561860.html",
+   "date": "2026-10-29",
+   "type": "press"
+  },
+  "hdd_goldesel": {
+   "publisher": "goldesel",
+   "title": "Heidelberger Druck Aktie: Gewinnprognose gekappt, Aktie verliert 14,8 Prozent",
+   "url": "https://goldesel.de/aktien/news/heidelberger-druck-aktie-gewinnprognose-gekappt-aktie-verliert-148-prozent",
+   "date": "2026-10-29",
+   "type": "press"
+  },
+  "hdd_downgrade": {
+   "publisher": "goldesel",
+   "title": "Heidelberger Druck Aktie: Prognosesenkung und Analystenabstufungen belasten",
+   "url": "https://goldesel.de/aktien/news/heidelberger-druck-aktie-prognosesenkung-und-analystenabstufungen-belasten",
+   "date": "2026-10-30",
+   "type": "analyst"
+  }
+ },
+ "items": [
+  {
+   "id": "hdd_apr_warning",
+   "date": "2026-04-15",
+   "kind": "guidance",
+   "dir": "neg",
+   "w": 3,
+   "event": "HDD_GUIDANCE_20260415",
+   "src": [
+    "hdd_apr"
+   ],
+   "en": "Profit warning: the adjusted EBITDA margin for 2025/26 was cut to 6.6% from 7.1%, mainly because of start-up costs for the ONBERG drone-defence joint venture.",
+   "de": "Gewinnwarnung: Die bereinigte EBITDA-Marge 2025/26 wurde von 7,1 % auf 6,6 % gesenkt, vor allem wegen Anlaufkosten für das Drohnenabwehr-Joint-Venture ONBERG."
+  },
+  {
+   "id": "hdd_onberg",
+   "date": "2026-07-10",
+   "kind": "company",
+   "dir": "pos",
+   "w": 1,
+   "src": [
+    "hdd_onberg"
+   ],
+   "en": "The ONBERG joint venture with Ondas (Heidelberg 49%) was set up to build drone-defence systems, a new pillar next to printing presses.",
+   "de": "Das Joint Venture ONBERG mit Ondas (Heidelberg 49 %) wurde für Drohnenabwehrsysteme gegründet, ein neues Standbein neben Druckmaschinen."
+  },
+  {
+   "id": "hdd_loss_guidance",
+   "date": "2026-07-13",
+   "kind": "guidance",
+   "dir": "neg",
+   "w": 2,
+   "src": [
+    "hdd_jul"
+   ],
+   "en": "Management expects a net loss in the low double-digit millions for 2026/27, with high structural costs and investments, and no dividend.",
+   "de": "Das Management erwartet für 2026/27 einen Nettoverlust im niedrigen zweistelligen Millionenbereich bei hohen Strukturkosten und Investitionen, ohne Dividende."
+  },
+  {
+   "id": "hdd_q1",
+   "date": "2026-08-19",
+   "kind": "company",
+   "dir": "neutral",
+   "w": 1,
+   "event": "HDD_Q1_20260819",
+   "src": [
+    "hdd_q1"
+   ],
+   "en": "Q1 2026/27: sales fell to €404m with a net loss of €32m, but the full-year forecast was confirmed; a new CFO was appointed from 1 October.",
+   "de": "Q1 2026/27: Umsatz sank auf 404 Mio. € bei 32 Mio. € Nettoverlust, die Jahresprognose wurde aber bestätigt; ein neuer Finanzvorstand ab 1. Oktober wurde bestellt."
+  },
+  {
+   "id": "hdd_cut",
+   "date": "2026-10-29",
+   "kind": "guidance",
+   "dir": "neg",
+   "w": 3,
+   "event": "HDD_GUIDANCE_20261029",
+   "src": [
+    "hdd_adhoc",
+    "hdd_drweb"
+   ],
+   "en": "Ad hoc at 12:00: the 2026/27 adjusted EBITDA margin target was cut to 5.6–6.6%, after a clear improvement on last year's 6.6% had been promised; the H1 margin was 3.7% against 6.4% a year earlier.",
+   "de": "Ad hoc um 12:00 Uhr: Das Ziel für die bereinigte EBITDA-Marge 2026/27 wurde auf 5,6–6,6 % gesenkt, nachdem eine spürbare Verbesserung gegenüber 6,6 % angekündigt war; die Halbjahresmarge lag bei 3,7 % nach 6,4 % im Vorjahr."
+  },
+  {
+   "id": "hdd_cut_reasons",
+   "date": "2026-10-29",
+   "kind": "company",
+   "dir": "neg",
+   "w": 2,
+   "event": "HDD_GUIDANCE_20261029",
+   "src": [
+    "hdd_dpa"
+   ],
+   "en": "The company cited cost pressure, negative product-mix effects from developments in the Middle East and delayed projects in its technology business.",
+   "de": "Das Unternehmen nannte Kostendruck, negative Produktmixeffekte aus der Entwicklung im Nahen Osten und Verzögerungen bei Projekten in der Technologiesparte."
+  },
+  {
+   "id": "hdd_orders",
+   "date": "2026-10-29",
+   "kind": "company",
+   "dir": "pos",
+   "w": 1,
+   "event": "HDD_GUIDANCE_20261029",
+   "src": [
+    "hdd_goldesel"
+   ],
+   "en": "Order intake rose almost 10% to €604m in the second quarter while sales slipped 2% to €509m; the sales target was kept.",
+   "de": "Der Auftragseingang stieg im zweiten Quartal um knapp 10 % auf 604 Mio. €, der Umsatz sank um 2 % auf 509 Mio. €; das Umsatzziel blieb."
+  },
+  {
+   "id": "hdd_downgrades",
+   "date": "2026-10-30",
+   "kind": "analyst",
+   "dir": "neg",
+   "w": 2,
+   "event": "HDD_GUIDANCE_20261029",
+   "src": [
+    "hdd_downgrade"
+   ],
+   "en": "The next day MPCM downgraded to hold and LBBW cut its target to €1.20.",
+   "de": "Am Folgetag stufte MPCM auf Halten ab, die LBBW senkte das Kursziel auf 1,20 €."
+  },
+  {
+   "id": "hdd_h1_next",
+   "date": "2026-10-29",
+   "kind": "watch",
+   "dir": "neutral",
+   "w": 1,
+   "src": [
+    "hdd_drweb"
+   ],
+   "en": "The full H1 report was due on 12 November.",
+   "de": "Der vollständige Halbjahresbericht war für den 12. November angekündigt."
+  }
+ ],
+ "events": {
+  "HDD_GUIDANCE_20261029": {
+   "question_en": "Why did Heidelberger Druck fall so hard on 29 October?",
+   "question_de": "Warum fiel Heidelberger Druck am 29. Oktober so stark?",
+   "open_en": "Here news and reaction point the same way; open is how much the drone-defence hopes had been priced in before.",
+   "open_de": "Hier zeigen Meldung und Reaktion in dieselbe Richtung; offen ist, wie viel Drohnenabwehr-Hoffnung vorher eingepreist war.",
+   "headline_en": "A clear profit warning: the margin target was cut and the half-year margin fell far below last year, so news and reaction point the same way.",
+   "headline_de": "Eine klare Gewinnwarnung: Das Margenziel wurde gesenkt und die Halbjahresmarge lag weit unter dem Vorjahr, Meldung und Reaktion zeigen in dieselbe Richtung."
+  }
+ }
+}
