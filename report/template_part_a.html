@@ -45,8 +45,8 @@
     {% endfor %}
   </table>
   {% if "small_peer_group" in k.flags %}<div class="note">{{ L.small_peer }}</div>{% endif %}
-  <div class="text"><b>{{ L.ds_h }}: {{ k.liquidity_check.category_estimate }}</b><br>
-    <span class="base">{{ L.ds_text.format(to=eur(k.liquidity_check.avg_turnover_eur_4m), xlm=bps(k.liquidity_check.median_xlm_25k_bps_4m)) }}</span></div>
+  <div class="text"><b>{{ L.ds_h }}: {{ k.liquidity_check.category_estimate or "n/a" }}</b><br>
+    <span class="base">{{ L.ds_text.format(to=eur(k.liquidity_check.avg_turnover_eur_4m), xlm=bps(k.liquidity_check.avg_xlm_25k_bps_4m)) }}</span></div>
 
   {# 3. Liquidity trend #}
   <h2>{{ L.trend_h }}</h2>
