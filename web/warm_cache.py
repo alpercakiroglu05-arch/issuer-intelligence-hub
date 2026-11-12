@@ -28,9 +28,15 @@ import server
 
 from ai import agent as ag
 from config import EXAMPLE_TICKERS, HERO_TICKERS
-from engine import baseline, data
+from engine import baseline, data, market
 
-DOCK = {  # the chips of the assistant dock (web/app.js, dockSugg); the page is sent as context (dockCtx)
+
+def hub_period() -> dict:
+    """The period fields the UI (web/hub) adds to every assistant context; YTD is its default period."""
+    ytd = next(p for p in market.periods() if p["key"] == "ytd")
+    return {"period": "ytd", "from": ytd["start_close"], "to": ytd["to"]}
+
+DOCK = {  # the analyst's suggested questions (web/hub/app.js sugg(); the previous UI web/app.js has the same chips)
     "dashboard": {"en": ["Has our liquidity improved?", "How do our spreads compare with our sector?",
                          "What were our biggest moves this year?", "How large an order can the book absorb?"],
                   "de": ["Hat sich unsere Liquidität verbessert?", "Wie sind unsere Spreads im Sektorvergleich?",
@@ -85,10 +91,10 @@ def main(tickers: list[str]) -> int:
                 if m["source"] != "llm":
                     rejected.append(f"{t} {day} {lang}: {m['rejected']}")
                 print(f"{t} {day} {lang} summary: {m['source']}", flush=True)
-        asks = [({"page": "dashboard"}, DOCK["dashboard"])]
+        asks = [({"page": "dashboard", **hub_period()}, DOCK["dashboard"])]
         card = top_card(isin)
         if card:
-            asks.append(({"page": "card", "day": card[0], "event_id": card[1]}, DOCK["card"]))
+            asks.append(({"page": "card", **hub_period(), "day": card[0], "event_id": card[1]}, DOCK["card"]))
         for ctx, qs in asks:
             for lang, questions in qs.items():
                 for q in questions:

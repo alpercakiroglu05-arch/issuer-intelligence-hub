@@ -1,7 +1,8 @@
 """
 Market comparison blocks for a dashboard (any front end).  OWNER: C1.  Deterministic, no model.
 
-    window(period)                  -> the trading dates of "3m" (63 days), "6m" (126) or "all"
+    window(period)                  -> the trading dates of "1m" (21 days), "3m" (63), "6m" (126), "ytd", "1y" (252) or "all"
+    periods()                       -> which of 1M / 3M / YTD / 1Y the data covers, with the effective dates
     versus_market(isin, period)     -> "You vs market": price, turnover and trading cost vs the index, with ranks
     market_days(isin, period, n)    -> "Big market days": how the share moved on the strongest market days
     timeline(isin, period)          -> one chart: turnover / trading cost / auction share with the index median
@@ -15,6 +16,12 @@ Definitions (one place, so every screen agrees):
 - Ranks and index medians use the current index members (universe.csv member_now) with data in the period;
   ranks include the share, medians exclude it.
 - "x normal" for turnover and trading cost is engine.compare.day_ratios (the impact-card baseline).
+- Price performance compounds the daily closing-auction returns of the window, so it runs from the close of
+  the trading day BEFORE the window to the last close. Prices are not adjusted for dividends or corporate
+  actions (ADJUSTED_PRICE in the raw data is deprecated). The first day of the data has no previous close, so
+  "ytd" starts at the 2 Jan close when the 31 Dec close is not in the excerpt (`periods()` says so).
+- A period that needs more history than the data holds ("1y" on a 10-month excerpt) raises ValueError; it is
+  never silently replaced by a shorter one.
 """
 from functools import lru_cache
 
@@ -23,7 +30,9 @@ import pandas as pd
 
 from engine import baseline, compare, data
 
-PERIODS = {"3m": 63, "6m": 126, "all": None}
+PERIODS = {"1m": 21, "3m": 63, "6m": 126, "ytd": "ytd", "1y": 252, "all": None}
+PERIOD_LABEL = {"1m": "1M", "3m": "3M", "6m": "6M", "ytd": "YTD", "1y": "1Y", "all": "All"}
+PRICE_BASIS = "closing-auction prices, not adjusted for dividends or corporate actions"
 MARKET_DAYS_N = 10
 MARKET_DAYS_BY_VOLUME = 3   # of the n rows, up to this many are market-wide volume days not already in the list
 ROLL = 10                   # days of the rolling median shown for the auction share
@@ -38,7 +47,44 @@ def window(period: str = "3m") -> list[pd.Timestamp]:
         raise ValueError(f"period must be one of {tuple(PERIODS)}")
     dates = np.sort(data.daily()["date"].unique())
     n = PERIODS[period]
+    if n == "ytd":
+        year = pd.Timestamp(dates[-1]).year
+        return [pd.Timestamp(d) for d in dates if pd.Timestamp(d).year == year]
+    if n is not None and len(dates) < n + 1:  # n returns need n + 1 closes
+        raise ValueError(f"{PERIOD_LABEL[period]} needs {n} trading days plus the close before them; the data holds "
+                         f"{len(dates)} trading days ({pd.Timestamp(dates[0]).date()} to {pd.Timestamp(dates[-1]).date()})")
     return [pd.Timestamp(d) for d in (dates if n is None else dates[-n:])]
+
+
+def _start_close(first: pd.Timestamp) -> pd.Timestamp:
+    """The close the period's return starts from: the trading day before the window, or the first day itself
+    when the data has nothing earlier (its own return is then not part of the period)."""
+    dates = np.sort(data.daily()["date"].unique())
+    i = int(np.searchsorted(dates, np.datetime64(first)))
+    return pd.Timestamp(dates[i - 1] if i > 0 else dates[0])
+
+
+def periods() -> list[dict]:
+    """1M / 3M / YTD / 1Y as the UI offers them: available or not, and the effective dates."""
+    dates = np.sort(data.daily()["date"].unique())
+    first, last = pd.Timestamp(dates[0]), pd.Timestamp(dates[-1])
+    out = []
+    for key in ("1m", "3m", "ytd", "1y"):
+        try:
+            w = window(key)
+        except ValueError as e:
+            need = last - pd.DateOffset(years=1)
+            out.append({"key": key, "label": PERIOD_LABEL[key], "available": False, "reason": str(e),
+                        "needs_from": str(need.date()), "data_from": str(first.date())})
+            continue
+        sc = _start_close(w[0])
+        note = None
+        if key == "ytd" and sc == w[0]:
+            note = (f"from the {sc.date()} close: the {sc.year - 1}-12-31 close is not in the data, so the move of "
+                    f"{sc.date()} itself is not included")
+        out.append({"key": key, "label": PERIOD_LABEL[key], "available": True, "from": str(w[0].date()),
+                    "to": str(w[-1].date()), "days": len(w), "start_close": str(sc.date()), "note": note})
+    return out
 
 
 def _members(isin: str) -> tuple[str, pd.DataFrame]:
@@ -72,14 +118,22 @@ def versus_market(isin: str, period: str = "3m") -> dict:
     to = w.groupby("isin")["turnover_eur"].median()
     xlm = w.groupby("isin")["xlm_25k"].median()
     pm = compare.peer_medians(isin, len(dates))
+    sc = _start_close(dates[0])
+    px = data.stock(isin).set_index("date")["price"]
+    ev = data.events()
+    exdiv = sorted(str(pd.Timestamp(d).date()) for d in ev[(ev["isin"] == isin) & (ev["type"] == "DIVIDEND_EX")]["reaction_day"]
+                   if pd.Timestamp(d) in set(dates) and pd.Timestamp(d) != sc)
+    corp = [str(d.date()) for d in me.loc[me["possible_corp_action"].fillna(False).astype(bool), "date"]]
     groups = {by: {"label": g["label"], "name": g["name"], "n": g["n"],
                    "turnover_eur": (g["values"] or {}).get("turnover_eur"), "xlm_25k": (g["values"] or {}).get("xlm_25k")}
               for by, g in pm["groups"].items() if by != "index" and not (by == "sector" and g["fallback"])}
     return {
-        "isin": isin, "index": idx, "period": period, "days": len(dates),
+        "isin": isin, "index": idx, "period": period, "label": PERIOD_LABEL[period], "days": len(dates),
         "from": str(dates[0].date()), "to": str(dates[-1].date()),
         "index_note": f"equal-weighted move of the other {idx} members; not the official index level",
-        "price": {"stock": _f(perf.get(isin)), "index": _f(_compound(me["peer_ret"])), **_rank(perf, isin, True)},
+        "price": {"stock": _f(perf.get(isin)), "index": _f(_compound(me["peer_ret"])), **_rank(perf, isin, True),
+                  "start_close": str(sc.date()), "close_start": _f(px.get(sc), 4), "close_end": _f(px.get(dates[-1]), 4),
+                  "basis": PRICE_BASIS, "ex_dividend_days": exdiv, "possible_corp_action_days": corp},
         "turnover_eur": {"stock": _f(to.get(isin), 0), "index": _f(to.drop(isin, errors="ignore").median(), 0),
                          **_rank(to, isin, True)},
         "xlm_25k": {"stock": _f(xlm.get(isin), 2), "index": _f(xlm.drop(isin, errors="ignore").median(), 2),

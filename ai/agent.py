@@ -33,10 +33,10 @@ import pandas as pd
 from ai import llm
 from ai.checks import meaning_errors, unsupported_numbers
 from config import COMPARE_MIN_GROUP, DATA_DIR
-from engine import baseline, compare, data, evidence, impact
+from engine import baseline, compare, data, evidence, impact, market
 
 MAX_ROUNDS = 6
-CACHE_VERSION = 4  # bump when the agent logic changes, so old cached answers are not replayed
+CACHE_VERSION = 5  # bump when the agent logic changes, so old cached answers are not replayed
 # GLM-5.3-Flash reasons before it answers; a small budget can end with no visible answer (model handbook)
 MAX_TOKENS = 4096
 BUDGET_S = 75  # whole tool loop; past this the deterministic answer is shown instead of a spinner
@@ -55,18 +55,27 @@ Rules:
 - A question about a specific day or event: call impact_card for that day, then show(view="card", day=...).
 - Whether an explanation of a move holds ("was it the market?", "did funds sell?", "was it an overreaction?",
   "was there a leak?"): call check_explanation and report its verdict and evidence; say "consistent with",
-  never "caused by". If the verdict is not_testable, say what the data cannot show.
+  never "caused by". If the verdict is not_testable, say what the data cannot show; no_evidence means no sign
+  in the data, not that it is ruled out.
   Never write "leak", "insider" or "rumour" yourself: say "unusual trading before the announcement" and that
   the data does not show why.
 - When the user wants to see, open, create or export something (impact card, comparison, report, dashboard),
   call show() so the UI offers a one-click button. ALWAYS also answer the question in text with the key figures;
   never reply only that a view is ready. Do not write links or placeholders like [VIEW CARD]: the UI shows
   the button itself.
+- If CONTEXT has a selected period and the user means it ("this period", "over this time", "recently"), use only
+  days between its from and to dates; unusual_days and compare_events cover the whole year, so filter them by date.
+- "Index peers" = the equal-weighted move of the other index members (not a median, not the official index level).
 - Rankings: comparison.n and compare_events count the OTHER events; the group is n + 1 events. Write
   "#3 of 215" (rank_of_day of n_group), never "#3 of 214".
 - Glossary (do not mix them up): price.ret = the share's own return that day ("the share fell 23.2%");
   price.abn_ret = the stock-specific move = return minus the equal-weighted average return of the other index members
   ("stock-specific -21.7%"). Never call ret "stock-specific" or abn_ret "the share fell".
+- Share-price performance over a period ("how did we do in the last 3 months / this year?"): call share_performance
+  with the period the user names, else the selected period in CONTEXT. Report the share's return, the index peers'
+  return and the difference in percentage points, with the dates. Say the prices are closing-auction prices not
+  adjusted for dividends; mention an ex-dividend day in the period if the tool lists one. A period the data does not
+  cover (e.g. 1 year) returns an error: say so and name the period the data does cover; never substitute silently.
 - "Has liquidity improved?": use the liquidity_trend verdict and summary (last 60 vs previous 60 trading days,
   stock vs index). Never compare a 60-day median with a 4-month average.
 - If the calendar lists an announcement for a day, name it; never say there is no context when there is one.
@@ -148,6 +157,25 @@ def company_overview(isin: str) -> dict:
         "unusual_days_last_60": k["anomaly_days_last_period"],
         "peer_groups": k["peer_groups"],
     })
+
+
+def share_performance(isin: str, period: str = "ytd") -> dict:
+    """Price performance, turnover and trading cost over a period vs the index peers (engine.market)."""
+    period = {"1y": "1y", "12m": "1y", "year": "1y", "1m": "1m", "month": "1m", "3m": "3m", "6m": "6m",
+              "ytd": "ytd", "all": "ytd"}.get(str(period).lower(), str(period).lower())
+    try:
+        v = market.versus_market(isin, period)
+    except ValueError as e:
+        return {"error": str(e), "available_periods": [p for p in market.periods() if p["available"]]}
+    pr = v["price"]
+    return _clean({"name": data.display_name(isin), "period": v["label"], "first_day": v["from"], "last_day": v["to"],
+                   "trading_days": v["days"], "start_close_date": pr["start_close"], "close_start_eur": pr["close_start"],
+                   "close_end_eur": pr["close_end"], "share_return": pr["stock"], "index_peers_return": pr["index"],
+                   "difference_pp": None if pr["stock"] is None or pr["index"] is None else round((pr["stock"] - pr["index"]) * 100, 1),
+                   "rank_by_return": pr["rank"], "of_index_members": pr["of"], "index": v["index"],
+                   "index_note": v["index_note"], "price_basis": pr["basis"], "ex_dividend_days": pr["ex_dividend_days"],
+                   "median_turnover_eur": v["turnover_eur"], "median_xlm_25k_bps": v["xlm_25k"],
+                   "coverage_note": next((p["note"] for p in market.periods() if p["key"] == period and p.get("note")), None)})
 
 
 def peer_benchmark(isin: str, by: str = "index") -> dict:
@@ -296,11 +324,14 @@ TOOLS = [
     _fn("find_company", "Find a DAX/MDAX/SDAX share by name, ticker or ISIN.", {"query": {"type": "string"}}, ["query"]),
     _fn("company_overview", "Normal state of the share over the last 60 trading days vs index/sector/size medians, "
         "liquidity trend (last 60 vs previous 60 days) and the Xetra liquidity category estimate.", {"isin": _ISIN}, ["isin"]),
+    _fn("share_performance", "Share-price return (closing auction, not dividend-adjusted) over 1m, 3m, ytd or 1y vs the "
+        "equal-weighted index peers, with rank, median turnover and trading cost (XLM 25k) over the same period.",
+        {"isin": _ISIN, "period": {"type": "string", "enum": ["1m", "3m", "ytd", "1y"]}}, ["isin"]),
     _fn("peer_benchmark", "Compare the share with a peer group: index, sector or size (the 10 stocks closest in turnover).",
         {"isin": _ISIN, "by": {"type": "string", "enum": ["index", "sector", "size"]}}, ["isin"]),
     _fn("trading_cost_curve", "Trading cost (XLM) by order size from EUR 10k to 10m vs peers, and the largest order "
         "the order book absorbs on most days.", {"isin": _ISIN}, ["isin"]),
-    _fn("unusual_days", "Unusual trading days of 2026 (volume spikes, stock-specific moves, spread widening) with "
+    _fn("unusual_days", "Unusual trading days of 2026 (volume spikes, stock-specific moves, trading cost (XLM) jumps) with "
         "market context and the matching calendar entry if any.", {"isin": _ISIN, "limit": {"type": "integer"}}, ["isin"]),
     _fn("event_calendar", "Corporate events of the share (results, AGM, dividends, ad hoc) with time, timing and "
         "reaction day.", {"isin": _ISIN}, ["isin"]),
@@ -314,7 +345,8 @@ TOOLS = [
          "isin": _ISIN, "day": _DAY}, ["event_type"]),
     _fn("check_explanation", "Test an explanation of a share move (e.g. 'it was the market', 'thin trading', "
         "'funds sold', 'overreaction', 'a leak before the news', 'our results') against the figures of that day. "
-        "Returns a verdict per claim: supported / contradicted / partly / not_testable, the evidence and a more "
+        "Returns a verdict per claim: supported (consistent, not proof) / partly / contradicted (measured against) / "
+        "no_evidence (no sign, cannot be ruled out) / not_testable, the evidence and a more "
         "defensible wording.", {"isin": _ISIN, "day": _DAY, "explanation": {"type": "string"},
                                 "event_id": {"type": "string"}}, ["isin", "day", "explanation"]),
     _fn("show", "Offer the user a one-click button that opens a view: the impact card of a day, the comparison "
@@ -323,11 +355,12 @@ TOOLS = [
          "event_id": {"type": "string"}, "event_type": {"type": "string", "enum": TYPES},
          "index": {"type": "string", "enum": ["DAX", "MDAX", "SDAX"]}}, ["view"]),
 ]
-IMPL = {"find_company": find_company, "company_overview": company_overview, "peer_benchmark": peer_benchmark,
+IMPL = {"find_company": find_company, "company_overview": company_overview, "share_performance": share_performance,
+        "peer_benchmark": peer_benchmark,
         "trading_cost_curve": trading_cost_curve, "unusual_days": unusual_days, "event_calendar": event_calendar,
         "impact_card": impact_card, "compare_events": compare_events, "check_explanation": check_explanation,
         "show": show}
-_NEEDS_ISIN = {"company_overview", "peer_benchmark", "trading_cost_curve", "unusual_days", "event_calendar",
+_NEEDS_ISIN = {"company_overview", "share_performance", "peer_benchmark", "trading_cost_curve", "unusual_days", "event_calendar",
                "impact_card", "check_explanation", "show"}
 
 
@@ -340,6 +373,8 @@ def call_tool(name: str, args: dict, isin: str, context: dict | None = None) -> 
     if name == "check_explanation" and (context or {}).get("day"):
         args.setdefault("day", context["day"])
         args.setdefault("event_id", context.get("event_id"))
+    if name == "share_performance" and (context or {}).get("period"):
+        args.setdefault("period", context["period"])
     if name == "compare_events":  # rank the company (and the open card's day) unless the model asked otherwise
         args.setdefault("isin", isin)
         if (context or {}).get("day") and args["isin"] == isin:
@@ -381,7 +416,9 @@ def _ctx_text(isin, context, lang):
     if c.get("day"):
         parts.append(f"impact card open for {c['day']}" + (f" (event_id {c['event_id']})" if c.get("event_id") else ""))
     if c.get("event_type"):
-        parts.append(f"comparison open for event type {c['event_type']}")
+        parts.append(f"comparison open for event type {c['event_type']}" + (f" in {c['index']}" if c.get("index") else ""))
+    if c.get("period"):
+        parts.append(f"selected period {str(c['period']).upper()}" + (f" ({c['from']} to {c['to']})" if c.get("from") else ""))
     return "; ".join(parts)
 
 
@@ -430,6 +467,14 @@ def _run_llm(question, isin, history, context, lang):
         if not calls:
             text = re.sub(r"<think>.*?</think>", "", msg.content or "", flags=re.S).strip()
             bad = _check(text, outputs, question, context)["unsupported"]
+            if not bad and not repaired and outputs and not re.search(r"\d", text):
+                # "the card is ready" with no figures: the button is shown anyway, the answer must carry the facts
+                repaired, draft = True, text
+                msgs += [{"role": "assistant", "content": text},
+                         {"role": "user", "content": "Answer the question itself in text with the key figures from the tool "
+                                                     "results (the UI already shows the button)."}]
+                text = ""
+                continue
             if bad and not repaired:  # one repair round: the model must fetch the figures or drop them
                 repaired, draft = True, text
                 msgs += [{"role": "assistant", "content": text},
@@ -458,6 +503,11 @@ def _run_llm(question, isin, history, context, lang):
                        max_tokens=MAX_TOKENS)
         text = (msg.content or "").strip()
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+    if actions and outputs and not re.search(r"\d", text):  # still only "the view is ready": answer from the same tools
+        fb = fallback(question, isin, context, lang)
+        fb["actions"] = fb["actions"] or actions
+        fb["note"] = "model answer had no figures; deterministic answer from the same tools"
+        return fb
     check = _check(text, outputs, question, context)
     if check["unsupported"]:  # still invented figures: never show them; the template answers with the same tools
         fb = fallback(question, isin, context, lang)
@@ -601,6 +651,20 @@ def _eur(x, de):
     return (f"{x / 1e3:.0f} Tsd. €") if de else f"€{x / 1e3:.0f}k"
 
 
+def perf_period(q: str) -> str | None:
+    """The period a question names (EN/DE), or None."""
+    q = q.lower()
+    if re.search(r"year.to.date|\bytd\b|this year|since (the start of the year|january|2 jan)|seit jahresbeginn|dieses jahr|im jahr 2026", q):
+        return "ytd"
+    if re.search(r"\b(1|one|12|twelve)[ -]?(year|yr|jahr)|past year|last year|letzten jahr|vergangenen jahr|12 (months|monate)", q):
+        return "1y"
+    if re.search(r"\b(3|three|drei)[ -]?(months?|monate?n?)|last quarter|letzten quartal", q):
+        return "3m"
+    if re.search(r"\b(1|one|ein(en)?)[ -]?(month|monat)|last month|past month|letzten monat|vergangenen monat", q):
+        return "1m"
+    return None
+
+
 def fallback(question: str, isin: str, context=None, lang: str = "en") -> dict:
     from ai import narrate as nar
     q, de, ctx = question.lower(), lang == "de", context or {}
@@ -635,8 +699,9 @@ def fallback(question: str, isin: str, context=None, lang: str = "en") -> dict:
         r = use("check_explanation", day=td, explanation=question, event_id=eid)
         ev = _event_on(isin, td, eid)
         bl = evidence.brief(isin, td, ev)["de" if de else "en"]
-        vw = {"supported": ("supported by the data", "von den Daten gestützt"), "contradicted": ("contradicted by the data", "von den Daten widerlegt"),
-              "partly": ("partly supported", "teilweise gestützt"), "not_testable": ("not testable with this data", "mit diesen Daten nicht prüfbar")}
+        vw = {"supported": ("consistent with the data", "mit den Daten vereinbar"), "contradicted": ("contradicted by the data", "von den Daten widerlegt"),
+              "partly": ("partly consistent with the data", "teilweise mit den Daten vereinbar"),
+              "no_evidence": ("not visible in the data", "in den Daten nicht erkennbar"), "not_testable": ("not testable with this data", "mit diesen Daten nicht prüfbar")}
         text = " ".join(f"{bl['claims'][k]['label']} {vw[bl['claims'][k]['verdict']][1 if de else 0]}: {bl['claims'][k]['text']}"
                         for k in r["checks"])
         act("card", day=td, event_id=(ev or {}).get("event_id"))
@@ -665,6 +730,29 @@ def fallback(question: str, isin: str, context=None, lang: str = "en") -> dict:
         else:
             text = nar.template_narrative(card, lang)
             act("card", day=td, event_id=ev["event_id"] if ev else None)
+    elif perf_period(q) or has("perform", "share price", "stock price", "price develop", "return", "how did we do",
+                               "kursentwicklung", "performance", "rendite", "aktienkurs", "wie lief") or \
+            re.search(r"how did (the|our|my) (share|stock)", q):
+        per = perf_period(q) or ctx.get("period") or "ytd"
+        r = use("share_performance", period=per)
+        if "error" in r:
+            av = ", ".join(f"{p['label']} ({p['from']} – {p['to']})" for p in r["available_periods"])
+            text = (f"Dieser Zeitraum ist in den Daten nicht abgedeckt: {r['error']}. Verfügbar: {av}." if de else
+                    f"That period is not covered by the data: {r['error']}. Available: {av}.")
+        else:
+            diff = r["difference_pp"]
+            if de:
+                text = (f"{name}, {r['period']} ({_d(r['start_close_date'], True)} bis {_d(r['last_day'], True)}): Aktie "
+                        f"{_pc(r['share_return'], True)}, {r['index']}-Vergleichswerte {_pc(r['index_peers_return'], True)}, also "
+                        f"{str(abs(diff)).replace('.', ',')} Prozentpunkte {'besser' if diff >= 0 else 'schlechter'}; Rang {r['rank_by_return']} "
+                        f"von {r['of_index_members']}. Schlussauktionskurse, nicht um Dividenden bereinigt"
+                        + (f" (Ex-Dividende am {_d(r['ex_dividend_days'][0], True)})" if r["ex_dividend_days"] else "") + ".")
+            else:
+                text = (f"{name}, {r['period']} ({_d(r['start_close_date'], False)} to {_d(r['last_day'], False)}): share "
+                        f"{_pc(r['share_return'], False)}, {r['index']} peers {_pc(r['index_peers_return'], False)}, so "
+                        f"{abs(diff)} percentage points {'ahead' if diff >= 0 else 'behind'}; rank {r['rank_by_return']} of "
+                        f"{r['of_index_members']}. Closing-auction prices, not adjusted for dividends"
+                        + (f" (ex-dividend on {_d(r['ex_dividend_days'][0], False)})" if r["ex_dividend_days"] else "") + ".")
     elif has("compare", "rank", "vergleich", "rang", "other compan", "andere", "similar event", "ähnlich", "which compan", "welches unternehmen") or (ctx.get("page") == "compare" and has("which", "welche", "who", "wer")):
         etype, idx = ctx.get("event_type") or "NOTABLE_DAY", ctx.get("index") if ctx.get("index") in ("DAX", "MDAX", "SDAX") else None
         if ctx.get("day"):

@@ -11,9 +11,12 @@ and what to check next. The claims check takes the explanations IR typically hea
 "it was thin trading", "funds sold") and tests each one against the same card figures:
 
     supported      the data is consistent with it (association, never proof of a cause)
-    contradicted   the data speaks against it
-    partly         some of it holds
+    partly         some of it holds, some does not
+    contradicted   the data measures it and speaks against it
+    no_evidence    no sign of it in the data, but the data cannot rule it out (coverage is incomplete,
+                   e.g. MSCI/STOXX index changes are only known when the calendar lists them)
     not_testable   the data cannot answer it (e.g. investor identities are not in Xetra data)
+Missing evidence is never reported as "contradicted": that needs a measured figure that speaks against the claim.
 
 Every figure comes from the impact card (engine/impact.py), engine.compare.day_ratios (the same baseline
 as the card) or engine.baseline.market_context. Nothing is estimated here and no cause is invented:
@@ -29,7 +32,9 @@ from report.fmt import formatters
 
 PRE_DAYS = 5            # trading days before the reaction day checked for unusual activity
 PRE_VOL_FLAG = 2.0      # x normal turnover before the news worth asking about
-VERDICTS = ("supported", "contradicted", "partly", "not_testable")
+VERDICTS = ("supported", "partly", "contradicted", "no_evidence", "not_testable")
+NORMAL_MOVE_Z = 2       # |stock-specific move| below 2x its normal daily size and turnover below REACTION_VOL = no clear reaction
+REACTION_VOL = 1.5
 CLAIMS = ("market", "announcement", "thin", "technical", "investors", "overreaction", "leak")
 CLAIM_LABEL = {
     "market": ("“It was the overall market.”", "„Das lag am Gesamtmarkt.“"),
@@ -71,6 +76,7 @@ def _facts(isin: str, day: str, card: dict) -> dict:
     dates = list(canon.index)
     i = dates.index(d) if d in dates else None
     pre = canon.iloc[max(0, i - PRE_DAYS): i] if i is not None else canon.iloc[0:0]
+    pre = pre[pre["vol_ratio"].notna()]
     # a busy day the market explains (option expiry, index change or review, market-wide volume) is no hint of
     # early news: EVD 20 Mar 2026 (quarterly expiry) had 2.0x normal turnover a week before the FY results
     # ... and neither is a day with the company's own earlier announcement (HDD 15 Apr 2026: 17.1x after the
@@ -85,6 +91,7 @@ def _facts(isin: str, day: str, card: dict) -> dict:
     return {
         "context": baseline.market_context(isin, day),
         "pre_days": len(pre),
+        "pre_days_own": len(own),   # days before without a market event or an earlier announcement of the company
         "pre_max_vol_ratio": None if pk is None else float(pre.loc[pk, "vol_ratio"]),
         "pre_max_vol_day": None if pk is None else str(pk.date()),
         "pre_abn_ret_sum": float(pre["abn_ret"].sum()) if len(pre) else None,
@@ -322,13 +329,24 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
     elif ret != 0 and peer * ret > 0 and abs(peer) >= 0.6 * abs(ret):
         put("market", "supported", T(f"Peers moved {f['pct'](peer)} against the share's {f['pct'](ret)}: most of the move was market-wide.",
                                      f"Die Vergleichswerte bewegten sich um {f['pct'](peer)} gegenüber {f['pct'](ret)} der Aktie: der Großteil war marktweit."))
-    elif big_move:
-        put("market", "contradicted", stock_specific + T(". The market explains little of it.", ". Der Markt erklärt davon wenig."),
-            better=stock_specific + T(", well beyond its normal daily range.", ", weit außerhalb der normalen Tagesschwankung."))
+    elif peer * ret > 0 and abs(peer) >= 0.25 * abs(ret):
+        put("market", "partly", T(f"The {idx} peers moved {f['pct'](peer)} in the same direction as the share's {f['pct'](ret)}: "
+                                  f"the market explains part of the move; {f['pct'](abn)} was stock-specific.",
+                                  f"Die {idx}-Werte bewegten sich um {f['pct'](peer)} in dieselbe Richtung wie die Aktie ({f['pct'](ret)}): "
+                                  f"der Markt erklärt einen Teil; {f['pct'](abn)} waren titelspezifisch."),
+            better=stock_specific + ".")
     else:
-        put("market", "partly", stock_specific + ".", better=stock_specific + ".")
+        put("market", "contradicted", stock_specific + T(". The market explains little of it.", ". Der Markt erklärt davon wenig."),
+            better=stock_specific + (T(", well beyond its normal daily range.", ", weit außerhalb der normalen Tagesschwankung.") if big_move else "."))
     # announcement
-    if has_event:
+    reacted = big_move or (_ok(v.get("ratio")) and v["ratio"] >= REACTION_VOL)
+    if has_event and not reacted:
+        put("announcement", "no_evidence",
+            T(f"The calendar lists “{e['title']}”, but the stock-specific move ({f['pct'](abn)}) and turnover "
+              f"({f['x'](v.get('ratio'))} normal) stayed within their normal range: no clear reaction in the data.",
+              f"Der Kalender nennt „{e['title']}“, aber titelspezifische Bewegung ({f['pct'](abn)}) und Umsatz "
+              f"({f['x'](v.get('ratio'))} normal) blieben im normalen Bereich: keine klare Reaktion in den Daten."))
+    elif has_event:
         if _ok(lag) and lag < 0:
             put("announcement", "partly", T(f"The calendar lists “{e['title']}”, but trading reacted {abs(lag)} min before the published time {pub_time}.",
                                             f"Der Kalender nennt „{e['title']}“, aber der Handel reagierte {abs(lag)} Min. vor der veröffentlichten Zeit {pub_time}."))
@@ -348,24 +366,34 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
     vr, xr = v.get("ratio"), li.get("ratio")
     if not _ok(vr):
         put("thin", "not_testable", T("No turnover baseline for this day.", "Keine Umsatzbasis für diesen Tag."))
-    elif vr >= 2:
-        put("thin", "contradicted", T(f"Turnover was {f['x'](vr)} normal: the move happened on heavy, not thin, trading.",
-                                      f"Der Umsatz lag beim {f['x'](vr)}en des Normalwerts: Die Bewegung kam bei starkem, nicht dünnem Handel."),
-            better=T(f"The move came on {f['x'](vr)} normal turnover.", f"Die Bewegung kam bei {f['x'](vr)} normalem Umsatz."))
-    elif vr < 1.2 and _ok(xr) and xr >= 1.5:
-        put("thin", "supported", T(f"Turnover was only {f['x'](vr)} normal while trading cost was {f['x'](xr)} normal: thin conditions.",
-                                   f"Umsatz nur {f['x'](vr)} normal bei {f['x'](xr)} Handelskosten: dünne Bedingungen."))
     else:
-        put("thin", "partly", T(f"Turnover {f['x'](vr)} normal, trading cost {f['x'](xr)} normal: no clear sign either way.",
-                                f"Umsatz {f['x'](vr)} normal, Handelskosten {f['x'](xr)} normal: kein klares Zeichen."))
+        low, costly = vr < 1.0, _ok(xr) and xr >= 1.5   # thin = below-normal turnover and/or a costlier order book
+        cost_t = T(f"trading cost {f['x'](xr)} normal", f"Handelskosten {f['x'](xr)} normal") if _ok(xr) else T("no trading cost figure", "keine Handelskosten-Angabe")
+        if low and costly:
+            put("thin", "supported", T(f"Turnover was only {f['x'](vr)} normal and {cost_t}: thin conditions.",
+                                       f"Umsatz nur {f['x'](vr)} normal und {cost_t}: dünne Bedingungen."))
+        elif low or costly:
+            put("thin", "partly", T(f"Turnover {f['x'](vr)} normal, {cost_t}: one sign of thin trading, not both.",
+                                    f"Umsatz {f['x'](vr)} normal, {cost_t}: ein Zeichen für dünnen Handel, nicht beide."))
+        else:
+            put("thin", "contradicted", T(f"Turnover was {f['x'](vr)} normal and {cost_t}: the move happened in normal or heavy trading, not thin trading.",
+                                          f"Umsatz {f['x'](vr)} normal, {cost_t}: Die Bewegung kam bei normalem oder starkem Handel, nicht bei dünnem."),
+                better=T(f"The move came on {f['x'](vr)} normal turnover.", f"Die Bewegung kam bei {f['x'](vr)} normalem Umsatz."))
     # technical
     tech = [k for k in ctx if k in TECHNICAL]
-    if tech:
+    if has_event and e.get("type") == "INDEX":
+        put("technical", "supported", T(f"The calendar lists an index event for this day: “{e['title']}”. Index funds trade "
+                                        "such changes, mostly in the closing auction.",
+                                        f"Der Kalender nennt ein Indexereignis für diesen Tag: „{e['title']}“. Indexfonds handeln "
+                                        "solche Änderungen, meist in der Schlussauktion."))
+    elif tech:
         put("technical", "supported", T("This day was " + "; ".join(CTX_WORDS[k][0] for k in tech) + ". That can move volume without company news.",
                                         "Dieser Tag war " + "; ".join(CTX_WORDS[k][1] for k in tech) + ". Das bewegt Umsatz ohne Unternehmensnachricht."))
     else:
-        put("technical", "contradicted", T("No index change, index review or option expiry on this day.",
-                                           "Kein Indexwechsel, Index-Review oder Verfallstag an diesem Tag."))
+        put("technical", "no_evidence", T("No DAX/MDAX/SDAX change, index review or option expiry on this day. Changes by other "
+                                          "index providers (MSCI, STOXX, FTSE) are only known if the calendar lists them.",
+                                          "Kein DAX/MDAX/SDAX-Wechsel, Index-Review oder Verfallstag an diesem Tag. Änderungen anderer "
+                                          "Indexanbieter (MSCI, STOXX, FTSE) sind nur bekannt, wenn der Kalender sie nennt."))
     # investors
     flow = (T(f" What the data does show: client orders (AGENT) were {'net sellers' if imb < 0 else 'net buyers'} ({f['spct0'](imb)}).",
               f" Was die Daten zeigen: Kundenorders (AGENT) waren per Saldo {'Verkäufer' if imb < 0 else 'Käufer'} ({f['spct0'](imb)}).")
@@ -377,6 +405,11 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
     # overreaction
     if not _ok(car) or not _ok(abn) or abn == 0:
         put("overreaction", "not_testable", T("The five days after are not all in the data yet.", "Die fünf Folgetage sind noch nicht alle in den Daten."))
+    elif not big_move:  # a reversal of a normal-sized move is noise, not the end of an overreaction
+        put("overreaction", "no_evidence", T(f"The stock-specific move on the day ({f['pct'](abn)}) was within its normal daily range, so "
+                                             f"there was no outsized move to reverse (day 0 to +5: {f['pct'](car)}).",
+                                             f"Die titelspezifische Bewegung am Tag ({f['pct'](abn)}) lag im normalen Tagesbereich; es gab "
+                                             f"keine übergroße Bewegung, die sich umkehren könnte (Tag 0 bis +5: {f['pct'](car)})."))
     elif car * abn > 0 and abs(car) >= 0.8 * abs(abn):
         put("overreaction", "contradicted", T(f"No reversal within five days: day 0 to +5 adds up to {f['pct'](car)} vs {f['pct'](abn)} on the day.",
                                               f"Keine Umkehr binnen fünf Tagen: Tag 0 bis +5 ergibt {f['pct'](car)} vs. {f['pct'](abn)} am Tag."))
@@ -397,10 +430,17 @@ def _build(c: dict, fx: dict, lang: str) -> dict:  # noqa: C901  one readable li
         put("leak", "partly", T(f"Turnover reached {f['x'](pre)} normal on {_d(fx['pre_max_vol_day'], lang)}, in the {fx['pre_days']} days before, with no announcement or market event on that day. The data does not show why.",
                                 f"Der Umsatz erreichte am {_d(fx['pre_max_vol_day'], lang)} das {f['x'](pre)}e des Normalwerts, in den {fx['pre_days']} Tagen davor, ohne Meldung oder Marktereignis an diesem Tag. Die Daten zeigen nicht, warum."))
     elif _ok(pre):
-        put("leak", "contradicted", T(f"In the {fx['pre_days']} trading days before, turnover stayed at most {f['x'](pre)} normal"
+        put("leak", "contradicted", T(f"In the {fx['pre_days']} trading days before (leaving out days with a market event or an earlier "
+                                      f"announcement), turnover stayed at most {f['x'](pre)} normal"
                                       + (", and trading reacted after the published time." if _ok(lag) else "."),
-                                      f"In den {fx['pre_days']} Handelstagen davor lag der Umsatz höchstens beim {f['x'](pre)}en des Normalwerts"
+                                      f"In den {fx['pre_days']} Handelstagen davor (ohne Tage mit Marktereignis oder früherer Meldung) "
+                                      f"lag der Umsatz höchstens beim {f['x'](pre)}en des Normalwerts"
                                       + (", und der Handel reagierte nach der Veröffentlichung." if _ok(lag) else ".")))
+    elif fx["pre_days"]:
+        put("leak", "not_testable", T(f"All {fx['pre_days']} trading days before had a market event or an earlier announcement, so "
+                                      "trading before this news cannot be separated from them.",
+                                      f"Alle {fx['pre_days']} Handelstage davor hatten ein Marktereignis oder eine frühere Meldung; "
+                                      "Handel vor dieser Nachricht lässt sich davon nicht trennen."))
     else:
         put("leak", "not_testable", T("No trading days before this one in the data.", "Keine Handelstage davor in den Daten."))
 

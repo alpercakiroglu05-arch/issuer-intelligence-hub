@@ -8,6 +8,7 @@ template text is used instead, and so is a text that calls another number the sh
 (meaning_errors). narrate_with_meta() says which one the user sees.
 """
 import json
+import re
 
 from ai import llm
 from ai.checks import meaning_errors, unsupported_numbers
@@ -20,7 +21,8 @@ What the main fields mean (do not mix them up):
   price.abn_ret = the stock-specific move (ret minus peer_ret). These are three DIFFERENT numbers.
 - price.gap_open = opening auction vs previous close; intraday.onset.ret_at_onset = move vs previous close
   at the onset minute (onset.time is a clock time during or before trading, read onset.session).
-- volume.ratio = turnover / normal turnover; liquidity.xlm_25k_bps = trading cost of a EUR 25k order.
+- volume.ratio = turnover / normal turnover; liquidity.xlm_25k_bps = trading cost of a EUR 25k order (XLM: the
+  round-trip cost incl. price impact). Call it "trading cost" ("Handelskosten"), never "spread" or "bid-ask spread".
 - liquidity.ratio > 1 means trading got MORE EXPENSIVE (liquidity got worse), < 1 cheaper.
 - comparison.*_pctile = share of comparable days with a smaller value ("bigger than X % of them");
   a pctile of 1.0 means "the biggest of them" (never write "bigger than 100 %").
@@ -28,7 +30,7 @@ Write 4-5 short sentences in {language}:
 1) start with: the share moved <price.ret>, its index peers <price.peer_ret>, so the stock-specific
    move was <price.abn_ret> (use these three numbers exactly in this meaning),
 2) how unusual the trading activity was (volume vs. normal),
-3) liquidity / spread and the opening/closing auctions (volume vs normal, auction price vs previous close / last trade),
+3) trading cost (XLM) and the opening/closing auctions (volume vs normal, auction price vs previous close / last trade),
 4) who traded (agent = client/institutional orders, prop, market makers), only if notable,
 5) if intraday.onset.time is set: when the market started pricing the news (that clock time),
 6) if comparison is set: how this event ranks among comparable events (percentiles, group size); write the rank
@@ -45,7 +47,7 @@ LANG = {"en": "English", "de": "German"}
 SYSTEM_DE_STYLE = """
 German number and date style (also in the first sentence): decimal comma, a space before %, the minus sign −,
 e.g. 'um −23,2 %, die MDAX-Vergleichswerte um −1,5 % (unternehmensspezifisch: −21,7 %)';
-dates as 27.03.2026; ratios as '8,6-fach'; amounts as '2,5 Mio. EUR' or '561 Tsd. EUR'; spreads in bps."""
+dates as 27.03.2026; ratios as '8,6-fach'; amounts as '2,5 Mio. EUR' or '561 Tsd. EUR'; trading cost in Bp."""
 
 
 def system_prompt(lang: str = "en") -> str:
@@ -64,6 +66,8 @@ def narrate_with_meta(card: dict, lang: str = "en", fresh: bool = False) -> dict
         ], cache=not fresh)
         text = (msg.content or "").strip()
         bad = unsupported_numbers(text, card) + meaning_errors(text, card)
+        if re.search(r"\bspreads?\b", text, flags=re.I):  # XLM is a round-trip trading cost, not the bid-ask spread
+            bad.append("'spread' used for the XLM trading cost")
         if text and not bad:
             return {"text": text, "source": "llm", "model": llm.model_name(), "rejected": [],
                     "cached": bool(getattr(msg, "cached", False))}

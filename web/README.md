@@ -1,6 +1,11 @@
 # Web front end (C3)
 
-The demo UI: Deutsche Börse family look, ISIN entry, dashboard, impact card, compare, IR snapshot and ideas, plus the IR analyst (AI agent) on every page.
+Two front ends on the same server and API:
+
+| URL | Files | What |
+|---|---|---|
+| `/` | `web/hub/` (`index.html`, `app.css`, `app.js`) | **The Issuer Intelligence Hub UI.** Opens straight on the dashboard of the last company (CTS Eventim the first time). Overview with periods 1M / 3M / YTD / 1Y, events, impact card (at a glance, the day, who traded, evidence), compare, report, IR analyst drawer, ⌘K search. Light theme by default, dark on request (remembered). |
+| `/index.html` | `web/index.html`, `app.css`, `app.js` | The previous UI (DB family look, ISIN entry, ideas page). `web/snapshot.py` still builds the offline copy from it. |
 Every number comes from the engine (`engine/`) through a small JSON API. Words come from `ai/` (LLM or template fallback).
 The page map and the challenge items each page covers are listed in [`docs/REQUIREMENTS.md`](../docs/REQUIREMENTS.md).
 
@@ -27,7 +32,7 @@ Without a key, the AI summary and the analyst use deterministic templates over t
 
 ### The IR analyst (agent)
 
-`ai/agent.py` gives the model ten tools over the engine (`company_overview`, `peer_benchmark`, `trading_cost_curve`,
+`ai/agent.py` gives the model eleven tools over the engine (`company_overview`, `share_performance`, `peer_benchmark`, `trading_cost_curve`,
 `unusual_days`, `event_calendar`, `impact_card`, `compare_events`, `check_explanation`, `find_company`, `show`). The model picks the tools, reads
 their JSON and answers; `show` becomes a one-click button in the UI (open card, compare, report). Every number in the answer is
 checked against the tool outputs (`ai/checks.py`); an answer with an unverified figure is replaced by the deterministic
@@ -35,6 +40,16 @@ answer from the same tools (the dock then says "fixed rules"). Causes come only 
 Answers are cached in `data/agent_cache.json` for the live demo (`LLM_CACHE`); a replayed answer is labelled
 "saved answer", never presented as a fresh analysis. Each model call times out after 45 s (`LLM_TIMEOUT`) and the
 whole tool loop after 75 s; then the deterministic answer is shown, so the demo never hangs.
+The UI sends the selected period (`period`, `from`, `to`) with every question, so "how did we do?" uses the period on screen;
+`share_performance` returns an error for a period the data does not cover (1Y), and the analyst says so.
+
+### Periods (web/hub)
+
+1M = last 21 trading days, 3M = 63, YTD = this calendar year, 1Y = 252 (engine.market, `GET /api/dashboard?period=`).
+The return runs from the close of the trading day before the window to the last close (closing-auction prices, not adjusted
+for dividends; ex-dividend days in the window are listed). The excerpt starts on 2 Jan 2026, so YTD starts at the 2 Jan close
+(the 31 Dec 2025 close is not in the data, the page says so) and 1Y is disabled with the reason. "Index" = the equal-weighted
+move of the other index members (`peer_ret`), the same index as the impact card's stock-specific move.
 
 ### Signature: evidence brief + "Test an explanation"
 

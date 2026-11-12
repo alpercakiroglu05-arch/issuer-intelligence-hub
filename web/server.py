@@ -16,7 +16,7 @@ API (all GET unless noted, JSON):
          [&date=&time=&type=&title=]      ... for an event the user added or imported (not in events.csv)
     /api/compare?type=&index=             same-type events (engine.compare)
     /api/evidence?isin=&day=&event_id=    evidence brief + explanation check for one card (engine/evidence.py)
-    GET  /api/dashboard?isin=&period=3m|6m|all  the dashboard in one call (engine.market): header, tiles,
+    GET  /api/dashboard?isin=&period=1m|3m|6m|ytd|1y|all  the dashboard in one call (engine.market): header, tiles,
                                           timeline, you vs market, big market days, events and unusual days
     POST /api/calendar {isin,events:[{date,time,type,title}]}  match the company's own calendar to trading days
     GET  /api/export?isin=&day=&event_id=&lang=  one-click IR report as a PDF file: with day = the impact card
@@ -167,6 +167,10 @@ def issuer(isin: str) -> dict:
         "index_auction_share": [r(bench["auction_share"].get(d)) for d in dates],
         "index_ret": [r(bench["ret"].get(d)) for d in dates],
     }
+    # the equal-weighted move of the other index members: the same "index" as engine.market's period performance
+    # and the impact card's abnormal return (share - peer_ret)
+    peer = s.set_index("date")["peer_ret"]
+    series["peer_ret"] = [r(peer.get(d)) for d in dates]
     canon = compare.day_ratios(isin)  # THE "x normal" (impact-card baseline), same as the card and the assistant
     series["vol_ratio"] = [r(canon["vol_ratio"].get(d)) for d in dates]
     ep = baseline.anomaly_episodes(isin)
@@ -332,8 +336,11 @@ def compare_table(etype: str, index: str | None) -> dict:
     t = t.sort_values("abs_abn_ret", ascending=False).reset_index(drop=True)
     t["rank"] = t.index + 1
     t["display"] = [data.display_name(i) for i in t["isin"]]
-    return clean({"types": compare.event_types(), "type": etype, "index": index or "ALL", "n": len(t),
-                  "rows": records(t)})
+    every = compare.same_type_events(etype, None)  # how many events each index choice holds, so the UI can say why one is empty
+    counts = {"ALL": len(every), **{i: int((every["index"] == i).sum()) if len(every) else 0 for i in ("DAX", "MDAX", "SDAX")}}
+    types = compare.event_types()
+    return clean({"types": types, "type": etype, "index": index or "ALL", "n": len(t), "counts": counts,
+                  "type_counts": {x: len(compare.same_type_events(x, None)) for x in types}, "rows": records(t)})
 
 
 def llm_available() -> bool:
@@ -457,7 +464,8 @@ class Handler(SimpleHTTPRequestHandler):
             "/api/status": lambda: {"data_dir": str(DATA_DIR), "stocks": len(universe()),
                                     "intraday_stocks": len(data.intraday_isins()), "llm": llm_available(),
                                     "model": llm_model(), "first_date": str(data.daily()["date"].min().date()),
-                                    "last_date": str(data.daily()["date"].max().date())},
+                                    "last_date": str(data.daily()["date"].max().date()),
+                                    "periods": market.periods()},
             "/api/universe": universe,
             "/api/issuer": lambda: issuer(q["isin"]),
             "/api/dashboard": lambda: dashboard(q["isin"], q.get("period", "3m")),
@@ -471,8 +479,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._guard(routes[u.path])
         if u.path == "/api/export":
             return self._file(export_file, q)
-        if u.path == "/":
-            self.path = "/index.html"
+        if u.path == "/":  # the Issuer Intelligence Hub UI (web/hub); the previous UI stays at /index.html
+            self.path = "/hub/index.html"
         return super().do_GET()
 
     def do_POST(self):
