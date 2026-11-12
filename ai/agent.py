@@ -320,7 +320,7 @@ def _fn(name, desc, props, req):
 
 _ISIN = {"type": "string", "description": "ISIN of the share, e.g. DE0005470306"}
 _DAY = {"type": "string", "description": "trading day YYYY-MM-DD"}
-TYPES = ["NOTABLE_DAY", "FY", "Q1", "H1", "Q3", "ADHOC", "GUIDANCE", "DIVIDEND_EX", "AGM", "INDEX", "MA", "CMD"]
+TYPES = ["NOTABLE_DAY", "FY", "Q1", "H1", "Q3", "ADHOC", "GUIDANCE", "DIVIDEND_EX", "AGM", "INDEX", "MA", "NEWS", "CMD"]
 TOOLS = [
     _fn("find_company", "Find a DAX/MDAX/SDAX share by name, ticker or ISIN.", {"query": {"type": "string"}}, ["query"]),
     _fn("company_overview", "Normal state of the share over the last 60 trading days vs index/sector/size medians, "

@@ -157,7 +157,7 @@ def test_events_csv_is_clean():
     import pandas as pd
     from config import EVENTS_CSV
     e = pd.read_csv(EVENTS_CSV, dtype=str).fillna("")
-    types = {"FY", "Q1", "H1", "Q3", "DIVIDEND_EX", "AGM", "ADHOC", "GUIDANCE", "MA", "CMD", "INDEX"}
+    types = {"FY", "Q1", "H1", "Q3", "DIVIDEND_EX", "AGM", "ADHOC", "GUIDANCE", "MA", "CMD", "INDEX", "NEWS"}
     assert set(e["type"]) <= types
     assert (e["source_url"].str.startswith("http")).all()
     assert pd.to_datetime(e["date"], format="%Y-%m-%d").notna().all()
