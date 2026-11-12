@@ -11,8 +11,9 @@ falls back to the template text.
 "Derivable" means: the JSON value itself, ×100 (percent), ÷1e3/1e6/1e9 (EUR k/m/bn), or a group size + 1
 ("#3 of 215" when n = 214), rounded to the decimals written in the text. Signs are ignored ("fell 23.2 %"
 for -0.232). Dates and clock times are split into their parts. German number style (21,7) is understood.
-A German short date without a year ("am 29.05.", "14.7.:") counts as a date only when the JSON has that day
-and month in an ISO date; "EUR 1,628m" in a JSON string also yields 1628 (English thousands separator).
+A German short date without a year ("am 29.05.", "14.7.:", also "am 14.04" without the closing dot when the
+month has two digits and no unit follows) counts as a date only when the JSON has that day and month in an
+ISO date; "EUR 1,628m" in a JSON string also yields 1628 (English thousands separator).
 Limitation: a small integer (e.g. "12") can match some unrelated value by chance; invented figures with
 decimals or large values are caught.
 """
@@ -22,7 +23,10 @@ import re
 
 _DATE_ISO = re.compile(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b")
 _DATE_DE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
-_DATE_DE_SHORT = re.compile(r"(?<![\d.,])(\d{1,2})\.(\d{1,2})\.(?![\d,])")  # "29.05." / "14.7.:", no year
+_DATE_DE_SHORT = re.compile(r"(?<![\d.,])(\d{1,2})\.(\d{1,2})\.(?!\d)")  # "29.05." / "14.7.:" / "14.04.,", no year
+# "am 14.04 und 03.02": no closing dot. Two-digit month only, and never before a unit, so "14.04 %" stays a number
+_DATE_DE_BARE = re.compile(r"(?<![\d.,])(\d{1,2})\.(\d{2})(?![\d.,])"
+                           r"(?!\s*(?:%|×|x\b|bps\b|Bp\b|Mio\b|Mrd\b|Tsd\b|EUR\b|€|Uhr\b|-?fach))")
 _THOUSANDS = re.compile(r"(?<![\d.,])\d{1,3}(?:,\d{3})+(?![\d,])")                       # "1,628" in "EUR 1,628m"
 _TIME = re.compile(r"\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b")
 _NUM = re.compile(r"(?<![\w.])[-+−]?\d+(?:[.,]\d+)?")
@@ -123,6 +127,7 @@ def unsupported_numbers(text: str, payload) -> list[str]:
     for m in _DATE_DE_SHORT.finditer(t):
         if (int(m.group(2)), int(m.group(1))) in days:  # a real date of the data, not a decimal number
             text = text.replace(m.group(0), " ", 1)
+    text = _DATE_DE_BARE.sub(lambda m: " " if (int(m.group(2)), int(m.group(1))) in days else m.group(0), text)
     bad = []
     for written, x, dec in _numbers(text):
         tol = 0.5 * 10 ** -dec + 1e-6

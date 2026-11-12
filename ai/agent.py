@@ -730,9 +730,11 @@ def fallback(question: str, isin: str, context=None, lang: str = "en") -> dict:
         else:
             text = nar.template_narrative(card, lang)
             act("card", day=td, event_id=ev["event_id"] if ev else None)
-    elif perf_period(q) or has("perform", "share price", "stock price", "price develop", "return", "how did we do",
-                               "kursentwicklung", "performance", "rendite", "aktienkurs", "wie lief") or \
-            re.search(r"how did (the|our|my) (share|stock)", q):
+    elif not has("unusual", "biggest", "largest", "strongest", "auffällig", "größte", "stärkste", "anomal", "spike") and (
+            # "our biggest moves this year" names a period too, but asks for the unusual days (branch below)
+            perf_period(q) or has("perform", "share price", "stock price", "price develop", "return", "how did we do",
+                                  "kursentwicklung", "performance", "rendite", "aktienkurs", "wie lief") or
+            re.search(r"how did (the|our|my) (share|stock)", q)):
         per = perf_period(q) or ctx.get("period") or "ytd"
         r = use("share_performance", period=per)
         if "error" in r:

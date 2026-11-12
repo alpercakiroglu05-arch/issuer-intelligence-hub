@@ -234,3 +234,17 @@ def test_assistant_glossary_calls_the_peer_move_an_average():
     from ai.agent import SYSTEM
     assert "equal-weighted average return of the other index members" in SYSTEM
     assert "median return of the other index members" not in SYSTEM and "cohort" not in SYSTEM.lower()
+
+
+@needs_data
+@pytest.mark.parametrize("question, lang", [("What were our biggest moves this year?", "en"),
+                                            ("Was waren unsere größten Bewegungen dieses Jahr?", "de")])
+def test_biggest_moves_this_year_lists_unusual_days_not_the_period_return(question, lang):
+    """The dock chip names a period ("this year") but asks for the unusual days."""
+    from ai import agent
+    r = agent.fallback(question, EVD, {"page": "dashboard", "period": "ytd"}, lang)
+    assert [s["tool"] for s in r["steps"]] == ["unusual_days"] and r["check"]["unsupported"] == []
+    assert r["actions"] and r["actions"][0]["view"] == "card"
+    perf = agent.fallback("How did our share do this year?", EVD, {"page": "dashboard", "period": "ytd"}, "en")
+    assert [s["tool"] for s in perf["steps"]] == ["share_performance"]
+
