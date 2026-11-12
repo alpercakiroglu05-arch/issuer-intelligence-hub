@@ -2,7 +2,7 @@
 
 **Deutsche Börse challenge, Futury Build Days #4 (Frankfurt, 11–12 Nov 2026)**
 
-The Issuer Intelligence Hub is a self-service tool for the IR team of an MDAX/SDAX company, which typically has no terminal and no analyst.
+The Issuer Intelligence Hub is a self-service tool for the IR team of a DAX, MDAX or SDAX company, above all the smaller ones, which typically have no terminal and no analyst.
 - **Part A** shows how the company's share normally trades.
 - **Part B** turns any announcement or unusual day into an **impact card**: what happened to price, turnover, trading cost, auctions and participants compared with normal, when the market started pricing the news, and how the event ranks against comparable events.
 - One click exports the card as a DE/EN IR snapshot.
