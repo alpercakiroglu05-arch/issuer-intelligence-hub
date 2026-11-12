@@ -138,10 +138,14 @@ def kpis(isin: str, days: int = 60) -> dict:
     idx = s["idx_latest"].iloc[-1]
     recent = s.tail(days)
 
+    # Being Public Guide p. 32: category A/B from the DAILY AVERAGE of the last four months (XLM and turnover).
+    # XLM exists only while the share is a DAX/MDAX/SDAX member: without it the category is unknown, not "B".
     lookback = s.tail(DS_LOOKBACK_DAYS)
     avg_turnover = float(lookback["turnover_eur"].mean())
-    xlm = float(lookback["xlm_25k"].median())
-    category = "A" if (xlm <= DS_XLM_MAX_BPS and avg_turnover >= DS_TURNOVER_MIN_EUR) else "B"
+    xlm_days = int(lookback["xlm_25k"].notna().sum())
+    xlm_avg = float(lookback["xlm_25k"].mean()) if xlm_days else None
+    xlm = float(lookback["xlm_25k"].median()) if xlm_days else None
+    category = _ds_category(lookback)
 
     # Index, sector and size medians: the one peer benchmark (engine.compare.peer_medians), same as web and report
     pm = peer_medians(isin, days)
@@ -167,10 +171,15 @@ def kpis(isin: str, days: int = 60) -> dict:
         "median_auction_share": pair("auction_share"),
         "median_agent_share": pair("agent_share"),
         "liquidity_check": {
-            "avg_turnover_eur_4m": avg_turnover, "median_xlm_25k_bps_4m": xlm,
-            "category_estimate": category,
-            "note": "Approximation of Xetra liquidity category A (XLM <= 100 bps and >= EUR 2.5m/day); "
-                    "category B needs a Designated Sponsor for continuous trading.",
+            "avg_turnover_eur_4m": avg_turnover, "avg_xlm_25k_bps_4m": xlm_avg, "median_xlm_25k_bps_4m": xlm,
+            "xlm_days_4m": xlm_days, "days_4m": int(len(lookback)),
+            "category_estimate": category,   # "A" | "B" | None (no XLM in the last four months)
+            "note": ("Estimate of the Xetra liquidity category from the daily average of the last four months: "
+                     "A = XLM (EUR 25k) <= 100 bps and order book turnover >= EUR 2.5m a day; "
+                     "B needs a Designated Sponsor for continuous trading."
+                     if category else
+                     "No XLM in the last four months (XLM exists only for DAX, MDAX and SDAX members), "
+                     "so the liquidity category cannot be estimated."),
         },
         "anomaly_days_last_period": int((anomalies(isin)["date"] >= recent["date"].min()).sum()),
         "peer_groups": {by: {k: g[k] for k in ("name", "label", "n", "fallback")} for by, g in groups.items()},
@@ -217,8 +226,9 @@ def _verdict(xlm_chg, to_chg, tol: float = LIQUIDITY_TREND_TOL) -> str:
 
 
 def _ds_category(frame: pd.DataFrame) -> str | None:
-    """Same rule as kpis(): XLM 25k <= DS_XLM_MAX_BPS and average turnover >= DS_TURNOVER_MIN_EUR -> A."""
-    xlm, avg = frame["xlm_25k"].median(), frame["turnover_eur"].mean()
+    """Being Public Guide p. 32, on daily averages: XLM (EUR 25k) <= DS_XLM_MAX_BPS and turnover >=
+    DS_TURNOVER_MIN_EUR -> "A", else "B"; None when the frame has no XLM (not an index member)."""
+    xlm, avg = frame["xlm_25k"].mean(), frame["turnover_eur"].mean()
     if pd.isna(xlm) or pd.isna(avg):
         return None
     return "A" if (xlm <= DS_XLM_MAX_BPS and avg >= DS_TURNOVER_MIN_EUR) else "B"

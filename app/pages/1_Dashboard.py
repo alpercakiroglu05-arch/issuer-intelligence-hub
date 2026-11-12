@@ -64,8 +64,8 @@ c[2].metric("Auction share", pct0(k["median_auction_share"]["stock"]),
 c[3].metric("Agent (client) share", pct0(k["median_agent_share"]["stock"]),
             f"{peer} {pct0(k['median_agent_share'][key])}", delta_color="off")
 lc = k["liquidity_check"]
-c[4].metric("Liquidity category (est.)", lc["category_estimate"],
-            f"4m: {eur(lc['avg_turnover_eur_4m'])}/day · {bps(lc['median_xlm_25k_bps_4m'])}", delta_color="off")
+c[4].metric("Liquidity category (est.)", lc["category_estimate"] or "n/a",
+            f"4m avg: {eur(lc['avg_turnover_eur_4m'])}/day · {bps(lc['avg_xlm_25k_bps_4m'])}", delta_color="off")
 
 # "Has our liquidity improved?" (engine.baseline.liquidity_trend, C2)
 st.markdown(f"**Has our liquidity improved?** · {trend['period']}")
