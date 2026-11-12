@@ -76,14 +76,13 @@ with the model in `.env`. It contains processed Deutsche Börse data: share it i
 
 ## Demo path (90 seconds)
 
-1. The app opens on the dashboard. Type `eventim` in the picker (or click the MDAX example) and choose **All**.
-2. Four tiles, then *You vs market* (price, turnover and trading cost against the MDAX, each with its rank) and
-   *Big market days* (how the share moved on the strongest index days).
-3. *Events & unusual days* -> row **26 Mar · 17:45 · Full-year results** -> the impact card opens in under a second.
-4. Card: stock-specific move -21.7 %, turnover 8.6x, rank 3 of 215; the minute chart marks **reaction in trading
-   from 09:03**; auctions and who traded; the AI summary loads after the numbers.
-5. **Test an explanation** -> "It was the overall market." -> "Not supported by the data", with wording the data supports.
-6. **Export PDF**, then switch to DE and export again. Optional: *see all* on the rank tile -> Compare.
+1. (0:00) Click **EVD CTS Eventim** → dashboard: €11.8m a day, 21.1 bps for €25k, liquidity stable, category A.
+2. (0:15) "Most unusual day this year: 27 March" → **Open its impact card**: −23.2 %, peers −1.5 %, stock-specific −21.7 %,
+   8.6× turnover, closing auction €25.6m (3.6×), reaction detected in trading at 09:03.
+3. (0:35) **Evidence brief** → type "The whole market sold off that day" → **Contradicted by the data**, with the
+   wording to use instead. Click "Funds / short sellers sold" → **Not testable with this data** (Xetra does not identify investors).
+4. (0:55) "See all of them" → **Compare**: rank 3 of 215 unusual MDAX days.
+5. (1:05) Press **A** → "Was this the market, or company-specific?" → the analyst runs the same check and cites the figures.
+6. (1:20) **IR snapshot** → main finding, limits, next step, explanations checked → Print / save as PDF. (Each card also has **Export IR report (PDF)**, one click.)
 
-Simple UI (12 Nov): one page per job, every number from `/api/dashboard`, `/api/card`, `/api/evidence` and
-`/api/compare`; `app.js` only formats and draws. The earlier UI is at the git tag `pre-ui`.
+URLs are shareable: `#/<ISIN>/<page>[/<day>/<event_id>]`, e.g. `#/DE0005470306/card/2026-03-27/EVD_FY_20260326`.
