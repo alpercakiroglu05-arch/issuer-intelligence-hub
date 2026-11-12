@@ -58,6 +58,8 @@ const TYPES = {FY: ["Full-year results", "Jahresergebnis"], Q1: ["Q1 results", "
   ADHOC: ["Ad hoc release", "Ad-hoc-Meldung"], GUIDANCE: ["Guidance change", "Prognoseänderung"], DIVIDEND_EX: ["Ex-dividend day", "Ex-Dividende"], AGM: ["Annual general meeting", "Hauptversammlung"],
   INDEX: ["Index change", "Indexänderung"], MA: ["Company news", "Unternehmensmeldung"], CMD: ["Capital markets day", "Kapitalmarkttag"], OTHER: ["Other news", "Sonstige Meldung"],
   UNUSUAL_DAY: ["Unusual day", "Auffälliger Tag"], NOTABLE_DAY: ["Unusual days", "Auffällige Tage"]};
+const SHORT = {FY: ["FY", "GJ"], Q1: ["Q1", "Q1"], H1: ["H1", "H1"], Q3: ["Q3", "Q3"], ADHOC: ["Ad hoc", "Ad hoc"], GUIDANCE: ["Guidance", "Prognose"], DIVIDEND_EX: ["Ex-div", "Ex-Div"],
+  AGM: ["AGM", "HV"], INDEX: ["Index", "Index"], MA: ["News", "Meldung"], CMD: ["CMD", "KMT"], OTHER: ["News", "Meldung"], UNUSUAL_DAY: ["Unusual", "Auffällig"]};
 const typeL = t => (TYPES[t] || [t, t])[de() ? 1 : 0];
 const CTX = {index_event: ["index change", "Indexänderung"], index_change: ["index change", "Indexänderung"], quarterly_expiry: ["quarterly expiry", "großer Verfall"], monthly_expiry: ["monthly expiry", "Monatsverfall"],
   month_end_review: ["index review date", "Index-Überprüfung"], market_wide_volume: ["market-wide volume", "marktweit hoher Umsatz"]};
@@ -124,7 +126,7 @@ function firstVisit() {
 
 /* ---------- dashboard ---------- */
 function timelineSVG(d) {
-  const tl = d.timeline, n = tl.date.length, W = 1040, H = 250, ml = 56, mr = 12, mt = 26, mb = 24, pw = W - ml - mr, ph = H - mt - mb;
+  const tl = d.timeline, n = tl.date.length, W = 1040, H = 300, ml = 56, mr = 12, mt = 72, mb = 24, pw = W - ml - mr, ph = H - mt - mb;
   const M = {turnover: ["turnover_eur", "index_turnover_eur", v => F.eur(v)], cost: ["xlm_25k", "index_xlm_25k", v => F.bps(v)], auction: ["auction_share", "index_auction_share", v => F.share(v)]}[S.metric];
   const a = tl[M[0]], b = tl[M[1]], max = Math.max(...a.filter(isN), ...b.filter(isN), 0) * 1.08 || 1;
   const x = i => ml + (i + .5) * pw / n, y = v => mt + ph - v / max * ph, bw = Math.max(1.5, pw / n * .62);
@@ -135,9 +137,11 @@ function timelineSVG(d) {
   g += S.metric === "turnover" ? a.map((v, i) => isN(v) ? `<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(mt + ph - y(v)).toFixed(1)}" fill="#c3cad5"><title>${F.day(tl.date[i], true)} · ${M[2](v)}</title></rect>` : "").join("")
     : `<path d="${path(a)}" fill="none" stroke="#1d4ed8" stroke-width="1.8"/>`;
   g += `<path d="${path(b)}" fill="none" stroke="#5b6472" stroke-width="1.2" stroke-dasharray="4 3"/>`;
-  const at = new Map(tl.date.map((dt, i) => [dt, i]));
-  g += d.events.concat(ownRows(d)).map(e => { const i = at.get(e.day); if (i === undefined) return ""; const X = x(i), ev = e.type !== "UNUSUAL_DAY";
-    return `<g class="mk" data-card="${e.day}" data-ev="${esc(e.event_id || "")}"><title>${F.day(e.day, true)} · ${esc(typeL(e.type))}${e.title ? " · " + esc(e.title) : ""}</title><line x1="${X}" x2="${X}" y1="${mt - 8}" y2="${mt + ph}" stroke="${ev ? "#1d4ed8" : "#b4530f"}" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/>${ev ? `<rect x="${X - 5}" y="${mt - 18}" width="10" height="10" fill="#1d4ed8"/>` : `<path d="M${X - 6},${mt - 8} L${X + 6},${mt - 8} L${X},${mt - 19} Z" fill="#b4530f"/>`}</g>`; }).join("");
+  const at = new Map(tl.date.map((dt, i) => [dt, i])), lanes = [-1e9, -1e9, -1e9];
+  g += d.events.concat(ownRows(d)).sort((p, q) => p.day.localeCompare(q.day)).map(e => { const i = at.get(e.day); if (i === undefined) return ""; const X = x(i), ev = e.type !== "UNUSUAL_DAY";
+    const label = (SHORT[e.type] || [e.type, e.type])[de() ? 1 : 0] + (isN(e.abn_ret) ? " " + F.pct(e.abn_ret, 0) : ""), w = label.length * 6.4 + 14;
+    let ln = lanes.findIndex(v => X - w / 2 > v + 4); if (ln < 0) ln = 0; lanes[ln] = X + w / 2; const Y = 4 + ln * 20;
+    return `<g class="mk" data-card="${e.day}" data-ev="${esc(e.event_id || "")}"><title>${F.day(e.day, true)} · ${esc(typeL(e.type))}${e.title ? " · " + esc(e.title) : ""}</title><line x1="${X}" x2="${X}" y1="${Y + 16}" y2="${mt + ph}" stroke="${ev ? "#0f2a5f" : "#b4530f"}" stroke-width="1" opacity=".35"/><rect x="${(X - w / 2).toFixed(1)}" y="${Y}" width="${w.toFixed(1)}" height="16" rx="8" fill="${ev ? "#0f2a5f" : "#fdf0e3"}"/><text x="${X}" y="${Y + 11.5}" text-anchor="middle" font-size="10.5" font-weight="600" fill="${ev ? "#fff" : "#8a3b08"}">${esc(label)}</text></g>`; }).join("");
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${L("Trading over time", "Handel im Zeitverlauf")}">${g}</svg>`;
 }
 const ownRows = d => ownEvents(S.isin).filter(e => e.reaction_day >= d.from && e.reaction_day <= d.to).map(e => ({day: e.reaction_day, published: e.date, time: e.time_local || null, timing: e.timing, event_id: e.event_id, type: e.type, title: e.title, own: true, context: []}));
@@ -150,19 +154,30 @@ function dashboard(d) {
   const grp = Object.values(vm.groups).map(g => `<tr><td>${g.name === "10 closest by turnover" || /closest/.test(g.name) ? L(`Similar size (${g.n} closest by turnover)`, `Ähnliche Größe (${g.n} nächste nach Umsatz)`) : esc(g.name) + ` (${g.n})`}</td><td class="r">${F.eur(g.turnover_eur)}</td><td class="r">${F.bps(g.xlm_25k)}</td></tr>`).join("");
   const rows = d.events.concat(ownRows(d)).sort((a, b) => b.day.localeCompare(a.day));
   return `<div class="wrap stack">
-  <section><h1>${esc(d.name)}</h1>
-    <div class="meta"><span>${esc(d.ticker)} · ${esc(idx)}${d.sector ? " · " + esc(d.sector) : ""}</span><span>${cat}</span><span class="grey">${d.isin}</span></div>
-    <div class="tiles">
-      ${tile(L("Turnover per day", "Umsatz pro Tag"), F.eur(t.turnover_eur.stock), L(`${idx} median ${F.eur(t.turnover_eur.index)}`, `${idx}-Median ${F.eur(t.turnover_eur.index)}`))}
-      ${tile(L("Trading cost, €25k order", "Handelskosten, 25-Tsd.-€-Order"), F.bps(t.xlm_25k.stock), L(`${idx} median ${F.bps(t.xlm_25k.index)}`, `${idx}-Median ${F.bps(t.xlm_25k.index)}`))}
-      ${tile(L("Price", "Kurs"), F.pct(t.price.stock), L(`${idx} ${F.pct(t.price.index)}`, `${idx} ${F.pct(t.price.index)}`), cls(t.price.stock))}
-      ${tile(L("Unusual days", "Auffällige Tage"), String(t.unusual_days), per)}
-    </div></section>
+  <section><div class="eyebrow">${esc(d.ticker)} · ${esc(idx)}${d.sector ? " · " + esc(d.sector) : ""} · ${per}</div><h1>${esc(d.name)}</h1>
+    <p class="lede">${L(`Traded <b>${F.eur(t.turnover_eur.stock)}</b> a day (${idx} median ${F.eur(t.turnover_eur.index)}) at a cost of <b>${F.bps(t.xlm_25k.stock)}</b> for a €25k order (${F.bps(t.xlm_25k.index)}). The share moved <b>${F.pct(t.price.stock)}</b>, the ${idx} ${F.pct(t.price.index)}. <b>${t.unusual_days}</b> unusual ${t.unusual_days === 1 ? "day" : "days"}.`,
+      `Umsatz <b>${F.eur(t.turnover_eur.stock)}</b> pro Tag (${idx}-Median ${F.eur(t.turnover_eur.index)}) bei Kosten von <b>${F.bps(t.xlm_25k.stock)}</b> für eine 25-Tsd.-€-Order (${F.bps(t.xlm_25k.index)}). Die Aktie bewegte sich um <b>${F.pct(t.price.stock)}</b>, der ${idx} um ${F.pct(t.price.index)}. <b>${t.unusual_days}</b> ${t.unusual_days === 1 ? "auffälliger Tag" : "auffällige Tage"}.`)}</p>
+    <div class="meta"><span>${cat}</span><span class="grey">${d.isin}</span></div>
+</section>
 
-  <section class="card"><div class="sec-h"><h2>${L("Trading over time", "Handel im Zeitverlauf")}</h2>
+  <section class="card"><div class="sec-h"><h2>${L("The period at a glance", "Der Zeitraum auf einen Blick")}</h2>
       <div class="seg" role="group">${[["turnover", L("Turnover", "Umsatz")], ["cost", L("Trading cost", "Handelskosten")], ["auction", L("Auction share", "Auktionsanteil")]].map(([v, x]) => `<button data-metric="${v}" aria-pressed="${S.metric === v}">${x}</button>`).join("")}</div></div>
     <div id="tchart">${timelineSVG(d)}</div>
-    <p class="note">${L(`Dashed: ${idx} median. ■ announcement · ▲ unusual day: click to open the impact card.`, `Gestrichelt: ${idx}-Median. ■ Meldung · ▲ auffälliger Tag: Klick öffnet die Impact Card.`)}${S.metric === "auction" ? " " + L("Auction share: 10-day rolling median.", "Auktionsanteil: gleitender 10-Tage-Median.") : ""}${S.metric === "cost" ? " " + L("Trading cost = XLM, the round-trip cost of a €25k order in basis points.", "Handelskosten = XLM, die Kosten für Kauf und Verkauf einer 25-Tsd.-€-Order in Basispunkten.") : ""}</p></section>
+    <p class="note">${L(`Every announcement and unusual day of the period, with its stock-specific move. Click one to open its impact card. Dashed: ${idx} median.`, `Jede Meldung und jeder auffällige Tag des Zeitraums mit der titelspezifischen Bewegung. Klick öffnet die Impact Card. Gestrichelt: ${idx}-Median.`)}${S.metric === "auction" ? " " + L("Auction share: 10-day rolling median.", "Auktionsanteil: gleitender 10-Tage-Median.") : ""}${S.metric === "cost" ? " " + L("Trading cost = XLM, the round-trip cost of a €25k order in basis points.", "Handelskosten = XLM, die Kosten für Kauf und Verkauf einer 25-Tsd.-€-Order in Basispunkten.") : ""}</p></section>
+
+  <section class="card"><div class="sec-h"><h2>${L("Events & unusual days", "Ereignisse & auffällige Tage")}</h2>
+      ${S.status.offline ? "" : `<button class="btn small" data-act="addev">${L("Add your calendar", "Eigenen Kalender ergänzen")}</button>`}</div>
+    ${S.addEv ? `<form class="form" id="evform"><input type="date" id="ev-d" required min="${d.from}" max="${d.to}" aria-label="${L("Date", "Datum")}"><input type="time" id="ev-t" aria-label="${L("Time", "Uhrzeit")}"><select id="ev-y" aria-label="${L("Type", "Typ")}">${["ADHOC", "FY", "Q1", "H1", "Q3", "GUIDANCE", "DIVIDEND_EX", "AGM", "CMD", "OTHER"].map(x => `<option value="${x}">${typeL(x)}</option>`).join("")}</select><input id="ev-n" placeholder="${L("What was announced", "Was wurde gemeldet")}" required><button class="btn primary" type="submit">${L("Add", "Hinzufügen")}</button></form>
+      <p class="note">${L("Or import a file (CSV with date, time, type, title; or ICS):", "Oder Datei importieren (CSV mit date, time, type, title; oder ICS):")} <input type="file" id="ev-f" accept=".csv,.ics,text/csv,text/calendar"></p>` : ""}
+    ${S.calMsg ? `<p class="note">${esc(S.calMsg)}</p>` : ""}
+    <div class="scroll"><table><thead><tr><th>${L("Published", "Veröffentlicht")}</th><th>${L("What", "Was")}</th><th class="r">${L("Stock-specific move", "Titelspezifische Bewegung")}</th><th class="r">${L("Turnover vs normal", "Umsatz vs. normal")}</th><th>${L("Market context", "Marktkontext")}</th><th></th></tr></thead><tbody>
+    ${rows.length ? rows.map(e => { const ev = e.type !== "UNUSUAL_DAY", next = ev && e.published && e.published !== e.day;
+      return `<tr class="go" data-card="${e.day}" data-ev="${esc(e.event_id || "")}"><td style="white-space:nowrap">${F.day(ev ? e.published : e.day)}${e.time ? " · " + esc(e.time) : ""}${next ? `<div class="grey">${L("reaction", "Reaktion")} ${F.day(e.day)}</div>` : ""}</td>
+        <td><span class="tag">${e.own ? L("Own · ", "Eigen · ") : ""}${esc(typeL(e.type))}</span>${e.unusual ? ` <span class="tag warn">${L("unusual", "auffällig")}</span>` : ""}<div>${ev ? esc(e.title) : `<span class="sub">${L("No announcement in the calendar; the data does not show why.", "Keine Meldung im Kalender; die Daten zeigen nicht, warum.")}</span>`}</div></td>
+        <td class="r ${cls(e.abn_ret)}"><b>${e.own ? "" : F.pct(e.abn_ret)}</b></td><td class="r">${e.own ? "" : F.x(e.vol_ratio)}</td><td class="sub">${ctxL(e.context)}</td><td class="r"><a href="#" tabindex="-1">${L("Impact card", "Impact Card")}</a></td></tr>`; }).join("")
+      : `<tr><td colspan="6" class="sub">${L("No announcement or unusual day in this period. Choose a longer period.", "Keine Meldung und kein auffälliger Tag in diesem Zeitraum. Längeren Zeitraum wählen.")}</td></tr>`}
+    </tbody></table></div>
+    <p class="note">${L("Unusual = turnover or stock-specific move far outside the share's own normal, or trading cost at twice normal. Stock-specific move = share minus the other index members.", "Auffällig = Umsatz oder titelspezifische Bewegung weit außerhalb des eigenen Normalbereichs oder doppelte Handelskosten. Titelspezifische Bewegung = Aktie minus andere Indexmitglieder.")}</p></section>
 
   <section class="card"><div class="sec-h"><h2>${L("You vs market", "Sie und der Markt")}</h2><span class="sub">${per} · ${F.day(d.from)} – ${F.day(d.to, true)}</span></div>
     <div class="scroll"><table><thead><tr><th></th><th class="r">${esc(d.ticker)}</th><th class="r">${esc(idx)}*</th><th class="r">${L(`Rank in ${idx}`, `Rang im ${idx}`)}</th></tr></thead><tbody>
@@ -181,20 +196,6 @@ function dashboard(d) {
     ${d.market_days.map(r => `<tr class="go" data-card="${r.date}"><td>${F.day(r.date)}${r.why === "market_wide_volume" ? ` <span class="tag">${L("market-wide volume", "marktweit hoher Umsatz")}</span>` : ""}</td><td class="r">${F.pct(r.index_ret)}</td><td class="r">${F.pct(r.ret)}</td><td class="r ${cls(r.abn_ret)}"><b>${F.pct(r.abn_ret)}</b></td><td class="r">${F.x(r.vol_ratio)}</td><td class="r">${F.x(r.xlm_ratio)}</td><td class="r"><a href="#" tabindex="-1">${L("Impact card", "Impact Card")}</a></td></tr>`).join("")}
     </tbody></table></div>
     <p class="note">${L(`The ${d.market_days.length} strongest ${idx} days of the period: largest index moves, plus days with market-wide high volume.`, `Die ${d.market_days.length} stärksten ${idx}-Tage des Zeitraums: größte Indexbewegungen sowie Tage mit marktweit hohem Umsatz.`)}</p></section>
-
-  <section class="card"><div class="sec-h"><h2>${L("Events & unusual days", "Ereignisse & auffällige Tage")}</h2>
-      ${S.status.offline ? "" : `<button class="btn small" data-act="addev">${L("Add your calendar", "Eigenen Kalender ergänzen")}</button>`}</div>
-    ${S.addEv ? `<form class="form" id="evform"><input type="date" id="ev-d" required min="${d.from}" max="${d.to}" aria-label="${L("Date", "Datum")}"><input type="time" id="ev-t" aria-label="${L("Time", "Uhrzeit")}"><select id="ev-y" aria-label="${L("Type", "Typ")}">${["ADHOC", "FY", "Q1", "H1", "Q3", "GUIDANCE", "DIVIDEND_EX", "AGM", "CMD", "OTHER"].map(x => `<option value="${x}">${typeL(x)}</option>`).join("")}</select><input id="ev-n" placeholder="${L("What was announced", "Was wurde gemeldet")}" required><button class="btn primary" type="submit">${L("Add", "Hinzufügen")}</button></form>
-      <p class="note">${L("Or import a file (CSV with date, time, type, title; or ICS):", "Oder Datei importieren (CSV mit date, time, type, title; oder ICS):")} <input type="file" id="ev-f" accept=".csv,.ics,text/csv,text/calendar"></p>` : ""}
-    ${S.calMsg ? `<p class="note">${esc(S.calMsg)}</p>` : ""}
-    <div class="scroll"><table><thead><tr><th>${L("Published", "Veröffentlicht")}</th><th>${L("What", "Was")}</th><th class="r">${L("Stock-specific move", "Titelspezifische Bewegung")}</th><th class="r">${L("Turnover vs normal", "Umsatz vs. normal")}</th><th>${L("Market context", "Marktkontext")}</th><th></th></tr></thead><tbody>
-    ${rows.length ? rows.map(e => { const ev = e.type !== "UNUSUAL_DAY", next = ev && e.published && e.published !== e.day;
-      return `<tr class="go" data-card="${e.day}" data-ev="${esc(e.event_id || "")}"><td style="white-space:nowrap">${F.day(ev ? e.published : e.day)}${e.time ? " · " + esc(e.time) : ""}${next ? `<div class="grey">${L("reaction", "Reaktion")} ${F.day(e.day)}</div>` : ""}</td>
-        <td><span class="tag">${e.own ? L("Own · ", "Eigen · ") : ""}${esc(typeL(e.type))}</span>${e.unusual ? ` <span class="tag warn">${L("unusual", "auffällig")}</span>` : ""}<div>${ev ? esc(e.title) : `<span class="sub">${L("No announcement in the calendar; the data does not show why.", "Keine Meldung im Kalender; die Daten zeigen nicht, warum.")}</span>`}</div></td>
-        <td class="r ${cls(e.abn_ret)}"><b>${e.own ? "" : F.pct(e.abn_ret)}</b></td><td class="r">${e.own ? "" : F.x(e.vol_ratio)}</td><td class="sub">${ctxL(e.context)}</td><td class="r"><a href="#" tabindex="-1">${L("Impact card", "Impact Card")}</a></td></tr>`; }).join("")
-      : `<tr><td colspan="6" class="sub">${L("No announcement or unusual day in this period. Choose a longer period.", "Keine Meldung und kein auffälliger Tag in diesem Zeitraum. Längeren Zeitraum wählen.")}</td></tr>`}
-    </tbody></table></div>
-    <p class="note">${L("Unusual = turnover or stock-specific move far outside the share's own normal, or trading cost at twice normal. Stock-specific move = share minus the other index members.", "Auffällig = Umsatz oder titelspezifische Bewegung weit außerhalb des eigenen Normalbereichs oder doppelte Handelskosten. Titelspezifische Bewegung = Aktie minus andere Indexmitglieder.")}</p></section>
   </div>`;
 }
 
@@ -218,7 +219,7 @@ function intradaySVG(d) {
 }
 function cardView(d, ev) {
   const c = d.card, p = c.price, v = c.volume, l = c.liquidity, a = c.auctions || {}, pa = c.participants || {}, e = c.event, cm = c.comparison, rk = d.rank && d.rank[S.lang];
-  const isEv = e.type !== "NOTABLE_DAY", pub = e.datetime_local;
+  const isEv = e.type !== "NOTABLE_DAY", pub = e.datetime_local, on = c.intraday && c.intraday.onset && c.intraday.onset.time;
   const tile = (k, val, s, cl = "") => `<div class="tile"><div class="k">${k}</div><div class="v ${cl}">${val}</div><div class="s">${s}</div></div>`;
   const b = ev && !ev.error ? ev[S.lang] : null;
   const first = b ? b.sections.filter(s => ["market", "trading", "unknown"].includes(s.key)).map(s => `<li><b>${esc(s.title)}:</b> ${esc(s.points[0])}</li>`).join("") : "";
@@ -232,6 +233,8 @@ function cardView(d, ev) {
       <span>${L("Trading day", "Handelstag")} <b>${F.day(e.reaction_day, true)}</b></span>
       ${e.source_url ? `<a href="${esc(e.source_url)}" target="_blank" rel="noopener">${L("Source", "Quelle")} ↗</a>` : ""}</div>
     <h1>${isEv ? esc(e.title) : L("Unusual trading day", "Auffälliger Handelstag")}</h1>
+    <p class="lede">${L(`${esc(c.name)} moved <b>${F.pct(p.ret)}</b>; the ${c.index} ${F.pct(p.peer_ret)}. <b>${F.pct(p.abn_ret)}</b> was stock-specific, on <b>${F.x(v.ratio)}</b> normal turnover.${on ? ` Trading reacted from <b>${on}</b>.` : ""}`,
+      `${esc(c.name)} bewegte sich um <b>${F.pct(p.ret)}</b>; der ${c.index} um ${F.pct(p.peer_ret)}. <b>${F.pct(p.abn_ret)}</b> waren titelspezifisch, bei <b>${F.x(v.ratio)}</b>em Umsatz.${on ? ` Der Handel reagierte ab <b>${on}</b>.` : ""}`)}</p>
     <div class="tiles">
       ${tile(L("Stock-specific move", "Titelspezifische Bewegung"), F.pct(p.abn_ret), L(`share ${F.pct(p.ret)} · ${c.index} ${F.pct(p.peer_ret)}`, `Aktie ${F.pct(p.ret)} · ${c.index} ${F.pct(p.peer_ret)}`), cls(p.abn_ret))}
       ${tile(L("Turnover", "Umsatz"), F.x(v.ratio), L(`${F.eur(v.turnover_eur)} · normal ${F.eur(v.baseline_eur)}`, `${F.eur(v.turnover_eur)} · normal ${F.eur(v.baseline_eur)}`))}
@@ -240,6 +243,15 @@ function cardView(d, ev) {
     </div></section>
 
   <section class="card"><div class="sec-h"><h2>${L("The day, minute by minute", "Der Tag, Minute für Minute")}</h2><span class="sub">${L("price vs previous close", "Kurs gegenüber Vortagesschluss")}</span></div>${intradaySVG(d)}</section>
+
+  <section class="card"><div class="sec-h"><h2>${L("Test an explanation", "Eine Erklärung prüfen")}</h2><span class="sub">${L("Fixed rules on the figures above; no language model.", "Feste Regeln auf den Zahlen oben; kein Sprachmodell.")}</span></div>
+    ${b ? `<div class="claims">${Object.entries(b.claims).map(([k, x]) => `<button class="chip" data-claim="${k}" aria-pressed="${S.claim === k}">${esc(x.label)}</button>`).join("")}</div>
+      ${cl ? `<div class="verdict"><b class="v">${VL[cl.verdict] || cl.verdict}.</b>${esc(cl.text)}${cl.better ? `<p class="note" style="margin-top:8px"><b>${L("Wording the data supports:", "Formulierung, die die Daten stützen:")}</b> ${esc(cl.better)}</p>` : ""}</div>` : ""}` : `<div class="skel"></div>`}</section>
+
+  <section class="card"><h2 style="margin-bottom:8px">${L("Summary", "Zusammenfassung")}</h2><div id="ai"><div class="skel"></div><div class="skel" style="width:80%"></div></div></section>
+
+  <section class="card"><h2 style="margin-bottom:8px">${L("Evidence", "Belege")}</h2>
+    ${b ? `<p><b>${esc(b.headline)}</b></p><ul style="margin:8px 0 0;padding-left:18px">${first}</ul><details ${S.more ? "open" : ""}><summary>${L("Show every point", "Alle Punkte zeigen")}</summary>${all}</details>` : ev && ev.error ? `<p class="sub">${esc(ev.error)}</p>` : `<div class="skel"></div><div class="skel" style="width:70%"></div>`}</section>
 
   <div class="two">
     <section class="card"><h2 style="margin-bottom:8px">${L("Auctions", "Auktionen")}</h2>
@@ -254,15 +266,6 @@ function cardView(d, ev) {
       <div class="kv"><span>${L("Market makers", "Market Maker")}</span><b>${F.share(pa.mm_share)}</b></div>
       <p class="note">${L("Xetra flows show these three groups only; they do not identify funds or retail investors.", "Xetra-Flüsse zeigen nur diese drei Gruppen; sie identifizieren weder Fonds noch Privatanleger.")}</p></section>
   </div>
-
-  <section class="card"><h2 style="margin-bottom:8px">${L("Summary", "Zusammenfassung")}</h2><div id="ai"><div class="skel"></div><div class="skel" style="width:80%"></div></div></section>
-
-  <section class="card"><h2 style="margin-bottom:8px">${L("Evidence", "Belege")}</h2>
-    ${b ? `<p><b>${esc(b.headline)}</b></p><ul style="margin:8px 0 0;padding-left:18px">${first}</ul><details ${S.more ? "open" : ""}><summary>${L("Show every point", "Alle Punkte zeigen")}</summary>${all}</details>` : ev && ev.error ? `<p class="sub">${esc(ev.error)}</p>` : `<div class="skel"></div><div class="skel" style="width:70%"></div>`}</section>
-
-  <section class="card"><div class="sec-h"><h2>${L("Test an explanation", "Eine Erklärung prüfen")}</h2><span class="sub">${L("Fixed rules on the figures above; no language model.", "Feste Regeln auf den Zahlen oben; kein Sprachmodell.")}</span></div>
-    ${b ? `<div class="claims">${Object.entries(b.claims).map(([k, x]) => `<button class="chip" data-claim="${k}" aria-pressed="${S.claim === k}">${esc(x.label)}</button>`).join("")}</div>
-      ${cl ? `<div class="verdict"><b class="v">${VL[cl.verdict] || cl.verdict}.</b>${esc(cl.text)}${cl.better ? `<p class="note" style="margin-top:8px"><b>${L("Wording the data supports:", "Formulierung, die die Daten stützen:")}</b> ${esc(cl.better)}</p>` : ""}</div>` : ""}` : `<div class="skel"></div>`}</section>
 
   <p class="note">${L(`Normal = median of the ${c.baseline.days_used} trading days ending a week before the day. The reaction time is read from trades (price beyond 2 standard deviations and turnover 3 times normal for the time of day); it is not the publication time.`, `Normal = Median der ${c.baseline.days_used} Handelstage bis eine Woche vor dem Tag. Die Reaktionszeit wird aus dem Handel gelesen (Kurs jenseits von 2 Standardabweichungen und 3-facher Umsatz für die Tageszeit); sie ist nicht die Veröffentlichungszeit.`)}</p>
   </div>`;
