@@ -4,6 +4,12 @@
 
 Futury Build Days 2026 · Deutsche Börse challenge *"Issuer Intelligence Hub and corporate event impact tracker"*
 
+🥈 **2nd place – Deutsche Börse Challenge, Futury Build Days 2026 (Frankfurt)**
+
+**Team 9:** [Oğuzhan](https://github.com/Bthn28) · [Alper](https://github.com/alpercakiroglu05-arch) · [Kaan](https://github.com/ydnka)
+
+
+> Deutsche Börse trading data is not included in this repository.
 ---
 
 ## Table of contents
